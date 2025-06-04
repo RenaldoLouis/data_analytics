@@ -23,13 +23,13 @@ const FormNewDataSet = () => {
     return (
         <Dialog>
             <FormProvider {...methods}>
-                <form onSubmit={methods.handleSubmit(onSubmit)}>
-                    <DialogTrigger asChild>
-                        <Button variant="link" className="cursor-pointer">Button</Button>
-                    </DialogTrigger>
-                    <DialogContent className="px-0">
+                <DialogTrigger asChild>
+                    <Button variant="link" className="cursor-pointer">Button</Button>
+                </DialogTrigger>
+                <DialogContent className="px-0">
+                    <form onSubmit={methods.handleSubmit(onSubmit)}>
                         <DialogHeader>
-                            <DialogTitle className="px-6">
+                            <DialogTitle className="px-6 py-3">
                                 New Data Set
                                 <Separator />
                             </DialogTitle>
@@ -41,16 +41,17 @@ const FormNewDataSet = () => {
                             </div>
                             <FileUpload />
                         </div>
-                        <DialogFooter className="px-6">
+                        <DialogFooter className="px-6 py-3">
                             <DialogClose asChild>
-                                <Button variant="outline">Cancel</Button>
+                                <Button variant="outline" type="button">Cancel</Button>
                             </DialogClose>
                             <Button type="submit">Save changes</Button>
                         </DialogFooter>
-                    </DialogContent>
-                </form>
+                    </form>
+                </DialogContent>
             </FormProvider>
         </Dialog>
+
     )
 }
 
