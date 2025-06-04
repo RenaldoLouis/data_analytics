@@ -1,22 +1,9 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { DataTable } from "@/components/data-table"
-import { FileUpload } from "@/components/fileUpload"
 import { SectionCards } from "@/components/section-cards"
 import { SiteHeader } from "@/components/site-header"
 import { Alert, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import {
   SidebarInset,
@@ -25,6 +12,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { H3 } from "@/components/ui/typography"
 import data from "./data.json"
+import FormNewDataSet from "./FormNewDataSet"
 
 export default function Page() {
   return (
@@ -58,39 +46,7 @@ export default function Page() {
               <div className="px-4 lg:px-6">
                 <Alert variant="default" className="flex justify-between items-center">
                   <AlertTitle>You don’t have any data sets. Add data sets first in order to make chart</AlertTitle>
-                  <Dialog >
-                    <form>
-                      <DialogTrigger asChild>
-                        <Button variant="link" className="cursor-pointer">Button</Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px] px-0">
-                        <DialogHeader>
-                          <DialogTitle className="px-6">
-                            New Data Set
-                            <Separator />
-                          </DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 px-6">
-                          <div className="grid gap-3">
-                            <Label htmlFor="name-1">Name</Label>
-                            <Input id="name-1" name="name" defaultValue="Pedro Duarte" />
-                          </div>
-                          {/* <div className="grid w-full max-w-sm items-center gap-3">
-                            <Label htmlFor="picture">Picture</Label>
-                            <Input id="picture" type="file" />
-                          </div> */}
-                          <FileUpload />
-                        </div>
-                        <DialogFooter className="px-6">
-                          <DialogClose asChild>
-                            <Button variant="outline" >Cancel</Button>
-                          </DialogClose>
-                          <Button type="submit">Save changes</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </form>
-                  </Dialog>
-
+                  <FormNewDataSet />
                 </Alert>
               </div>
               <SectionCards />
