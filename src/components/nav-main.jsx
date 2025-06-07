@@ -1,25 +1,30 @@
 "use client"
 
-import { IconCirclePlusFilled, IconMail } from "@tabler/icons-react";
-
-import { Button } from "@/components/ui/button"
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import { useRouter } from 'next/navigation';
 
 export function NavMain({
   items
 }) {
+  const router = useRouter();
+
+  const handleClickMenu = (menu) => {
+    router.push(menu);
+
+  }
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">
-            <SidebarMenuButton
+            {/* <SidebarMenuButton
               tooltip="Quick Create"
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear">
               <IconCirclePlusFilled />
@@ -31,13 +36,13 @@ export function NavMain({
               variant="outline">
               <IconMail />
               <span className="sr-only">Inbox</span>
-            </Button>
+            </Button> */}
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
           {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title}>
+            <SidebarMenuItem key={item.title} onClick={() => handleClickMenu(item.url)} style={{ background: "#EAF3FB" }}>
+              <SidebarMenuButton tooltip={item.title} className="cursor-pointer">
                 {item.icon && <item.icon />}
                 <span>{item.title}</span>
               </SidebarMenuButton>

@@ -43,9 +43,9 @@ const FormNewDataSet = () => {
                         </div>
                         <DialogFooter className="px-6 py-3">
                             <DialogClose asChild>
-                                <Button variant="outline" type="button">Cancel</Button>
+                                <Button variant="outline" type="button" className="cursor-pointer">Cancel</Button>
                             </DialogClose>
-                            <Button type="submit">Save changes</Button>
+                            <Button type="submit" className="cursor-pointer">Save changes</Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
