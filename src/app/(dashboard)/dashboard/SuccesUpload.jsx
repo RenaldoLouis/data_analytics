@@ -17,7 +17,6 @@ const SuccessUpload = (props) => {
     const { setUploadDone } = props
 
     const handleClickNext = () => {
-        setUploadDone(null)
         closeRef.current?.click()
         router.push(SideMenubarUrl.DataSets);
     }
@@ -39,7 +38,7 @@ const SuccessUpload = (props) => {
             </DialogHeader>
             <DialogFooter className="px-6 py-3">
                 <DialogClose asChild>
-                    <Button ref={closeRef} onClick={() => setUploadDone(null)} variant="outline" type="button" className="cursor-pointer">Close</Button>
+                    <Button ref={closeRef} variant="outline" type="button" className="cursor-pointer">Close</Button>
                 </DialogClose>
                 <Button onClick={handleClickNext} type="submit" className="cursor-pointer">Next</Button>
             </DialogFooter>

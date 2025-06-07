@@ -26,9 +26,9 @@ const WarningUpload = (props) => {
             </DialogHeader>
             <DialogFooter className="px-6 py-3">
                 <DialogClose asChild>
-                    <Button onClick={() => setUploadDone(null)} variant="outline" type="button" className="cursor-pointer">Close</Button>
+                    <Button variant="outline" type="button" className="cursor-pointer">Close</Button>
                 </DialogClose>
-                <Button onClick={() => setUploadDone(null)} type="submit" className="cursor-pointer">Next</Button>
+                <Button type="submit" className="cursor-pointer">Next</Button>
             </DialogFooter>
         </div>
     )

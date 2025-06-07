@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { UploadStatus } from "@/constant/UploadStatus"
 import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
+import { toast } from "sonner"
 import NewUpload from "./NewUpload"
 import SuccessUpload from "./SuccesUpload"
 import WarningUpload from "./WarningUpload"
@@ -27,6 +28,29 @@ const FormNewDataSet = () => {
 
     const onSubmit = (data) => {
         console.log("Form submitted:", data)
+        // TO DO: juat uplaod file to backend
+        // services.dataset.addNewDataSet("file").then((res) => {
+        //     if (res.status === 200) {
+        //         toast("Event has been created", {
+        //             description: "Sunday, December 03, 2023 at 9:00 AM",
+        //             action: {
+        //                 label: "Undo",
+        //                 onClick: () => console.log("Undo"),
+        //             },
+        //         })
+        //     } else {
+        //         throw new Error("Email sending failed with status " + res.status);
+        //     }
+        // })
+
+        toast("Event has been created", {
+            description: "Sunday, December 03, 2023 at 9:00 AM",
+            action: {
+                label: "Undo",
+                onClick: () => console.log("Undo"),
+            },
+        })
+
         setUploadDone(UploadStatus.dataClear)
     }
 
@@ -64,7 +88,7 @@ const FormNewDataSet = () => {
         <Dialog>
             <FormProvider {...methods}>
                 <DialogTrigger asChild>
-                    <Button variant="link" className="cursor-pointer">Button</Button>
+                    <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Button</Button>
                 </DialogTrigger>
                 <DialogContent className="px-0 py-0" showCloseButton={false}>
                     {dialogContent()}
