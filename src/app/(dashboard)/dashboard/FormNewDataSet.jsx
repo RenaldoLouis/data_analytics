@@ -36,24 +36,24 @@ const FormNewDataSet = () => {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
 
             if (res.status === 200) {
-                toast("Dataset uploaded successfully", {
-                    description: "File has been uploaded.",
-                    // action: {
-                    //     label: "Undo",
-                    //     onClick: () => console.log("Undo"),
-                    // },
-                });
+                // toast("Dataset uploaded successfully", {
+                //     description: "File has been uploaded.",
+                //     action: {
+                //         label: "action",
+                //         onClick: () => console.log("action"),
+                //     },
+                // });
+                setUploadDone(UploadStatus.dataClear);
             } else {
                 throw new Error("Upload failed with status " + res.status);
             }
 
-            // setUploadDone(UploadStatus.dataClear);
         } catch (error) {
             toast("Upload failed", {
                 description: error.message,
             });
 
-            // setUploadDone(UploadStatus.dataClear);
+            setUploadDone(UploadStatus.dataClear);
         }
     };
 
