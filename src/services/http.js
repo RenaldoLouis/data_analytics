@@ -45,33 +45,70 @@ class HttpService {
   }
 
   get(url) {
-    return this.axios.get(url);
+    return this.axios.get(url, {
+      baseURL: this.baseURL,
+      headers: {
+        'Authorization': `Bearer ${this.authToken ?? ''}`,
+        'Content-Type': 'application/json',
+      },
+    });
   }
 
   post(url, payload) {
-    return this.axios.post(url, payload);
+    return this.axios.post(url, payload, {
+      baseURL: this.baseURL,
+      headers: {
+        Authorization: `Bearer ${this.authToken ?? ''}`,
+        'Content-Type': 'application/json',
+      }
+    });
   }
-  postBlob(url, payload) {
-    return this.axios.post(url, payload, { responseType: 'blob' });
+
+  postFormData(url, payload) {
+    return this.axios.post(url, payload, {
+      baseURL: this.baseURL,
+      headers: {
+        Authorization: `Bearer ${this.authToken ?? ''}`,
+        'Content-Type': 'multipart/form-data'
+      }
+    });
   }
 
   put(url, payload) {
-    return this.axios.put(url, payload);
+    return this.axios.put(url, {
+      baseURL: this.baseURL,
+      headers: {
+        'Authorization': `Bearer ${this.authToken ?? ''}`,
+        'Content-Type': 'application/json',
+      },
+      data: payload,
+    });
   }
 
   patch(url, payload) {
-    return this.axios.patch(url, payload);
+    return this.axios.patch(url, {
+      baseURL: this.baseURL,
+      headers: {
+        'Authorization': `Bearer ${this.authToken ?? ''}`,
+        'Content-Type': 'application/json',
+      },
+      data: payload,
+    });
   }
 
   delete(url, payload) {
     return this.axios.delete(url, {
       baseURL: this.baseURL,
       headers: {
-        'auth-token': this.authToken ?? '',
+        'Authorization': `Bearer ${this.authToken ?? ''}`,
         'Content-Type': 'application/json',
       },
       data: payload,
     });
+  }
+
+  postBlob(url, payload) {
+    return this.axios.post(url, payload, { responseType: 'blob' });
   }
 }
 

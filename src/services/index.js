@@ -23,6 +23,15 @@ const postRequest = async (path, payload) => {
     }
 };
 
+const postFormRequest = async (path, payload) => {
+    try {
+        const res = await http.postFormData(path, payload);
+        return res;
+    } catch (err) {
+        return handleErrors(err);
+    }
+};
+
 const postBlobRequest = async (path, payload) => {
     try {
         const res = await http.postBlob(path, payload);
@@ -87,6 +96,6 @@ export default {
         downloadFiles: (files) => postBlobRequest(`/api/v1/apcs/download-files-aws`, files),
     },
     dataset: {
-        addNewDataSet: (files) => postBlobRequest(`/api/v1/apcs/download-files-aws`, files),
+        addNewDataSet: (files) => postFormRequest(`/dataset`, files),
     }
 };

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { UploadStatus } from "@/constant/UploadStatus"
+import services from "@/services"
 import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -26,33 +27,35 @@ const FormNewDataSet = () => {
 
     const [uploadDone, setUploadDone] = useState(null);
 
-    const onSubmit = (data) => {
-        console.log("Form submitted:", data)
-        // TO DO: juat uplaod file to backend
-        // services.dataset.addNewDataSet("file").then((res) => {
-        //     if (res.status === 200) {
-        //         toast("Event has been created", {
-        //             description: "Sunday, December 03, 2023 at 9:00 AM",
-        //             action: {
-        //                 label: "Undo",
-        //                 onClick: () => console.log("Undo"),
-        //             },
-        //         })
-        //     } else {
-        //         throw new Error("Email sending failed with status " + res.status);
-        //     }
-        // })
+    const onSubmit = async (data) => {
+        const formData = new FormData();
+        formData.append("file", data.file[0]); // Assuming file input is handled via react-hook-form or similar
+        formData.append("name", data.name);     // e.g., from a text input field
 
-        toast("Event has been created", {
-            description: "Sunday, December 03, 2023 at 9:00 AM",
-            action: {
-                label: "Undo",
-                onClick: () => console.log("Undo"),
-            },
-        })
+        try {
+            const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
 
-        setUploadDone(UploadStatus.dataClear)
-    }
+            if (res.status === 200) {
+                toast("Dataset uploaded successfully", {
+                    description: "File has been uploaded.",
+                    // action: {
+                    //     label: "Undo",
+                    //     onClick: () => console.log("Undo"),
+                    // },
+                });
+            } else {
+                throw new Error("Upload failed with status " + res.status);
+            }
+
+            // setUploadDone(UploadStatus.dataClear);
+        } catch (error) {
+            toast("Upload failed", {
+                description: error.message,
+            });
+
+            // setUploadDone(UploadStatus.dataClear);
+        }
+    };
 
     const dialogContent = () => {
         switch (uploadDone) {

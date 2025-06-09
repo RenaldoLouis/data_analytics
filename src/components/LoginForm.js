@@ -37,7 +37,7 @@ const LoginForm = () => {
             const res = await services.auth.login(payload);
 
             if (res.status === 200) {
-                toast("Register success", {
+                toast("Login success", {
                     description: formatted,
                 });
                 clearInputs();
@@ -45,7 +45,7 @@ const LoginForm = () => {
                 router.push('/dashboard');
             } else {
                 const data = await res.error.data; // assuming API returns JSON with error message
-                setError(data?.message || "Registration failed. Please try again.");
+                setError(data?.message || "Login failed. Please try again.");
             }
         } catch (err) {
             setError(err.message || "An unexpected error occurred.");
