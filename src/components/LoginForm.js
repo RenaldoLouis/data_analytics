@@ -1,7 +1,10 @@
 "use client"
-import { useState } from 'react';
-// import { signIn } from "next-auth/react";
+import { setUserAuthToken } from '@/lib/authHelper';
+import services from '@/services';
+import moment from 'moment';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 const LoginForm = () => {
     const router = useRouter();
@@ -17,24 +20,37 @@ const LoginForm = () => {
         setPassword("");
         setError("");
     }
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        // signIn("credentials", {
-        //     email,
-        //     password,
-        //     redirect: false
-        // })
-        //     .then(res => {
-        //         if (res.error) {
-        //             setError(JSON.parse(res.error).message);
-        //         }
-        //         else {
-        //             clearInputs();
-        //             router.push("/");
-        //         }
-        //     })
-        //     .catch(e => console.error(e))
-    }
+        setError(""); // Clear previous errors
+
+        const now = moment();
+        const formatted = now.format('dddd, MMMM DD, YYYY [at] h:mm A');
+
+        const payload = {
+            email,
+            password
+        };
+
+        try {
+            const res = await services.auth.login(payload);
+
+            if (res.status === 200) {
+                toast("Register success", {
+                    description: formatted,
+                });
+                clearInputs();
+                setUserAuthToken(res.data.data)
+                router.push('/dashboard');
+            } else {
+                const data = await res.error.data; // assuming API returns JSON with error message
+                setError(data?.message || "Registration failed. Please try again.");
+            }
+        } catch (err) {
+            setError(err.message || "An unexpected error occurred.");
+        }
+    };
 
     return (
         <form

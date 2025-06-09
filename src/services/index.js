@@ -60,7 +60,8 @@ const deleteRequest = async (path) => {
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
     auth: {
-        login: (payload) => postRequest('/admin/login', payload),
+        login: (payload) => postRequest('/auth/login', payload),
+        register: (payload) => postRequest('/auth/register', payload),
     },
     medicalStaff: {
         // getMedicalStaff: (status) => getRequest(`/secure/admin/staff?status=${status}`),

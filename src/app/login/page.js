@@ -9,7 +9,7 @@ export default function Login() {
             <div className="w-2/3 bg-[#0f0f16] flex items-center justify-center">
                 <img
                     className="w-1/4 object-contain"
-                    src="/login.png"
+                    src="/login.jpg"
                     alt=""
                 />
             </div>

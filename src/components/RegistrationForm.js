@@ -1,7 +1,9 @@
 "use client"
-import { registerUser } from '@/services/auth';
+import services from '@/services';
+import moment from 'moment';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 const RegistrationForm = () => {
     const router = useRouter();
@@ -12,27 +14,42 @@ const RegistrationForm = () => {
 
     const handleEmailChange = e => setEmail(e.target.value);
     const handlePasswordChange = e => setPassword(e.target.value);
+
     const clearInputs = () => {
         setEmail("");
         setPassword("");
         setError("");
     }
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        registerUser(email, password)
-            .then(res => {
-                if (res.status === 200) {
-                    clearInputs();
-                    router.push('/verification');
-                }
-                else {
-                    setError(res.message);
-                }
-            })
-            .catch(e => {
-                console.error(e);
-            })
-    }
+        setError(""); // Clear previous errors
+
+        const now = moment();
+        const formatted = now.format('dddd, MMMM DD, YYYY [at] h:mm A');
+
+        const payload = {
+            email,
+            password
+        };
+
+        try {
+            const res = await services.auth.register(payload);
+
+            if (res.status === 200) {
+                toast("Register success", {
+                    description: formatted,
+                });
+                clearInputs();
+                router.push('/login');
+            } else {
+                const data = await res.error.data; // assuming API returns JSON with error message
+                setError(data?.message || "Registration failed. Please try again.");
+            }
+        } catch (err) {
+            setError(err.message || "An unexpected error occurred.");
+        }
+    };
 
     return (
         <form
@@ -59,13 +76,14 @@ const RegistrationForm = () => {
             >
                 Register
             </button>
-            {error &&
+
+            {error && (
                 <p className="text-red-500 font-bold text-center">
                     {error}
                 </p>
-            }
+            )}
         </form>
-    )
-}
+    );
+};
 
 export default RegistrationForm;
