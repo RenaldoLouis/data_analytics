@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { setUserAuthToken } from "@/lib/authHelper";
-import services from "@/services";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -41,18 +40,30 @@ const LoginForm = () => {
     const onSubmit = async (data) => {
         const formatted = moment().format("dddd, MMMM DD, YYYY [at] h:mm A");
 
+        const email = data.email
+        const password = data.password
         try {
-            const res = await services.auth.login(data);
+            // const res = await services.auth.login(data);
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password }),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            });
 
             if (res.status === 200) {
                 toast("Login success", {
                     description: formatted,
                 });
 
-                setUserAuthToken(res.data.data);
+                const json = await res.json();
+
+                setUserAuthToken(json.data);
                 router.push("/dashboard");
             } else {
-                const errData = await res.error?.data;
+                const errData = await res.error;
                 form.setError("root", {
                     message: errData?.message || "Login failed. Please try again.",
                 });
