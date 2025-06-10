@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/apiClient";
 import http from "./http";
 
 const handleErrors = (err /* path  payload */) => {
@@ -25,19 +26,24 @@ const postRequest = async (path, payload) => {
 
 const postFormRequest = async (path, payload /* this is FormData */) => {
     try {
-        const res = await fetch(path, {
+        // const res = await fetch(path, {
+        //     method: 'POST',
+        //     body: payload, // This is your FormData object
+        //     credentials: 'include', // Ensures cookies (like HttpOnly token) are sent
+        //     // headers: {
+        //     //     'Content-Type': 'multipart/form-data',
+        //     // },
+        // });
+
+        // const json = await res.json();
+        // if (!res.ok) throw new Error(json.message || 'Something went wrong');
+
+        // return json;
+        return apiClient(path, {
             method: 'POST',
-            body: payload, // This is your FormData object
-            credentials: 'include', // Ensures cookies (like HttpOnly token) are sent
-            // headers: {
-            //     'Content-Type': 'multipart/form-data',
-            // },
+            body: payload,
+            form: true,
         });
-
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.message || 'Something went wrong');
-
-        return json;
     } catch (err) {
         return handleErrors(err);
     }

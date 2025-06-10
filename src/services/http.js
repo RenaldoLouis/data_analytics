@@ -1,4 +1,4 @@
-// might not need this anymore, this might still be used but only for api that does notneed token
+// might not need this anymore, this might still be used but only for api that does not need token authentication
 
 import config from '@/config';
 import { STATUS_CODES } from '@/lib/apiHelper';
