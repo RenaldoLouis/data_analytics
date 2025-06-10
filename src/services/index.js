@@ -23,10 +23,21 @@ const postRequest = async (path, payload) => {
     }
 };
 
-const postFormRequest = async (path, payload) => {
+const postFormRequest = async (path, payload /* this is FormData */) => {
     try {
-        const res = await http.postFormData(path, payload);
-        return res;
+        const res = await fetch(path, {
+            method: 'POST',
+            body: payload, // This is your FormData object
+            credentials: 'include', // Ensures cookies (like HttpOnly token) are sent
+            // headers: {
+            //     'Content-Type': 'multipart/form-data',
+            // },
+        });
+
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Something went wrong');
+
+        return json;
     } catch (err) {
         return handleErrors(err);
     }
@@ -69,33 +80,13 @@ const deleteRequest = async (path) => {
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
     auth: {
-        login: (payload) => postRequest('/auth/login', payload),
         register: (payload) => postRequest('/auth/register', payload),
-    },
-    medicalStaff: {
-        // getMedicalStaff: (status) => getRequest(`/secure/admin/staff?status=${status}`),
-        getMedicalStaff: (status, role) => getRequest(`/secure/admin/staff`, { status, role }),
-        editStaff: (status) => getRequest(`/secure/admin/staff?status=${status}`),
-        approveStaff: (staffData) => putRequest(`/secure/admin/staff/approval`, staffData),
-        updateStaff: (staffID, staffData) => patchRequest(`/secure/admin/staff/${staffID}`, staffData),
-    },
-    payment: {
-        createPayment: (data) => postRequest(`/api/v1/apcs/createPayment`, data)
-    },
-    email: {
-        sendEmail: (data) => postRequest(`/api/v1/apcs/sendEmail`, data),
-        sendEmailWinner: (data) => postRequest(`/api/v1/apcs/sendEmailWinner`, data),
-        sendEmailMarketing: (data) => postRequest(`/api/v1/apcs/sendEmailMarketing`, data),
-    },
-    galery: {
-        getGalery: (eventName) => getRequest(`/api/v1/apcs/getGaleries?eventName=${eventName}`),
-        getVideos: () => getRequest(`/api/v1/apcs/getVideos`)
     },
     aws: {
         postSignedUrl: (directoryname, fileName) => postRequest(`/api/v1/apcs/signed-url-images?directoryname=${directoryname}&fileName=${fileName}`),
         downloadFiles: (files) => postBlobRequest(`/api/v1/apcs/download-files-aws`, files),
     },
     dataset: {
-        addNewDataSet: (files) => postFormRequest(`/dataset`, files),
+        addNewDataSet: (files) => postFormRequest(`/api/dataset`, files),
     }
 };

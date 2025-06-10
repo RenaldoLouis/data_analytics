@@ -1,12 +1,14 @@
+// might not need this anymore, this might still be used but only for api that does notneed token
+
 import config from '@/config';
 import { STATUS_CODES } from '@/lib/apiHelper';
-import { getUserAuthToken, removeLocalUserDetails, removeUserAuthToken } from '@/lib/authHelper';
+import { getUserAuthTokenCookie } from '@/lib/cookieHelper';
 import axios from 'axios';
 
 class HttpService {
   constructor() {
     this.baseURL = config.api.baseURL;
-    this.authToken = getUserAuthToken();
+    this.authToken = getUserAuthTokenCookie();
     this.createAxiosInstance();
 
     this.axios.interceptors.response.use(
@@ -14,8 +16,8 @@ class HttpService {
       (error) => {
         if (error.response?.status === STATUS_CODES.ERROR.UNAUTHORIZED) {
           this.removeAuthTokenHeader();
-          removeLocalUserDetails();
-          removeUserAuthToken();
+          // removeLocalUserDetails();
+          // removeUserAuthTokenCookie();
           window.open(`${window.location.origin}/login?ref=${window.location.pathname}`, '_self');
         }
 
@@ -58,7 +60,7 @@ class HttpService {
     return this.axios.post(url, payload, {
       baseURL: this.baseURL,
       headers: {
-        Authorization: `Bearer ${this.authToken ?? ''}`,
+        // Authorization: `Bearer ${this.authToken ?? ''}`,
         'Content-Type': 'application/json',
       }
     });

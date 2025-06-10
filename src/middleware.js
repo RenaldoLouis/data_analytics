@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 export async function middleware(req) {
     const token = req.cookies.get('token')?.value;
 
-    console.log("token", token)
     if (!token) {
         return NextResponse.redirect(new URL('/login', req.url));
     }
@@ -17,8 +16,9 @@ export async function middleware(req) {
             Authorization: `Bearer ${token}`,
         },
     });
-    console.log("link", `${process.env.BACKEND_URL}/auth/authenticate`)
-    // console.log("res", res)
+
+    console.log("middleware res", res)
+
     if (!res.ok) {
         return NextResponse.redirect(new URL('/login', req.url));
     }

@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { setUserAuthToken } from "@/lib/authHelper";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -60,7 +59,7 @@ const LoginForm = () => {
 
                 const json = await res.json();
 
-                setUserAuthToken(json.data);
+                // setUserAuthToken(json.data);
                 router.push("/dashboard");
             } else {
                 const errData = await res.error;

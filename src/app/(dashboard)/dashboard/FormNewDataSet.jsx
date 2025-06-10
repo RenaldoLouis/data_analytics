@@ -35,15 +35,15 @@ const FormNewDataSet = () => {
         try {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
 
-            if (res.status === 200) {
-                // toast("Dataset uploaded successfully", {
-                //     description: "File has been uploaded.",
-                //     action: {
-                //         label: "action",
-                //         onClick: () => console.log("action"),
-                //     },
-                // });
-                setUploadDone(UploadStatus.dataClear);
+            if (res.success) {
+                toast("Dataset uploaded successfully", {
+                    description: "File has been uploaded.",
+                    action: {
+                        label: "action",
+                        onClick: () => console.log("action"),
+                    },
+                });
+                // setUploadDone(UploadStatus.dataClear);
             } else {
                 throw new Error("Upload failed with status " + res.status);
             }
@@ -53,7 +53,7 @@ const FormNewDataSet = () => {
                 description: error.message,
             });
 
-            setUploadDone(UploadStatus.dataClear);
+            // setUploadDone(UploadStatus.dataClear);
         }
     };
 
@@ -91,7 +91,7 @@ const FormNewDataSet = () => {
         <Dialog>
             <FormProvider {...methods}>
                 <DialogTrigger asChild>
-                    <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Button</Button>
+                    <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>
                 </DialogTrigger>
                 <DialogContent className="px-0 py-0" showCloseButton={false}>
                     {dialogContent()}
