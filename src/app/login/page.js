@@ -1,18 +1,20 @@
-import LoginForm from "@/components/LoginForm"
+import LoginForm from "@/components/LoginForm";
 
-export default function Login() {
+export default function LoginPage() {
     return (
-        <main className="flex h-screen">
-            <div className="w-1/3 flex justify-center items-center">
-                <LoginForm />
-            </div>
-            <div className="w-2/3 bg-[#0f0f16] flex items-center justify-center">
-                <img
-                    className="w-1/4 object-contain"
-                    src="/login.jpg"
-                    alt=""
-                />
+        <main className="flex h-screen items-center justify-center bg-[#f3f4f6]"> {/* Light gray bg */}
+            <div className="flex w-[90%] max-w-6xl h-[85%] rounded-[2rem] overflow-hidden shadow-lg">
+                {/* Left Side */}
+                <div className="w-1/2 bg-[#071d34] flex items-center justify-center">
+                    <div className="w-full h-full bg-[url('/login.jpg')] bg-no-repeat bg-cover" />
+                </div>
+
+                {/* Right Side (Login Form) */}
+                <div className="w-1/2 bg-white flex items-center justify-center px-12">
+                    <LoginForm />
+                </div>
             </div>
         </main>
-    )
+
+    );
 }

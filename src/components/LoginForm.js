@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-
 import { Button } from "@/components/ui/button";
 import {
     Form,
@@ -19,15 +18,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
-// Validation schema using zod
+// Schema
 const loginSchema = z.object({
-    email: z.string().email("Invalid email address"),
-    password: z.string().min(1, "Password is required"),
+    email: z.string().min(1, "Enter username or registered email"),
+    password: z.string().min(1, "Enter password"),
 });
 
-const LoginForm = () => {
+export default function LoginForm() {
     const router = useRouter();
-
     const form = useForm({
         resolver: zodResolver(loginSchema),
         defaultValues: {
@@ -37,93 +35,104 @@ const LoginForm = () => {
     });
 
     const onSubmit = async (data) => {
-        const formatted = moment().format("dddd, MMMM DD, YYYY [at] h:mm A");
-
-        const email = data.email
-        const password = data.password
         try {
-            // const res = await services.auth.login(data);
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                body: JSON.stringify({ email, password }),
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include'
+            const res = await fetch("/api/login", {
+                method: "POST",
+                body: JSON.stringify(data),
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
             });
 
             if (res.status === 200) {
                 toast("Login success", {
-                    description: formatted,
+                    description: moment().format("dddd, MMMM DD, YYYY [at] h:mm A"),
                 });
-
-                const json = await res.json();
-
-                // setUserAuthToken(json.data);
                 router.push("/dashboard");
             } else {
-                const errData = await res.error;
                 form.setError("root", {
-                    message: errData?.message || "Login failed. Please try again.",
+                    message: "Invalid credentials. Try again.",
                 });
             }
         } catch (err) {
             form.setError("root", {
-                message: err.message || "An unexpected error occurred.",
+                message: err.message || "Unexpected error occurred.",
             });
         }
     };
 
     return (
-        <Form {...form}>
-            <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="flex flex-col space-y-6 w-full max-w-md px-6"
-            >
-                <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                                <Input placeholder="Enter your email address" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
+        <div className="w-full max-w-md">
+            <h2 className="text-2xl font-bold text-center">Login</h2>
+            <p className="text-sm text-gray-500 text-center mt-1 mb-6">
+                Enter your credentials to access your account
+            </p>
+
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                    <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Email or Username</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="Enter username or registered email" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="password"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl>
+                                    <Input type="password" placeholder="Enter password" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <div className="text-right">
+                        <a href="#" className="text-sm text-blue-600 hover:underline">
+                            Forgot Password
+                        </a>
+                    </div>
+
+                    {form.formState.errors.root?.message && (
+                        <p className="text-red-500 font-semibold text-center">
+                            {form.formState.errors.root.message}
+                        </p>
                     )}
-                />
 
-                <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                                <Input
-                                    type="password"
-                                    placeholder="Enter your password"
-                                    {...field}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                    <Button type="submit" className="w-full bg-gray-500 text-white">
+                        Login
+                    </Button>
 
-                {form.formState.errors.root?.message && (
-                    <p className="text-red-500 font-bold text-center">
-                        {form.formState.errors.root.message}
-                    </p>
-                )}
+                    <div className="flex items-center gap-2 text-gray-400 text-sm my-4">
+                        <div className="flex-grow border-t" />
+                        <span>or</span>
+                        <div className="flex-grow border-t" />
+                    </div>
 
-                <Button type="submit" className="w-full">
-                    Log In
-                </Button>
-            </form>
-        </Form>
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="w-1/2 border-blue-600 text-blue-600">
+                            Try Free Trial
+                        </Button>
+                        <Button variant="outline" className="w-1/2 border-blue-600 text-blue-600">
+                            Request Free Demo Video
+                        </Button>
+                    </div>
+
+                    <div className="pt-8 text-center text-gray-500 text-sm">
+                        <span className="font-semibold text-black">Daya Cipta Tech</span>
+                    </div>
+                </form>
+            </Form>
+        </div>
     );
-};
-
-export default LoginForm;
+}

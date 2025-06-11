@@ -8,7 +8,9 @@ import {
   SidebarMenuItem,
   useSidebar
 } from "@/components/ui/sidebar";
+import { IconPlus } from "@tabler/icons-react";
 import { useMemo } from "react";
+
 
 // Helper to generate a random hex color
 function getRandomColor() {
@@ -31,7 +33,12 @@ export function NavDatasets({ items }) {
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Data Sets</SidebarGroupLabel>
+      <SidebarGroupLabel>
+        <div className="flex justify-between w-100">
+          Data Sets
+          <IconPlus className="w-4 h-4 cursor-pointer" />
+        </div>
+      </SidebarGroupLabel>
       <SidebarMenu>
         {coloredItems.map((item) => (
           <SidebarMenuItem key={item.name}>
