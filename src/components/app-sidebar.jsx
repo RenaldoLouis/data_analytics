@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { SideMenubarTitle, SideMenubarUrl } from "@/constant/SideMenubar"
+import { NavDatasets } from "./nav-datasets"
 
 const data = {
   user: {
@@ -50,7 +51,7 @@ const data = {
   // navClouds: [
   //   {
   //     title: "Capture",
-  //     icon: IconCamera,
+  //     icon: IconChartBar,
   //     isActive: true,
   //     url: "#",
   //     items: [
@@ -66,7 +67,7 @@ const data = {
   //   },
   //   {
   //     title: "Proposal",
-  //     icon: IconFileDescription,
+  //     icon: IconChartBar,
   //     url: "#",
   //     items: [
   //       {
@@ -81,7 +82,7 @@ const data = {
   //   },
   //   {
   //     title: "Prompts",
-  //     icon: IconFileAi,
+  //     icon: IconChartBar,
   //     url: "#",
   //     items: [
   //       {
@@ -99,36 +100,33 @@ const data = {
   //   {
   //     title: "Settings",
   //     url: "#",
-  //     icon: IconSettings,
+  //     icon: IconChartBar,
   //   },
   //   {
   //     title: "Get Help",
   //     url: "#",
-  //     icon: IconHelp,
+  //     icon: IconChartBar,
   //   },
   //   {
   //     title: "Search",
   //     url: "#",
-  //     icon: IconSearch,
+  //     icon: IconChartBar,
   //   },
   // ],
-  // documents: [
-  //   {
-  //     name: "Data Library",
-  //     url: "#",
-  //     icon: IconDatabase,
-  //   },
-  //   {
-  //     name: "Reports",
-  //     url: "#",
-  //     icon: IconReport,
-  //   },
-  //   {
-  //     name: "Word Assistant",
-  //     url: "#",
-  //     icon: IconFileWord,
-  //   },
-  // ],
+  documents: [
+    {
+      name: "Data Library",
+      url: "#"
+    },
+    {
+      name: "Reports",
+      url: "#"
+    },
+    {
+      name: "Word Assistant",
+      url: "#"
+    },
+  ],
 }
 
 export function AppSidebar({
@@ -150,8 +148,8 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        {/* <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
+        <NavDatasets items={data.documents} />
+        {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
