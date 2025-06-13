@@ -31,6 +31,8 @@ const FormNewDataSet = () => {
         const formData = new FormData();
         formData.append("file", data.file[0]); // Assuming file input is handled via react-hook-form or similar
         formData.append("name", data.name);     // e.g., from a text input field
+        formData.append("dateFormat", "DD-MM-YYYY");     // e.g., from a text input field
+        formData.append("timeFormat", "HH:mm");     // e.g., from a text input field
 
         try {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data

@@ -17,6 +17,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import Image from "next/image";
 
 // Schema
 const loginSchema = z.object({
@@ -59,6 +60,10 @@ export default function LoginForm() {
             });
         }
     };
+
+    const handleClickFreeTrial = () => {
+        router.push("/register");
+    }
 
     return (
         <div className="w-full max-w-md">
@@ -120,7 +125,7 @@ export default function LoginForm() {
                     </div>
 
                     <div className="flex gap-3">
-                        <Button variant="outline" className="w-1/2 border-blue-600 text-blue-600">
+                        <Button variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
                             Try Free Trial
                         </Button>
                         <Button variant="outline" className="w-1/2 border-blue-600 text-blue-600">
@@ -128,8 +133,13 @@ export default function LoginForm() {
                         </Button>
                     </div>
 
-                    <div className="pt-8 text-center text-gray-500 text-sm">
-                        <span className="font-semibold text-black">Daya Cipta Tech</span>
+                    <div className="pt-8 flex justify-center text-gray-500 text-sm">
+                        <Image
+                            src="/logo.svg"  // Can be a local image (in public folder) or external URL
+                            alt="Description of image"
+                            width={207}
+                            height={28}
+                        />
                     </div>
                 </form>
             </Form>
