@@ -9,10 +9,8 @@ import {
   useSidebar
 } from "@/components/ui/sidebar";
 import { IconPlus } from "@tabler/icons-react";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 
-
-// Helper to generate a random hex color
 function getRandomColor() {
   const letters = "0123456789ABCDEF";
   return "#" + Array.from({ length: 6 }, () =>
@@ -22,14 +20,20 @@ function getRandomColor() {
 
 export function NavDatasets({ items }) {
   const { isMobile } = useSidebar();
+  const [coloredItems, setColoredItems] = useState([]);
 
-  // Generate stable random colors using useMemo
-  const coloredItems = useMemo(() => {
-    return items.map((item) => ({
-      ...item,
-      color: getRandomColor()
-    }));
+  useEffect(() => {
+    // Only run on client after mount
+    setColoredItems(
+      items.map((item) => ({
+        ...item,
+        color: getRandomColor(),
+      }))
+    );
   }, [items]);
+
+  // Optional: Avoid rendering until hydrated
+  if (coloredItems.length === 0) return null;
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
