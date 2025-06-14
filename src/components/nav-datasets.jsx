@@ -8,32 +8,50 @@ import {
   SidebarMenuItem,
   useSidebar
 } from "@/components/ui/sidebar";
+import services from "@/services";
 import { IconPlus } from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-function getRandomColor() {
-  const letters = "0123456789ABCDEF";
-  return "#" + Array.from({ length: 6 }, () =>
-    letters[Math.floor(Math.random() * 16)]
-  ).join("");
-}
+const predefinedColors = [
+  "#FF6B6B",
+  "#6BCB77",
+  "#4D96FF",
+  "#FFD93D",
+  "#9D4EDD",
+  "#FF922B",
+  "#00C2D1",
+  "#A29BFE",
+  "#F06595",
+  "#20C997"
+];
 
 export function NavDatasets({ items }) {
   const { isMobile } = useSidebar();
-  const [coloredItems, setColoredItems] = useState([]);
+  const [dataSetsList, setDataSetsList] = useState([]);
+  const router = useRouter();
+
 
   useEffect(() => {
-    // Only run on client after mount
-    setColoredItems(
-      items.map((item) => ({
-        ...item,
-        color: getRandomColor(),
-      }))
-    );
-  }, [items]);
+    async function fetchData() {
+      const res = await services.dataset.getAllDataset();
 
-  // Optional: Avoid rendering until hydrated
-  if (coloredItems.length === 0) return null;
+      const dataWithColors = res.data.map((item, index) => ({
+        ...item,
+        color: predefinedColors[index % predefinedColors.length], // cycle through colors
+      }));
+
+      setDataSetsList(dataWithColors);
+    }
+
+    fetchData();
+  }, []);
+
+  const handleClickNavigateDataSets = (sheetId) => {
+    router.push(`/datasets/${sheetId}`);
+  }
+
+  if (dataSetsList.length === 0) return null;
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
@@ -44,10 +62,10 @@ export function NavDatasets({ items }) {
         </div>
       </SidebarGroupLabel>
       <SidebarMenu>
-        {coloredItems.map((item) => (
-          <SidebarMenuItem key={item.name}>
+        {dataSetsList.map((item, index) => (
+          <SidebarMenuItem key={`${item.name} ${index}`}>
             <SidebarMenuButton asChild>
-              <div href={item.url} className="flex items-center space-x-3">
+              <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item.id)} className="flex items-center space-x-3">
                 <span
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: item.color }}
@@ -55,36 +73,9 @@ export function NavDatasets({ items }) {
                 <span>{item.name}</span>
               </div>
             </SidebarMenuButton>
-            {/* <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuAction showOnHover className="data-[state=open]:bg-accent rounded-sm">
-                    <IconDots />
-                    <span className="sr-only">More</span>
-                  </SidebarMenuAction>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="w-24 rounded-lg"
-                  side={isMobile ? "bottom" : "right"}
-                  align={isMobile ? "end" : "start"}>
-                  <DropdownMenuItem>
-                    <IconFolder />
-                    <span>Open</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <IconShare3 />
-                    <span>Share</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive">
-                    <IconTrash />
-                    <span>Delete</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu> */}
           </SidebarMenuItem>
         ))}
       </SidebarMenu>
     </SidebarGroup>
   );
 }
-

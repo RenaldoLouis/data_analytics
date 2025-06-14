@@ -15,8 +15,7 @@ export function NavMain({
   const router = useRouter();
 
   const handleClickMenu = (menu) => {
-    router.push(menu);
-
+    router.push(`/${menu}`);
   }
 
   return (

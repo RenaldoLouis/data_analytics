@@ -7,9 +7,13 @@ const handleErrors = (err /* path  payload */) => {
     return { error: errorMessageKey };
 };
 
-const getRequest = async (path, params) => {
+
+const getRequest = async (path) => {
     try {
-        return await http.get(path, params);
+        return apiClient(path, {
+            method: 'GET',
+            form: true,
+        });
     } catch (err) {
         return handleErrors(err);
     }
@@ -94,5 +98,6 @@ export default {
     },
     dataset: {
         addNewDataSet: (files) => postFormRequest(`/api/dataset`, files),
+        getAllDataset: () => getRequest(`/api/dataset`),
     }
 };

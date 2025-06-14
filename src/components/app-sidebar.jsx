@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  IconChartBar,
   IconInnerShadowTop,
   IconListDetails
 } from "@tabler/icons-react"
@@ -32,11 +31,11 @@ const data = {
       url: SideMenubarUrl.Dashboard,
       icon: IconListDetails,
     },
-    {
-      title: SideMenubarTitle.DataSets,
-      url: SideMenubarUrl.DataSets,
-      icon: IconChartBar,
-    },
+    // {
+    //   title: SideMenubarTitle.DataSets,
+    //   url: SideMenubarUrl.DataSets,
+    //   icon: IconChartBar,
+    // },
     // {
     //   title: "Projects",
     //   url: "#",
