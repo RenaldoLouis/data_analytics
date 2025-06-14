@@ -7,6 +7,7 @@ import services from "@/services"
 import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { toast } from "sonner"
+import * as XLSX from 'xlsx'
 import NewUpload from "./NewUpload"
 import SuccessUpload from "./SuccesUpload"
 import WarningUpload from "./WarningUpload"
@@ -27,13 +28,40 @@ const FormNewDataSet = () => {
 
     const [uploadDone, setUploadDone] = useState(null);
 
+    const createSingleSheetFile = async (file, selectedSheetIndex) => {
+        // Read the file as ArrayBuffer
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: "array" });
+
+        const sheetNames = workbook.SheetNames;
+        const selectedSheetName = sheetNames[selectedSheetIndex];
+        const selectedSheet = workbook.Sheets[selectedSheetName];
+
+        // Create a new workbook with only the selected sheet
+        const newWorkbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWorkbook, selectedSheet, selectedSheetName);
+
+        // Write it to binary string
+        const wbout = XLSX.write(newWorkbook, { bookType: "xlsx", type: "array" });
+
+        // Create a new Blob (or File)
+        const newFile = new File([wbout], `sheet_${selectedSheetName}.xlsx`, {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        return newFile;
+    };
+
     const onSubmit = async (data) => {
-        console.log("parseInt(data.sheetSelection)]", parseInt(data.sheetSelection))
+        //recreate the sheet
+        const selectedSheetIndex = parseInt(data.sheetSelection)
+        const fileToSend = await createSingleSheetFile(data.file[0], selectedSheetIndex);
+
         const formData = new FormData();
-        formData.append("file", data.file[0]); // Assuming file input is handled via react-hook-form or similar
-        formData.append("name", data.name);     // e.g., from a text input field
-        formData.append("dateFormat", data.dateFormat);     // e.g., from a text input field
-        formData.append("timeFormat", data.timeFormat);     // e.g., from a text input field
+        formData.append("file", fileToSend);
+        formData.append("name", data.name);
+        formData.append("dateFormat", data.dateFormat);
+        formData.append("timeFormat", data.timeFormat);
 
         try {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
