@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 
 
 const NewUploadStep1 = (props) => {
-    const { register, errors } = props
+    const { register, errors, setSheetList } = props
     return (
         <>
             <div className="grid gap-3">
@@ -19,7 +19,7 @@ const NewUploadStep1 = (props) => {
                     <p className="text-sm text-red-500">{errors.name.message}</p>
                 )}
             </div>
-            <FileUpload />
+            <FileUpload setSheetList={setSheetList} />
         </>
     )
 }

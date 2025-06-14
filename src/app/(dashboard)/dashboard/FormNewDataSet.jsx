@@ -18,21 +18,22 @@ const FormNewDataSet = () => {
             file: null,
         },
     })
-
     const {
         register,
         handleSubmit,
+        watch,
         formState: { errors },
     } = methods
 
     const [uploadDone, setUploadDone] = useState(null);
 
     const onSubmit = async (data) => {
+        console.log("parseInt(data.sheetSelection)]", parseInt(data.sheetSelection))
         const formData = new FormData();
         formData.append("file", data.file[0]); // Assuming file input is handled via react-hook-form or similar
         formData.append("name", data.name);     // e.g., from a text input field
-        formData.append("dateFormat", "DD-MM-YYYY");     // e.g., from a text input field
-        formData.append("timeFormat", "HH:mm");     // e.g., from a text input field
+        formData.append("dateFormat", data.dateFormat);     // e.g., from a text input field
+        formData.append("timeFormat", data.timeFormat);     // e.g., from a text input field
 
         try {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
@@ -45,8 +46,9 @@ const FormNewDataSet = () => {
                         onClick: () => console.log("action"),
                     },
                 });
-                // setUploadDone(UploadStatus.dataClear);
+                setUploadDone(UploadStatus.dataClear);
             } else {
+                setUploadDone(UploadStatus.dataNotClear);
                 throw new Error("Upload failed with status " + res.status);
             }
 
@@ -55,7 +57,7 @@ const FormNewDataSet = () => {
                 description: error.message,
             });
 
-            // setUploadDone(UploadStatus.dataClear);
+            setUploadDone(UploadStatus.dataNotClear);
         }
     };
 
@@ -95,7 +97,7 @@ const FormNewDataSet = () => {
                 <DialogTrigger asChild>
                     <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>
                 </DialogTrigger>
-                <DialogContent className="px-0 py-0" showCloseButton={false}>
+                <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false}>
                     {dialogContent()}
                 </DialogContent>
             </FormProvider>

@@ -61,7 +61,8 @@ export default function LoginForm() {
         }
     };
 
-    const handleClickFreeTrial = () => {
+    const handleClickFreeTrial = (e) => {
+        e.preventDefault();   // stop the form from submitting
         router.push("/register");
     }
 
@@ -125,10 +126,10 @@ export default function LoginForm() {
                     </div>
 
                     <div className="flex gap-3">
-                        <Button variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
+                        <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
                             Try Free Trial
                         </Button>
-                        <Button variant="outline" className="w-1/2 border-blue-600 text-blue-600">
+                        <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600">
                             Request Free Demo Video
                         </Button>
                     </div>

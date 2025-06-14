@@ -3,8 +3,11 @@ import { cn } from "@/lib/utils"
 import { FileText, FileX, Trash2, Upload } from "lucide-react"
 import { useState } from "react"
 import { Controller, useFormContext } from "react-hook-form"
+import * as XLSX from "xlsx"
 
-export function FileUpload() {
+export function FileUpload(props) {
+    const { setSheetList } = props
+
     const [fileName, setFileName] = useState(null)
     const [fileSize, setFileSize] = useState(null)
     const {
@@ -98,23 +101,34 @@ export function FileUpload() {
                                     type="file"
                                     className="hidden"
                                     onChange={(e) => {
-                                        const fileList = e.target.files
-                                        const file = fileList?.[0]
-                                        const validationResult = validateFile(file)
+                                        const fileList = e.target.files;
+                                        const file = fileList?.[0];
+                                        const validationResult = validateFile(file);
 
                                         if (validationResult === true) {
-                                            setFileName(file.name)
-                                            setFileSize(`${Math.round(file.size / 1024)}kb`)
-                                            clearErrors("file")
-                                            onChange(fileList)
+                                            setFileName(file.name);
+                                            setFileSize(`${Math.round(file.size / 1024)}kb`);
+                                            clearErrors("file");
+                                            onChange(fileList);
+
+                                            // Read sheet names using xlsx
+                                            const reader = new FileReader();
+                                            reader.onload = (evt) => {
+                                                const data = evt.target.result;
+                                                const workbook = XLSX.read(data, { type: "binary" });
+                                                const sheetNames = workbook.SheetNames;
+                                                setSheetList(sheetNames)
+                                                console.log("Sheet names:", sheetNames); // Or update state, etc.
+                                            };
+                                            reader.readAsBinaryString(file);
                                         } else {
-                                            setFileName(null)
-                                            setFileSize(null)
-                                            onChange(null)
+                                            setFileName(null);
+                                            setFileSize(null);
+                                            onChange(null);
                                             setError("file", {
                                                 type: "manual",
-                                                message: validationResult
-                                            })
+                                                message: validationResult,
+                                            });
                                         }
                                     }}
                                 />
