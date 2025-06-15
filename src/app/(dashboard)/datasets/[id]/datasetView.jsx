@@ -1,21 +1,34 @@
 'use client'
 
+import { DataTable } from "@/components/data-table"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { H3 } from "@/components/ui/typography"
-// import FormNewDataSet from "./FormNewDataSet"
-import { DataTable } from "@/components/data-table"
 import { DatasetViewConst } from "@/constant/DatasetViewConst"
-import { useState } from "react"
-import data from "./data.json"
+import services from "@/services"
+import { useEffect, useState } from "react"
 import DatasetsChartView from "./datasetsChartView"
 
 export default function DataSetView(props) {
     const { datasetId } = props
 
     const [currentView, setCurrentView] = useState(DatasetViewConst.chart);
+    const [data, setData] = useState([])
+    const [pagination, setPagination] = useState({
+        pageIndex: 1,
+        pageLimit: 10,
+    })
 
-    console.log("datasetId", datasetId)
+    useEffect(() => {
+        async function fetchData() {
+            const res = await services.dataset.getAllDatasetById(datasetId, pagination.pageLimit, pagination.pageIndex);
+            setData(res.data.datasets);
+        }
+
+        fetchData();
+    }, [datasetId, pagination]);
+
+    console.log("data", data)
 
     const handleTabView = (view) => {
         setCurrentView(view)

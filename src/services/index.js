@@ -99,5 +99,6 @@ export default {
     dataset: {
         addNewDataSet: (files) => postFormRequest(`/api/dataset`, files),
         getAllDataset: () => getRequest(`/api/dataset`),
+        getAllDatasetById: (id, limit, page) => getRequest(`/api/dataset/${id}?limit=${limit}&page=${page}`),
     }
 };
