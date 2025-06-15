@@ -20,7 +20,6 @@ export async function apiClient(path, { method = 'GET', body, headers = {}, form
 
         const res = await fetch(path, options);
 
-        // ✅ If token is invalid or expired, redirect to login
         if (res.status === 401) {
             // Optional: toast before redirect
             // toast.error("Session expired. Please log in again.");

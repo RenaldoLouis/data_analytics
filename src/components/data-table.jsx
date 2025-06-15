@@ -18,18 +18,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCircleCheckFilled,
-  IconDotsVertical,
-  IconGripVertical,
-  IconLayoutColumns,
-  IconLoader,
-  IconPlus,
-  IconTrendingUp,
+  IconTrendingUp
 } from "@tabler/icons-react";
 import {
   flexRender,
@@ -43,10 +36,8 @@ import {
 } from "@tanstack/react-table";
 import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
-import { toast } from "sonner";
 import { z } from "zod";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
@@ -59,14 +50,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -87,9 +70,7 @@ import {
 } from "@/components/ui/table";
 import {
   Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
+  TabsContent
 } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -103,200 +84,6 @@ export const schema = z.object({
   reviewer: z.string(),
 })
 
-// Create a separate component for the drag handle
-function DragHandle({
-  id
-}) {
-  const { attributes, listeners } = useSortable({
-    id,
-  })
-
-  return (
-    <Button
-      {...attributes}
-      {...listeners}
-      variant="ghost"
-      size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent">
-      <IconGripVertical className="text-muted-foreground size-3" />
-      <span className="sr-only">Drag to reorder</span>
-    </Button>
-  );
-}
-
-const columns = [
-  // {
-  //   id: "drag",
-  //   header: () => null,
-  //   cell: ({ row }) => <DragHandle id={row.original.id} />,
-  // },
-  // {
-  //   id: "select",
-  //   header: ({ table }) => (
-  //     <div className="flex items-center justify-center">
-  //       <Checkbox
-  //         checked={
-  //           table.getIsAllPageRowsSelected() ||
-  //           (table.getIsSomePageRowsSelected() && "indeterminate")
-  //         }
-  //         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-  //         aria-label="Select all" />
-  //     </div>
-  //   ),
-  //   cell: ({ row }) => (
-  //     <div className="flex items-center justify-center">
-  //       <Checkbox
-  //         checked={row.getIsSelected()}
-  //         onCheckedChange={(value) => row.toggleSelected(!!value)}
-  //         aria-label="Select row" />
-  //     </div>
-  //   ),
-  //   enableSorting: false,
-  //   enableHiding: false,
-  // },
-  {
-    accessorKey: "header",
-    header: "Header",
-    cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />;
-    },
-    enableHiding: false,
-  },
-  {
-    accessorKey: "type",
-    header: "Section Type",
-    cell: ({ row }) => (
-      <div className="w-32">
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {row.original.type}
-        </Badge>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status === "Done" ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-        ) : (
-          <IconLoader />
-        )}
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: "target",
-    header: () => <div className="w-full text-right">Target</div>,
-    cell: ({ row }) => {
-      const handleChange = (value) => {
-        const newData = [...data]
-        newData[row.index] = {
-          ...newData[row.index],
-          target: value,
-        }
-        setData(newData)
-      }
-
-      return (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            toast.success("Target saved")
-          }}
-        >
-          <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-            Target
-          </Label>
-          <Input
-            id={`${row.original.id}-target`}
-            className="h-8 w-16 text-right bg-transparent border-transparent focus-visible:border"
-            defaultValue={row.original.target}
-            onBlur={(e) => handleChange(e.target.value)}
-          />
-        </form>
-      )
-    },
-  },
-  {
-    accessorKey: "limit",
-    header: () => <div className="w-full text-right">Limit</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}>
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`} />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "reviewer",
-    header: "Reviewer",
-    cell: ({ row }) => {
-      const handleChange = (value) => {
-        const newData = [...data]
-        newData[row.index] = {
-          ...newData[row.index],
-          reviewer: value,
-        }
-        setData(newData)
-        toast.success("Reviewer updated")
-      }
-
-      return (
-        <Select onValueChange={handleChange} defaultValue={row.original.reviewer}>
-          <SelectTrigger
-            className="w-38"
-            id={`${row.original.id}-reviewer`}
-          >
-            <SelectValue placeholder="Assign reviewer" />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-            <SelectItem value="Jamik Tashpulatov">Jamik Tashpulatov</SelectItem>
-          </SelectContent>
-        </Select>
-      )
-    },
-  },
-  {
-    id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon">
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
-]
 
 function DraggableRow({
   row
@@ -326,9 +113,10 @@ function DraggableRow({
 
 export function DataTable({
   data: initialData,
-  dataSetId
+  setDataToUpdate
 }) {
-  // console.log("dataSetId", dataSetId)
+  const excludeKeys = ["transaction_id", "customer_id", "id"];
+
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -347,6 +135,54 @@ export function DataTable({
   )
 
   const dataIds = React.useMemo(() => data?.map(({ id }) => id) || [], [data])
+
+  const keys = Object.keys(initialData[0] || {}); // get all keys from first row
+
+  const columns = Object.keys(initialData[0] || {})
+    .filter((key) => !excludeKeys.includes(key)) // Exclude specific keys
+    .map((key) => ({
+      accessorKey: key,
+      header: key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      cell: ({ row }) => {
+        const [localValue, setLocalValue] = React.useState(row.original[key]);
+
+        const handleChange = (e) => {
+          setLocalValue(e.target.value);
+        };
+
+        const handleBlur = () => {
+          const updatedRow = { ...data[row.index], [key]: localValue };
+
+          // 1. Update the main table data
+          const newData = [...data];
+          newData[row.index] = updatedRow;
+          setData(newData);
+
+          // 2. Update the modified rows list
+          setDataToUpdate((prev) => {
+            const existingIndex = prev.findIndex((r) => r.id === updatedRow.id);
+            if (existingIndex !== -1) {
+              // Row already exists, update it
+              const updated = [...prev];
+              updated[existingIndex] = updatedRow;
+              return updated;
+            } else {
+              // New edited row
+              return [...prev, updatedRow];
+            }
+          });
+        };
+
+        return (
+          <Input
+            value={localValue ?? ""}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className="h-8 w-full bg-transparent border border-input rounded px-2"
+          />
+        );
+      },
+    }));
 
   const table = useReactTable({
     data,
@@ -386,69 +222,6 @@ export function DataTable({
 
   return (
     <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <Label htmlFor="view-selector" className="sr-only">
-          View
-        </Label>
-        <Select defaultValue="outline">
-          <SelectTrigger className="flex w-fit @4xl/main:hidden" size="sm" id="view-selector">
-            <SelectValue placeholder="Select a view" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="outline">Outline</SelectItem>
-            <SelectItem value="past-performance">Past Performance</SelectItem>
-            <SelectItem value="key-personnel">Key Personnel</SelectItem>
-            <SelectItem value="focus-documents">Focus Documents</SelectItem>
-          </SelectContent>
-        </Select>
-        <TabsList
-          className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Outline</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            Past Performance <Badge variant="secondary">3</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            Key Personnel <Badge variant="secondary">2</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-        </TabsList>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Customize Columns</span>
-                <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter((column) =>
-                  typeof column.accessorFn !== "undefined" &&
-                  column.getCanHide())
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }>
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm">
-            <IconPlus />
-            <span className="hidden lg:inline">Add Section</span>
-          </Button>
-        </div>
-      </div>
       <TabsContent
         value="outline"
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">

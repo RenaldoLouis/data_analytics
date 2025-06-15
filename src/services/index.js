@@ -12,7 +12,7 @@ const getRequest = async (path) => {
     try {
         return apiClient(path, {
             method: 'GET',
-            form: true,
+            form: false,
         });
     } catch (err) {
         return handleErrors(err);
@@ -47,6 +47,18 @@ const postFormRequest = async (path, payload /* this is FormData */) => {
             method: 'POST',
             body: payload,
             form: true,
+        });
+    } catch (err) {
+        return handleErrors(err);
+    }
+};
+
+const putRequestMiddleware = async (path, payload /* this is FormData */) => {
+    try {
+        return apiClient(path, {
+            method: 'PUT',
+            body: payload,
+            form: false,
         });
     } catch (err) {
         return handleErrors(err);
@@ -100,5 +112,6 @@ export default {
         addNewDataSet: (files) => postFormRequest(`/api/dataset`, files),
         getAllDataset: () => getRequest(`/api/dataset`),
         getAllDatasetById: (id, limit, page) => getRequest(`/api/dataset/${id}?limit=${limit}&page=${page}`),
+        updateDataset: (id, datasetContents) => putRequestMiddleware(`/api/dataset/updateDatasetContents/${id}`, datasetContents),
     }
 };

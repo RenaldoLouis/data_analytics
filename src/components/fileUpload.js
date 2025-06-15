@@ -118,7 +118,6 @@ export function FileUpload(props) {
                                                 const workbook = XLSX.read(data, { type: "binary" });
                                                 const sheetNames = workbook.SheetNames;
                                                 setSheetList(sheetNames)
-                                                console.log("Sheet names:", sheetNames); // Or update state, etc.
                                             };
                                             reader.readAsBinaryString(file);
                                         } else {
