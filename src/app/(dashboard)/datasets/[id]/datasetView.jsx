@@ -6,47 +6,49 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { H3 } from "@/components/ui/typography"
 import { DatasetViewConst } from "@/constant/DatasetViewConst"
+import { useDatasetTable } from "@/hooks/useDatasetTable"
 import services from "@/services"
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { toast } from "sonner"
 import DatasetsChartView from "./datasetsChartView"
 
 export default function DataSetView(props) {
     const { datasetId } = props
 
     const [currentView, setCurrentView] = useState(DatasetViewConst.chart);
-    const [data, setData] = useState([])
-    const [dataTable, setDataTable] = useState([])
     const [dataToUpdate, setDataToUpdate] = useState([]);
     const [pagination, setPagination] = useState({
         pageIndex: 1,
         pageLimit: 10,
     })
 
-    useEffect(() => {
-        async function fetchData() {
-            const res = await services.dataset.getAllDatasetById(datasetId, pagination.pageLimit, pagination.pageIndex);
-            const cleanedArray = res.data.datasets.map(item => ({
-                ...item.data,
-                id: item.id, // or dataset_id, or both if needed
-            }));
-
-            setData(res.data.datasets);
-            setDataTable(cleanedArray);
-        }
-
-        fetchData();
-    }, [datasetId, pagination]);
+    const {
+        dataTable,
+        data,
+        loading,
+        error,
+        refetch, // <- call this after updates
+    } = useDatasetTable(datasetId, pagination);
 
     const handleUpdateData = async () => {
         const datasetContents = dataToUpdate.map((eachData) => ({
             id: eachData.id,
-            data: eachData, // or you can clone/pick specific fields if needed
+            data: eachData,
         }));
 
-        // ✅ Wrap in object when sending
         const res = await services.dataset.updateDataset(datasetId, {
             datasetContents,
         });
+
+        if (res.success) {
+            toast("Dataset Updated successfully");
+            refetch();
+        } else {
+            toast("Upload failed", {
+                description: error.message,
+            });
+            throw new Error("Upload failed with status " + res.status);
+        }
     };
 
     const handleTabView = (view) => {

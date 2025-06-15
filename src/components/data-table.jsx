@@ -138,6 +138,10 @@ export function DataTable({
 
   const keys = Object.keys(initialData[0] || {}); // get all keys from first row
 
+  React.useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
   const columns = Object.keys(initialData[0] || {})
     .filter((key) => !excludeKeys.includes(key)) // Exclude specific keys
     .map((key) => ({
