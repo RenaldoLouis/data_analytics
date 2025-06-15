@@ -65,7 +65,7 @@ export function NavDatasets({ items }) {
         {dataSetsList.map((item, index) => (
           <SidebarMenuItem key={`${item.name} ${index}`}>
             <SidebarMenuButton asChild>
-              <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item.id)} className="flex items-center space-x-3">
+              <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item.id)} className="flex items-center space-x-3 cursor-pointer">
                 <span
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: item.color }}

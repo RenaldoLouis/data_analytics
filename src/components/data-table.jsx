@@ -326,8 +326,10 @@ function DraggableRow({
 }
 
 export function DataTable({
-  data: initialData
+  data: initialData,
+  dataSetId
 }) {
+  // console.log("dataSetId", dataSetId)
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =

@@ -9,10 +9,11 @@ export default function Page() {
     <>
       <div className="flex justify-between px-4 lg:px-6">
         <H3>All chart</H3>
-        <Tabs defaultValue="account" className="w-[400px] items-end">
+        <Tabs defaultValue="layout1" className="w-[400px] items-end">
           <TabsList>
-            <TabsTrigger value="account">Account</TabsTrigger>
-            <TabsTrigger value="password">Password</TabsTrigger>
+            <TabsTrigger value="layout1">Layout 1</TabsTrigger>
+            <TabsTrigger value="layout2">Layout 2</TabsTrigger>
+            <TabsTrigger value="layout3">Layout 3</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
