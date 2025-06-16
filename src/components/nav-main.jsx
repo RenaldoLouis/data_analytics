@@ -10,12 +10,15 @@ import {
 import { useRouter } from 'next/navigation';
 
 export function NavMain({
-  items
+  items,
+  selectedNav,
+  setSelectedNav
 }) {
   const router = useRouter();
 
-  const handleClickMenu = (menu) => {
-    router.push(`/${menu}`);
+  const handleClickMenu = (item) => {
+    setSelectedNav(item.id)
+    router.push(`/${item.url}`);
   }
 
   return (
@@ -40,7 +43,7 @@ export function NavMain({
         </SidebarMenu>
         <SidebarMenu>
           {items.map((item) => (
-            <SidebarMenuItem key={item.title} onClick={() => handleClickMenu(item.url)} style={{ background: "#EAF3FB" }}>
+            <SidebarMenuItem key={item.title} onClick={() => handleClickMenu(item)} style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
               <SidebarMenuButton tooltip={item.title} className="cursor-pointer">
                 {item.icon && <item.icon />}
                 <span>{item.title}</span>

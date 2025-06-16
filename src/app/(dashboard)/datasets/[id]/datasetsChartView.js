@@ -33,7 +33,7 @@ const DatasetsChartView = () => {
     const [isShowChart, setIsShowChart] = useState(true);
 
     return (
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center">
             {isShowChart ? (
                 <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
                     <BarChart accessibilityLayer data={chartData}>

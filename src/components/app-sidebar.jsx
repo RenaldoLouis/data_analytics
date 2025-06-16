@@ -17,6 +17,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { SideMenubarTitle, SideMenubarUrl } from "@/constant/SideMenubar"
+import { useState } from "react"
 import { NavDatasets } from "./nav-datasets"
 
 const data = {
@@ -27,6 +28,7 @@ const data = {
   },
   navMain: [
     {
+      id: '1',
       title: SideMenubarTitle.Dashboard,
       url: SideMenubarUrl.Dashboard,
       icon: IconListDetails,
@@ -114,14 +116,17 @@ const data = {
   // ],
   documents: [
     {
+      id: '2',
       name: "Data Library",
       url: "#"
     },
     {
+      id: '3',
       name: "Reports",
       url: "#"
     },
     {
+      id: '4',
       name: "Word Assistant",
       url: "#"
     },
@@ -131,6 +136,9 @@ const data = {
 export function AppSidebar({
   ...props
 }) {
+
+  const [selectedNav, setSelectedNav] = useState("1");
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -146,8 +154,8 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDatasets items={data.documents} />
+        <NavMain items={data.navMain} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
+        <NavDatasets items={data.documents} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
         {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
       </SidebarContent>
       <SidebarFooter>

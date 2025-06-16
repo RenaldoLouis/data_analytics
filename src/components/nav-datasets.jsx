@@ -26,7 +26,7 @@ const predefinedColors = [
   "#20C997"
 ];
 
-export function NavDatasets({ items }) {
+export function NavDatasets({ items, setSelectedNav, selectedNav }) {
   const { isMobile } = useSidebar();
   const [dataSetsList, setDataSetsList] = useState([]);
   const router = useRouter();
@@ -47,8 +47,9 @@ export function NavDatasets({ items }) {
     fetchData();
   }, []);
 
-  const handleClickNavigateDataSets = (sheetId) => {
-    router.push(`/datasets/${sheetId}`);
+  const handleClickNavigateDataSets = (item) => {
+    setSelectedNav(item.id)
+    router.push(`/datasets/${item.id}`);
   }
 
   if (dataSetsList.length === 0) return null;
@@ -65,7 +66,7 @@ export function NavDatasets({ items }) {
         {dataSetsList.map((item, index) => (
           <SidebarMenuItem key={`${item.name} ${index}`}>
             <SidebarMenuButton asChild>
-              <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item.id)} className="flex items-center space-x-3 cursor-pointer">
+              <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item)} className="flex items-center space-x-3 cursor-pointer" style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
                 <span
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: item.color }}
