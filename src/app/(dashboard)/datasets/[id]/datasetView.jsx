@@ -82,15 +82,18 @@ export default function DataSetView(props) {
             <div className="px-4 lg:px-6">
                 <ChartAreaInteractive />
             </div> */}
-            {currentView === DatasetViewConst.chart ? (
-                <DatasetsChartView />
-            ) : (
-                <DataTable
-                    data={dataTable}
-                    setDataToUpdate={setDataToUpdate}
-                />
-
-            )}
+            <div className="flex">
+                <div className="flex-auto">
+                    {currentView === DatasetViewConst.chart ? (
+                        <DatasetsChartView />
+                    ) : (
+                        <DataTable
+                            data={dataTable}
+                            setDataToUpdate={setDataToUpdate}
+                        />
+                    )}
+                </div>
+            </div>
         </>
     );
 }
