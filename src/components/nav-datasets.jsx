@@ -11,7 +11,7 @@ import {
 import services from "@/services";
 import { IconPlus } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 const predefinedColors = [
   "#FF6B6B",
@@ -26,9 +26,8 @@ const predefinedColors = [
   "#20C997"
 ];
 
-export function NavDatasets({ items, setSelectedNav, selectedNav }) {
+export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, dataSetsList }) {
   const { isMobile } = useSidebar();
-  const [dataSetsList, setDataSetsList] = useState([]);
   const router = useRouter();
 
 

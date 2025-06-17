@@ -17,7 +17,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { SideMenubarTitle, SideMenubarUrl } from "@/constant/SideMenubar"
-import { useState } from "react"
+import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import { NavDatasets } from "./nav-datasets"
 
 const data = {
@@ -114,30 +115,47 @@ const data = {
   //     icon: IconChartBar,
   //   },
   // ],
-  documents: [
-    {
-      id: '2',
-      name: "Data Library",
-      url: "#"
-    },
-    {
-      id: '3',
-      name: "Reports",
-      url: "#"
-    },
-    {
-      id: '4',
-      name: "Word Assistant",
-      url: "#"
-    },
-  ],
+  // documents: [
+  //   {
+  //     id: '2',
+  //     name: "Data Library",
+  //     url: "#"
+  //   },
+  //   {
+  //     id: '3',
+  //     name: "Reports",
+  //     url: "#"
+  //   },
+  //   {
+  //     id: '4',
+  //     name: "Word Assistant",
+  //     url: "#"
+  //   },
+  // ],
 }
 
 export function AppSidebar({
   ...props
 }) {
+  const pathname = usePathname();
 
   const [selectedNav, setSelectedNav] = useState("1");
+  const [dataSetsList, setDataSetsList] = useState([]);
+
+  useEffect(() => {
+    if (pathname === "/dashboard") {
+      setSelectedNav('1')
+    } else {
+      if (dataSetsList.length > 0) {
+        const match = pathname.match(/\/datasets\/([a-f0-9\-]+)/);
+
+        if (match) {
+          const datasetId = match[1];
+          setSelectedNav(datasetId)
+        }
+      }
+    }
+  }, [pathname, dataSetsList]);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -155,7 +173,7 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
-        <NavDatasets items={data.documents} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
+        <NavDatasets setDataSetsList={setDataSetsList} dataSetsList={dataSetsList} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
         {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
       </SidebarContent>
       <SidebarFooter>
