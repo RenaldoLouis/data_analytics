@@ -1,13 +1,25 @@
-"use client"
+"use client";
+
+import { Button } from "@/components/ui/button";
 import {
     ChartContainer,
     ChartLegend,
     ChartLegendContent,
     ChartTooltip,
-    ChartTooltipContent
-} from "@/components/ui/chart"
-import { useState } from "react"
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+    ChartTooltipContent,
+} from "@/components/ui/chart";
+import { H3 } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
+import {
+    BarChart2,
+    BarChartBig,
+    LayoutGrid,
+    PieChart,
+    Rows3,
+} from "lucide-react"; // icons used as chart options
+import { useState } from "react";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+
 const chartData = [
     { month: "January", desktop: 186, mobile: 80 },
     { month: "February", desktop: 305, mobile: 200 },
@@ -15,7 +27,8 @@ const chartData = [
     { month: "April", desktop: 73, mobile: 190 },
     { month: "May", desktop: 209, mobile: 130 },
     { month: "June", desktop: 214, mobile: 140 },
-]
+];
+
 const chartConfig = {
     desktop: {
         label: "Desktop",
@@ -25,44 +38,105 @@ const chartConfig = {
         label: "Mobile",
         color: "#60a5fa",
     },
-}
+};
 
+const chartTypes = [
+    { icon: <BarChart2 />, label: "Bar" },
+    { icon: <BarChartBig />, label: "Stacked Bar" },
+    { icon: <Rows3 />, label: "Horizontal" },
+    { icon: <PieChart />, label: "Pie" },
+    { icon: <LayoutGrid />, label: "Grid" },
+];
 
 const DatasetsChartView = () => {
-
     const [isShowChart, setIsShowChart] = useState(true);
+    const [selectedChartType, setSelectedChartType] = useState("Stacked Bar");
 
     return (
-        <div className="flex items-center justify-center">
-            {isShowChart ? (
-                <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                    <BarChart accessibilityLayer data={chartData}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis
-                            dataKey="month"
-                            tickLine={false}
-                            tickMargin={10}
-                            axisLine={false}
-                            tickFormatter={(value) => value.slice(0, 3)}
-                        />
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <ChartLegend content={<ChartLegendContent />} />
-                        <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
-                        <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
-                    </BarChart>
-                </ChartContainer>
-            ) : (
-                <div className="bg-white p-8 rounded shadow place-items-center">
-                    <H3 className="text-xl font-bold">
-                        You will be able to create chart after all validation are clear and normalized
-                    </H3>
-                    <Button variant="link" className="font-bold cursor-pointer" style={{ color: "#2168AB" }}>
-                        Edit Data Sets
-                    </Button>
+        <div className="w-full p-6">
+            {/* Column & Row Settings */}
+            <div className="border rounded-md overflow-hidden mb-6 divide-y divide-gray-200">
+                {/* Columns */}
+                <div className="flex items-start bg-gray-50 px-4 py-3 gap-3">
+                    <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
+                        ✏️ <span className="text-blue-600">Columns</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium">
+                            📅 Tanggal Beli
+                        </span>
+                    </div>
                 </div>
-            )}
+
+                {/* Rows (with horizontal scroll) */}
+                <div className="flex items-start px-4 py-3 gap-3">
+                    <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
+                        ✏️ <span className="text-blue-600">Rows</span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                        {["Jumlah Qty", "Harga", "Jumlah Order", "Diskon", "Tax", "Total", "Kode Barang"].map((item) => (
+                            <span
+                                key={item}
+                                className="inline-flex items-center gap-2 rounded-full bg-orange-100 text-orange-700 px-3 py-1 text-sm font-medium whitespace-nowrap"
+                            >
+                                # {item}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+
+            {/* Chart Type Picker */}
+            <div className="mb-6 flex gap-4 overflow-x-auto">
+                {chartTypes.map((type) => (
+                    <button
+                        key={type.label}
+                        onClick={() => setSelectedChartType(type.label)}
+                        className={cn(
+                            "border rounded-md p-3 flex items-center justify-center w-24 h-20 transition",
+                            selectedChartType === type.label
+                                ? "border-blue-500 bg-blue-100"
+                                : "border-gray-300 hover:bg-gray-100"
+                        )}
+                    >
+                        {type.icon}
+                    </button>
+                ))}
+            </div>
+
+            {/* Chart View */}
+            <div className="bg-white rounded-md p-4 shadow-sm">
+                {isShowChart ? (
+                    <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
+                        <BarChart accessibilityLayer data={chartData}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis
+                                dataKey="month"
+                                tickLine={false}
+                                tickMargin={10}
+                                axisLine={false}
+                                tickFormatter={(value) => value.slice(0, 3)}
+                            />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <ChartLegend content={<ChartLegendContent />} />
+                            <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
+                            <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
+                        </BarChart>
+                    </ChartContainer>
+                ) : (
+                    <div className="text-center py-10">
+                        <H3 className="text-xl font-bold mb-2">
+                            You will be able to create chart after all validation are clear and normalized
+                        </H3>
+                        <Button variant="link" className="font-bold" style={{ color: "#2168AB" }}>
+                            Edit Data Sets
+                        </Button>
+                    </div>
+                )}
+            </div>
         </div>
-    )
-}
+    );
+};
 
 export default DatasetsChartView;
