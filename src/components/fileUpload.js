@@ -1,15 +1,39 @@
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { FileText, FileX, Trash2, Upload } from "lucide-react"
-import { useState } from "react"
-import { Controller, useFormContext } from "react-hook-form"
+import { Controller, useFormContext, useWatch } from "react-hook-form"
 import * as XLSX from "xlsx"
 
-export function FileUpload(props) {
-    const { setSheetList } = props
+const readSheetNames = (file) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
 
-    const [fileName, setFileName] = useState(null)
-    const [fileSize, setFileSize] = useState(null)
+        reader.onload = (evt) => {
+            try {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: "binary" });
+                const sheetNames = workbook.SheetNames;
+                resolve(sheetNames);
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        reader.onerror = () => {
+            reject(new Error("Failed to read file"));
+        };
+
+        reader.readAsBinaryString(file);
+    });
+};
+
+export function FileUpload(props) {
+    const { setSheetList, setIsLoading } = props
+
+    const fileWatch = useWatch({ name: "file" });
+    const file = fileWatch?.[0];
+    const fileName = file?.name ?? null;
+    const fileSize = file ? `${Math.round(file.size / 1024)}kb` : null;
     const {
         control,
         setError,
@@ -61,8 +85,6 @@ export function FileUpload(props) {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setFileName(null)
-                                        setFileSize(null)
                                         onChange(null)
                                         clearErrors("file")
                                     }}
@@ -100,34 +122,37 @@ export function FileUpload(props) {
                                     id="file-upload"
                                     type="file"
                                     className="hidden"
-                                    onChange={(e) => {
+                                    onChange={async (e) => {
+                                        setIsLoading(true);
+
                                         const fileList = e.target.files;
                                         const file = fileList?.[0];
                                         const validationResult = validateFile(file);
 
                                         if (validationResult === true) {
-                                            setFileName(file.name);
-                                            setFileSize(`${Math.round(file.size / 1024)}kb`);
                                             clearErrors("file");
                                             onChange(fileList);
 
-                                            // Read sheet names using xlsx
-                                            const reader = new FileReader();
-                                            reader.onload = (evt) => {
-                                                const data = evt.target.result;
-                                                const workbook = XLSX.read(data, { type: "binary" });
-                                                const sheetNames = workbook.SheetNames;
-                                                setSheetList(sheetNames)
-                                            };
-                                            reader.readAsBinaryString(file);
+                                            try {
+                                                const sheetNames = await readSheetNames(file);
+                                                setSheetList(sheetNames);
+                                            } catch (err) {
+                                                console.error("Error reading file:", err);
+                                                setError("file", {
+                                                    type: "manual",
+                                                    message: "Failed to read the Excel file.",
+                                                });
+                                            }
+
+                                            setIsLoading(false);
                                         } else {
-                                            setFileName(null);
-                                            setFileSize(null);
                                             onChange(null);
                                             setError("file", {
                                                 type: "manual",
                                                 message: validationResult,
                                             });
+
+                                            setIsLoading(false);
                                         }
                                     }}
                                 />

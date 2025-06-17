@@ -16,7 +16,7 @@ const totalSteps = 3
 const NewUpload = (props) => {
     const { watch, setError } = useFormContext()
 
-    const { handleSubmit, onSubmit, register, errors } = props
+    const { handleSubmit, onSubmit, register, errors, isLoading, setIsLoading } = props
     const file = watch("file")
     const name = watch("name")
 
@@ -31,13 +31,15 @@ const NewUpload = (props) => {
                 message: "Please upload a file before proceeding.",
             });
             return;
-        } else if (currentStep === 1 && !name) {
+        }
+        else if (currentStep === 1 && !name) {
             setError("name", {
                 type: "manual",
                 message: "Please input name for the dataset.",
             });
             return;
-        } else {
+        }
+        else {
             if (currentStep < totalSteps) {
                 setCurrentStep(prev => prev + 1);
             }
@@ -59,12 +61,16 @@ const NewUpload = (props) => {
                     register={register}
                     errors={errors}
                     setSheetList={setSheetList}
+                    setIsLoading={setIsLoading}
+                    isLoading={isLoading}
                 />;
             case 2:
                 return <NewUploadStep2 />;
             case 3:
                 return <NewUploadStep3
                     sheetList={sheetList}
+                    setIsLoading={setIsLoading}
+                    isLoading={isLoading}
                 />;
         }
     }

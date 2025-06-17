@@ -52,7 +52,10 @@ export default function RegistrationForm() {
     const onSubmit = async (data) => {
         const tempData = {
             email: data.email,
-            password: data.password
+            password: data.password,
+            first_name: data.firstName,
+            last_name: data.lastName,
+            phone: data.phone,
         }
         try {
             const res = await services.auth.register(tempData);

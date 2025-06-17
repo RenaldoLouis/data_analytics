@@ -9,7 +9,7 @@ import {
 import { useMemo } from "react"
 import { useFormContext } from "react-hook-form"
 
-const NewUploadStep3 = ({ sheetList }) => {
+const NewUploadStep3 = ({ sheetList, isLoading }) => {
     const { setValue, watch } = useFormContext()
 
     const sheetSelection = watch("sheetSelection") ?? ""
@@ -22,6 +22,9 @@ const NewUploadStep3 = ({ sheetList }) => {
 
     return (
         <div className="grid gap-6 w-full">
+            {isLoading && (
+                <LoadingScreen />
+            )}
             <div className="grid gap-3 w-full">
                 <Label>Sheet Selection</Label>
                 <Select

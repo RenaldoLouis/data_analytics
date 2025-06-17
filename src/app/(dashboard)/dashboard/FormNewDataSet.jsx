@@ -27,6 +27,7 @@ const FormNewDataSet = () => {
     } = methods
 
     const [uploadDone, setUploadDone] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     const createSingleSheetFile = async (file, selectedSheetIndex) => {
         // Read the file as ArrayBuffer
@@ -53,6 +54,7 @@ const FormNewDataSet = () => {
     };
 
     const onSubmit = async (data) => {
+        setIsLoading(true)
         //recreate the sheet
         const selectedSheetIndex = parseInt(data.sheetSelection)
         const fileToSend = await createSingleSheetFile(data.file[0], selectedSheetIndex);
@@ -80,12 +82,14 @@ const FormNewDataSet = () => {
                 throw new Error("Upload failed with status " + res.status);
             }
 
+            setIsLoading(false)
         } catch (error) {
             toast("Upload failed", {
                 description: error.message,
             });
 
             setUploadDone(UploadStatus.dataNotClear);
+            setIsLoading(false)
         }
     };
 
@@ -115,6 +119,8 @@ const FormNewDataSet = () => {
                     onSubmit={onSubmit}
                     register={register}
                     errors={errors}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
                 />;
         }
     }
