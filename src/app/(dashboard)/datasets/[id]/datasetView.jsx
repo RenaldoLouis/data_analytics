@@ -25,6 +25,7 @@ export default function DataSetView(props) {
     const {
         dataTable,
         data,
+        chartData,
         loading,
         error,
         refetch, // <- call this after updates
@@ -54,6 +55,11 @@ export default function DataSetView(props) {
     const handleTabView = (view) => {
         setCurrentView(view)
     }
+
+    // console.log("data", data)
+    // console.log("dataTable", dataTable)
+    console.log("chartData", chartData)
+
 
     return (
         <>
@@ -85,7 +91,9 @@ export default function DataSetView(props) {
             <div className="flex">
                 <div className="flex-auto">
                     {currentView === DatasetViewConst.chart ? (
-                        <DatasetsChartView />
+                        <DatasetsChartView
+                            chartData={chartData}
+                        />
                     ) : (
                         <DataTable
                             data={dataTable}
@@ -97,4 +105,3 @@ export default function DataSetView(props) {
         </>
     );
 }
-

@@ -23,14 +23,14 @@ import { useState } from "react";
 import { useDrop } from 'react-dnd';
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 
-const chartData = [
-    { month: "January", desktop: 186, mobile: 80 },
-    { month: "February", desktop: 305, mobile: 200 },
-    { month: "March", desktop: 237, mobile: 120 },
-    { month: "April", desktop: 73, mobile: 190 },
-    { month: "May", desktop: 209, mobile: 130 },
-    { month: "June", desktop: 214, mobile: 140 },
-];
+// const chartData = [
+//     { month: "January", desktop: 186, mobile: 80 },
+//     { month: "February", desktop: 305, mobile: 200 },
+//     { month: "March", desktop: 237, mobile: 120 },
+//     { month: "April", desktop: 73, mobile: 190 },
+//     { month: "May", desktop: 209, mobile: 130 },
+//     { month: "June", desktop: 214, mobile: 140 },
+// ];
 
 const chartConfig = {
     desktop: {
@@ -51,7 +51,24 @@ const chartTypes = [
     { icon: <LayoutGrid />, label: "Grid" },
 ];
 
-const DatasetsChartView = () => {
+function groupByAgeAndPayment(data) {
+    const result = {};
+
+    data.forEach(({ customer_age, payment_method }) => {
+        if (!result[customer_age]) result[customer_age] = {};
+        if (!result[customer_age][payment_method]) result[customer_age][payment_method] = 0;
+
+        result[customer_age][payment_method] += 1;
+    });
+
+    // Convert to array of objects
+    return Object.entries(result).map(([age, methods]) => ({
+        customer_age: parseInt(age),
+        ...methods,
+    }));
+}
+
+const DatasetsChartView = ({ chartData }) => {
     const [isShowChart, setIsShowChart] = useState(true);
     const [selectedChartType, setSelectedChartType] = useState("Stacked Bar");
     const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow } = useDashboardContext();
@@ -75,6 +92,8 @@ const DatasetsChartView = () => {
             isOver: monitor.isOver(),
         }),
     });
+
+    const processedData = groupByAgeAndPayment(chartData);
 
     return (
         <div className="w-full p-6">
@@ -150,7 +169,7 @@ const DatasetsChartView = () => {
             <div className="bg-white rounded-md p-4 shadow-sm">
                 {isShowChart ? (
                     <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
-                        <BarChart accessibilityLayer data={chartData}>
+                        {/* <BarChart accessibilityLayer data={chartData}>
                             <CartesianGrid vertical={false} />
                             <XAxis
                                 dataKey="month"
@@ -163,6 +182,15 @@ const DatasetsChartView = () => {
                             <ChartLegend content={<ChartLegendContent />} />
                             <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
                             <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
+                        </BarChart> */}
+                        <BarChart data={processedData}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="customer_age" tickLine={false} tickMargin={10} axisLine={false} />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <ChartLegend content={<ChartLegendContent />} />
+                            {['Bank Transfer', 'Credit Card', 'PayPal'].map((method) => (
+                                <Bar key={method} dataKey={method} radius={4} />
+                            ))}
                         </BarChart>
                     </ChartContainer>
                 ) : (

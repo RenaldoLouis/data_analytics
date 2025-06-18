@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 export function useDatasetTable(datasetId, pagination) {
     const [data, setData] = useState([]);
     const [dataTable, setDataTable] = useState([]);
+    const [chartData, setChartdata] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -27,6 +28,21 @@ export function useDatasetTable(datasetId, pagination) {
 
             setData(res.data.datasets);
             setDataTable(cleanedArray);
+
+            if (chartData.length <= 0) {
+                const res = await services.dataset.getAllDatasetById(
+                    datasetId,
+                    100,
+                    1
+                );
+
+                const cleanedArray = res.data.datasets.map((item) => ({
+                    ...item.data,
+                    id: item.id,
+                }));
+                setChartdata(cleanedArray)
+            }
+
         } catch (err) {
             console.error("Failed to fetch dataset:", err);
             setError(err);
@@ -42,6 +58,7 @@ export function useDatasetTable(datasetId, pagination) {
 
     return {
         data,
+        chartData,
         dataTable,
         loading,
         error,
