@@ -6,10 +6,12 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { H3 } from "@/components/ui/typography";
+import { ItemTypes } from "@/constant/DragTypes";
 import { AnimatePresence, motion } from "framer-motion";
 import { Pencil } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useDrag } from "react-dnd";
 
 const availableDimensions = [
     { name: "Tanggal Beli", icon: "📅" },
@@ -25,6 +27,22 @@ const availableMeasures = [
     { name: "Jumlah Order", icon: "🔢" },
     { name: "Menu Item", icon: "🔢" },
 ];
+
+const DraggableItem = ({ item, type }) => {
+    const [, drag] = useDrag(() => ({
+        type,
+        item,
+    }));
+
+    return (
+        <li
+            ref={drag}
+            className="text-sm text-gray-700 flex items-center gap-2 cursor-pointer"
+        >
+            <span>{item.icon}</span> {item.name}
+        </li>
+    );
+};
 
 export default function DatasetRightContent() {
     const pathname = usePathname();
@@ -74,12 +92,7 @@ export default function DatasetRightContent() {
                             <ScrollArea className="h-auto max-h-28 rounded-md p-2">
                                 <ul className="space-y-1">
                                     {availableDimensions.map((dim) => (
-                                        <li
-                                            key={dim.name}
-                                            className="text-sm text-gray-700 flex items-center gap-2 cursor-pointer"
-                                        >
-                                            <span>{dim.icon}</span> {dim.name}
-                                        </li>
+                                        <DraggableItem key={dim.name} item={dim} type={ItemTypes.DIMENSION} />
                                     ))}
                                 </ul>
                             </ScrollArea>
@@ -92,12 +105,7 @@ export default function DatasetRightContent() {
                             <ScrollArea className="h-auto max-h-28 rounded-md p-2">
                                 <ul className="space-y-1">
                                     {availableMeasures.map((m) => (
-                                        <li
-                                            key={m.name}
-                                            className="text-sm text-gray-700 flex items-center gap-2 cursor-pointer"
-                                        >
-                                            <span>{m.icon}</span> {m.name}
-                                        </li>
+                                        <DraggableItem key={m.name} item={m} type={ItemTypes.MEASURE} />
                                     ))}
                                 </ul>
                             </ScrollArea>

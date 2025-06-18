@@ -9,6 +9,8 @@ import {
     ChartTooltipContent,
 } from "@/components/ui/chart";
 import { H3 } from "@/components/ui/typography";
+import { ItemTypes } from "@/constant/DragTypes";
+import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
 import {
     BarChart2,
@@ -18,6 +20,7 @@ import {
     Rows3,
 } from "lucide-react"; // icons used as chart options
 import { useState } from "react";
+import { useDrop } from 'react-dnd';
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 
 const chartData = [
@@ -51,6 +54,27 @@ const chartTypes = [
 const DatasetsChartView = () => {
     const [isShowChart, setIsShowChart] = useState(true);
     const [selectedChartType, setSelectedChartType] = useState("Stacked Bar");
+    const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow } = useDashboardContext();
+
+    const [{ isOver: isOverColumn }, dropColumn] = useDrop({
+        accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
+        drop: (item) => {
+            setSelectedColumn((prev) => [...new Set([...prev, item.name])]);
+        },
+        collect: (monitor) => ({
+            isOver: monitor.isOver(),
+        }),
+    });
+
+    const [{ isOver: isOverRow }, dropRow] = useDrop({
+        accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
+        drop: (item) => {
+            setSelectedRow((prev) => [...new Set([...prev, item.name])]);
+        },
+        collect: (monitor) => ({
+            isOver: monitor.isOver(),
+        }),
+    });
 
     return (
         <div className="w-full p-6">
@@ -61,10 +85,21 @@ const DatasetsChartView = () => {
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
                         ✏️ <span className="text-blue-600">Columns</span>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium">
-                            📅 Tanggal Beli
-                        </span>
+                    <div
+                        ref={dropColumn}
+                        className={cn(
+                            "flex items-center gap-2 flex-wrap p-2 rounded-md min-h-[40px] min-w-52",
+                            isOverColumn ? "bg-blue-50 border border-blue-400" : "bg-white"
+                        )}
+                    >
+                        {selectedColumn.map((item) => (
+                            <span
+                                key={item}
+                                className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium"
+                            >
+                                📅 {item}
+                            </span>
+                        ))}
                     </div>
                 </div>
 
@@ -73,8 +108,14 @@ const DatasetsChartView = () => {
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
                         ✏️ <span className="text-blue-600">Rows</span>
                     </div>
-                    <div className="flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                        {["Jumlah Qty", "Harga", "Jumlah Order", "Diskon", "Tax", "Total", "Kode Barang"].map((item) => (
+                    <div
+                        ref={dropRow}
+                        className={cn(
+                            "flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 p-2 rounded-md min-h-[40px] min-w-52",
+                            isOverRow ? "bg-orange-50 border border-orange-400" : "bg-white"
+                        )}
+                    >
+                        {selectedRow.map((item) => (
                             <span
                                 key={item}
                                 className="inline-flex items-center gap-2 rounded-full bg-orange-100 text-orange-700 px-3 py-1 text-sm font-medium whitespace-nowrap"
