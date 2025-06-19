@@ -1,4 +1,5 @@
 // src/hooks/useDatasetRightContent.js
+import { ItemTypes } from '@/constant/DragTypes';
 import services from '@/services';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -31,10 +32,10 @@ export function useDatasetRightContent(datasetId) {
 
             for (const [key, value] of Object.entries(cleanedArray[0])) {
                 if (typeof value === "number") {
-                    const tempObject = { name: key, icon: "🔢" };
+                    const tempObject = { name: key, icon: "🔢", type: ItemTypes.MEASURE };
                     measures.push(tempObject);
                 } else {
-                    const tempObject = { name: key, icon: "🔘" };
+                    const tempObject = { name: key, icon: "🔘", type: ItemTypes.DIMENSION };
                     dimensions.push(tempObject);
                 }
             }

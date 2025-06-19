@@ -67,39 +67,38 @@ const chartTypes = [
 function transformChartData(rawData, selectedRow, selectedColumn) {
     if (selectedRow.length === 0 || selectedColumn.length === 0) return [];
 
-    const rowKey = selectedRow[0]; // e.g., 'Quantity' (incorrect for X-axis in your desired output)
-    const colKey = selectedColumn[0]; // e.g., 'Storage Location'
+    // Access the name and type from the selectedRow object
+    const rowField = selectedRow[0].name; // The field name its Metrics / Values (e.g., 'Customer Age', 'Quantity')
+    const rowType = selectedRow[0].type; // The type (e.g., ItemTypes.DIMENSION, ItemTypes.MEASURE)
+    const colKey = selectedColumn[0].name; // The field name for the column (always a dimension/grouping)
 
     const grouped = {};
+    // Determine aggregation type based on the ItemType of the field in 'Rows'
+    const isSumming = rowType === ItemTypes.MEASURE; // True if it's a measure, false if it's a dimension
 
     rawData.forEach((item) => {
-        // Corrected: rowKey should be 'Storage Location' for the X-axis
-        // colKey should be 'Quantity' that we want to sum
-        const xAxisDimension = item[colKey]; // This will be 'Storage Location'
-        const valueToSum = item[rowKey]; // This will be 'Quantity'
+        const xAxisDimensionValue = item[colKey];
+        const measureValue = item[rowField]; // Use rowField here
 
-        // Initialize if not present
-        if (!grouped[xAxisDimension]) {
-            // For simple sum, we just need a single accumulator per dimension
-            grouped[xAxisDimension] = 0;
+        if (!grouped[xAxisDimensionValue]) {
+            grouped[xAxisDimensionValue] = 0; // Initialize for both sum and count
         }
 
-        // Aggregate: Sum the 'valueToSum' (which is 'Quantity')
-        // Ensure valueToSum is treated as a number
-        grouped[xAxisDimension] += Number(valueToSum);
+        if (isSumming) {
+            // Aggregate by summing for MEASURES
+            grouped[xAxisDimensionValue] += Number(measureValue) || 0;
+        } else {
+            // Aggregate by counting for DIMENSIONS (when they are in the 'Rows' slot)
+            grouped[xAxisDimensionValue] += 1;
+        }
     });
 
-    // Convert to chart data array
-    // Each entry will be like { "Storage Location": "Asue", "Sum of Quantity": 1 }
-    // Or for your current Bar component structure, it needs to look like:
-    // { "Storage Location": "Asue", "Asue_SumQuantity": 1 } if you want separate bars per location
-    // or simply { "Storage Location": "Asue", "Quantity": 1 } if Quantity is the single bar
-    // Let's make it flexible for a single measure (summed quantity)
+    const aggregatedKeySuffix = isSumming ? '_Sum' : '_Count';
+    const finalAggregatedKey = rowField + aggregatedKeySuffix; // Use rowField here
 
-    return Object.entries(grouped).map(([xAxisValue, sumQuantity]) => ({
-        [colKey]: xAxisValue, // The dimension for the X-axis (e.g., "Storage Location")
-        [rowKey + '_Sum']: sumQuantity, // The aggregated measure (e.g., "Quantity_Sum")
-        // Appending '_Sum' to the key to avoid conflicts and clearly indicate aggregation
+    return Object.entries(grouped).map(([xAxisValue, aggregatedValue]) => ({
+        [colKey]: xAxisValue,
+        [finalAggregatedKey]: aggregatedValue,
     }));
 }
 
@@ -111,7 +110,7 @@ const DatasetsChartView = ({ chartData }) => {
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
         drop: (item) => {
-            setSelectedColumn((prev) => [...new Set([...prev, item.name])]);
+            setSelectedColumn((prev) => [...new Set([...prev, { name: item.name, type: item.type }])]);
         },
         collect: (monitor) => ({
             isOver: monitor.isOver(),
@@ -121,7 +120,7 @@ const DatasetsChartView = ({ chartData }) => {
     const [{ isOver: isOverRow }, dropRow] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
         drop: (item) => {
-            setSelectedRow((prev) => [...new Set([...prev, item.name])]);
+            setSelectedRow((prev) => [...new Set([...prev, { name: item.name, type: item.type }])]);
         },
         collect: (monitor) => ({
             isOver: monitor.isOver(),
@@ -132,14 +131,20 @@ const DatasetsChartView = ({ chartData }) => {
 
     // seriesKeys will now represent the summed measure, e.g., ['Quantity_Sum']
     const seriesKeys = processedData.length > 0
-        ? Object.keys(processedData[0]).filter(key => key !== selectedColumn[0])
+        ? Object.keys(processedData[0]).filter(key => key !== selectedColumn[0].name)
         : [];
 
-    // Dynamically generate a chart config for colors and labels
     const dynamicChartConfig = seriesKeys.reduce((config, key) => {
+        let label = key;
+        if (key.endsWith('_Sum')) {
+            label = key.replace('_Sum', ' (Sum)');
+        } else if (key.endsWith('_Count')) {
+            label = key.replace('_Count', ' (Count)');
+        }
+
         config[key] = {
             label: key.replace('_Sum', ''), // Clean up label for legend/tooltip
-            color: `hsl(${Math.random() * 360}, 70%, 50%)`, // Generate a random color
+            color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         };
         return config;
     }, {});
@@ -151,7 +156,8 @@ const DatasetsChartView = ({ chartData }) => {
         if (type === 'column') {
             setSelectedColumn((prev) => prev.filter(i => i !== item));
         } else {
-            setSelectedRow((prev) => prev.filter(i => i !== item));
+            // When removing from rows, filter by item.name
+            setSelectedRow((prev) => prev.filter(i => i.name !== item.name));
         }
     };
 
@@ -173,15 +179,15 @@ const DatasetsChartView = ({ chartData }) => {
                     >
                         {selectedColumn.map((item) => (
                             <span
-                                key={item}
+                                key={item.name}
                                 className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium"
                             >
-                                📅 {item}
+                                📅 {item.name}
                                 <button
                                     onClick={() => handleRemoveItem(item, 'column')}
                                     className="text-blue-500 hover:text-blue-800"
                                 >
-                                    &times; {/* A simple 'x' character */}
+                                    &times;
                                 </button>
                             </span>
                         ))}
@@ -202,15 +208,15 @@ const DatasetsChartView = ({ chartData }) => {
                     >
                         {selectedRow.map((item) => (
                             <span
-                                key={item}
+                                key={item.name} // Use item.name as key
                                 className="inline-flex items-center gap-2 rounded-full bg-orange-100 text-orange-700 px-3 py-1 text-sm font-medium whitespace-nowrap"
                             >
-                                # {item}
+                                # {item.name} {/* Display item.name */}
                                 <button
                                     onClick={() => handleRemoveItem(item, 'row')}
                                     className="text-blue-500 hover:text-blue-800"
                                 >
-                                    &times; {/* A simple 'x' character */}
+                                    &times;
                                 </button>
                             </span>
                         ))}
@@ -244,8 +250,7 @@ const DatasetsChartView = ({ chartData }) => {
                         <BarChart data={processedData}>
                             <CartesianGrid vertical={false} />
                             <XAxis
-                                // dataKey={selectedRow[0]}
-                                dataKey={selectedColumn[0]} // X-axis is now the dimension from `selectedColumn` (e.g., 'Storage Location')
+                                dataKey={selectedColumn[0]?.name} // X-axis is now the dimension from `selectedColumn` (e.g., 'Storage Location')
                                 tickLine={false}
                                 tickMargin={10}
                                 axisLine={false}
