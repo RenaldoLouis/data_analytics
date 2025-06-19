@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
     ChartContainer,
     ChartLegend,
@@ -23,14 +22,28 @@ import { useState } from "react";
 import { useDrop } from 'react-dnd';
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 
-// const chartData = [
-//     { month: "January", desktop: 186, mobile: 80 },
-//     { month: "February", desktop: 305, mobile: 200 },
-//     { month: "March", desktop: 237, mobile: 120 },
-//     { month: "April", desktop: 73, mobile: 190 },
-//     { month: "May", desktop: 209, mobile: 130 },
-//     { month: "June", desktop: 214, mobile: 140 },
-// ];
+
+const renderChart = () => {
+    switch (selectedChartType) {
+        case 'Bar':
+        case 'Stacked Bar':
+        case 'Horizontal': // You'll need to adjust the BarChart component for horizontal
+            return (
+                <BarChart data={processedData} /* ... your dynamic props ... */ >
+                    {/* ... */}
+                </BarChart>
+            );
+        case 'Pie':
+            // You would need a different data transformation for Pie charts
+            // and would render <PieChart> from recharts here.
+            return <p>Pie Chart coming soon!</p>;
+        case 'Grid':
+            // This would likely be your <DataTable> component
+            return <p>Grid view coming soon!</p>;
+        default:
+            return <p>Select a chart type.</p>;
+    }
+}
 
 const chartConfig = {
     desktop: {
@@ -51,20 +64,42 @@ const chartTypes = [
     { icon: <LayoutGrid />, label: "Grid" },
 ];
 
-function groupByAgeAndPayment(data) {
-    const result = {};
+function transformChartData(rawData, selectedRow, selectedColumn) {
+    if (selectedRow.length === 0 || selectedColumn.length === 0) return [];
 
-    data.forEach(({ customer_age, payment_method }) => {
-        if (!result[customer_age]) result[customer_age] = {};
-        if (!result[customer_age][payment_method]) result[customer_age][payment_method] = 0;
+    const rowKey = selectedRow[0]; // e.g., 'Quantity' (incorrect for X-axis in your desired output)
+    const colKey = selectedColumn[0]; // e.g., 'Storage Location'
 
-        result[customer_age][payment_method] += 1;
+    const grouped = {};
+
+    rawData.forEach((item) => {
+        // Corrected: rowKey should be 'Storage Location' for the X-axis
+        // colKey should be 'Quantity' that we want to sum
+        const xAxisDimension = item[colKey]; // This will be 'Storage Location'
+        const valueToSum = item[rowKey]; // This will be 'Quantity'
+
+        // Initialize if not present
+        if (!grouped[xAxisDimension]) {
+            // For simple sum, we just need a single accumulator per dimension
+            grouped[xAxisDimension] = 0;
+        }
+
+        // Aggregate: Sum the 'valueToSum' (which is 'Quantity')
+        // Ensure valueToSum is treated as a number
+        grouped[xAxisDimension] += Number(valueToSum);
     });
 
-    // Convert to array of objects
-    return Object.entries(result).map(([age, methods]) => ({
-        customer_age: parseInt(age),
-        ...methods,
+    // Convert to chart data array
+    // Each entry will be like { "Storage Location": "Asue", "Sum of Quantity": 1 }
+    // Or for your current Bar component structure, it needs to look like:
+    // { "Storage Location": "Asue", "Asue_SumQuantity": 1 } if you want separate bars per location
+    // or simply { "Storage Location": "Asue", "Quantity": 1 } if Quantity is the single bar
+    // Let's make it flexible for a single measure (summed quantity)
+
+    return Object.entries(grouped).map(([xAxisValue, sumQuantity]) => ({
+        [colKey]: xAxisValue, // The dimension for the X-axis (e.g., "Storage Location")
+        [rowKey + '_Sum']: sumQuantity, // The aggregated measure (e.g., "Quantity_Sum")
+        // Appending '_Sum' to the key to avoid conflicts and clearly indicate aggregation
     }));
 }
 
@@ -93,7 +128,32 @@ const DatasetsChartView = ({ chartData }) => {
         }),
     });
 
-    const processedData = groupByAgeAndPayment(chartData);
+    const processedData = transformChartData(chartData, selectedRow, selectedColumn);
+
+    // seriesKeys will now represent the summed measure, e.g., ['Quantity_Sum']
+    const seriesKeys = processedData.length > 0
+        ? Object.keys(processedData[0]).filter(key => key !== selectedColumn[0])
+        : [];
+
+    // Dynamically generate a chart config for colors and labels
+    const dynamicChartConfig = seriesKeys.reduce((config, key) => {
+        config[key] = {
+            label: key.replace('_Sum', ''), // Clean up label for legend/tooltip
+            color: `hsl(${Math.random() * 360}, 70%, 50%)`, // Generate a random color
+        };
+        return config;
+    }, {});
+
+
+    console.log("processedData", processedData)
+
+    const handleRemoveItem = (item, type) => {
+        if (type === 'column') {
+            setSelectedColumn((prev) => prev.filter(i => i !== item));
+        } else {
+            setSelectedRow((prev) => prev.filter(i => i !== item));
+        }
+    };
 
     return (
         <div className="w-full p-6">
@@ -117,6 +177,12 @@ const DatasetsChartView = ({ chartData }) => {
                                 className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium"
                             >
                                 📅 {item}
+                                <button
+                                    onClick={() => handleRemoveItem(item, 'column')}
+                                    className="text-blue-500 hover:text-blue-800"
+                                >
+                                    &times; {/* A simple 'x' character */}
+                                </button>
                             </span>
                         ))}
                     </div>
@@ -140,6 +206,12 @@ const DatasetsChartView = ({ chartData }) => {
                                 className="inline-flex items-center gap-2 rounded-full bg-orange-100 text-orange-700 px-3 py-1 text-sm font-medium whitespace-nowrap"
                             >
                                 # {item}
+                                <button
+                                    onClick={() => handleRemoveItem(item, 'row')}
+                                    className="text-blue-500 hover:text-blue-800"
+                                >
+                                    &times; {/* A simple 'x' character */}
+                                </button>
                             </span>
                         ))}
                     </div>
@@ -168,39 +240,34 @@ const DatasetsChartView = ({ chartData }) => {
             {/* Chart View */}
             <div className="bg-white rounded-md p-4 shadow-sm">
                 {isShowChart ? (
-                    <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
-                        {/* <BarChart accessibilityLayer data={chartData}>
+                    <ChartContainer config={dynamicChartConfig} className="min-h-[300px] w-full">
+                        <BarChart data={processedData}>
                             <CartesianGrid vertical={false} />
                             <XAxis
-                                dataKey="month"
+                                // dataKey={selectedRow[0]}
+                                dataKey={selectedColumn[0]} // X-axis is now the dimension from `selectedColumn` (e.g., 'Storage Location')
                                 tickLine={false}
                                 tickMargin={10}
                                 axisLine={false}
-                                tickFormatter={(value) => value.slice(0, 3)}
                             />
                             <ChartTooltip content={<ChartTooltipContent />} />
                             <ChartLegend content={<ChartLegendContent />} />
-                            <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
-                            <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
-                        </BarChart> */}
-                        <BarChart data={processedData}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis dataKey="customer_age" tickLine={false} tickMargin={10} axisLine={false} />
-                            <ChartTooltip content={<ChartTooltipContent />} />
-                            <ChartLegend content={<ChartLegendContent />} />
-                            {['Bank Transfer', 'Credit Card', 'PayPal'].map((method) => (
-                                <Bar key={method} dataKey={method} radius={4} />
+
+                            {seriesKeys.map((key) => (
+                                <Bar
+                                    key={key}
+                                    dataKey={key}
+                                    fill={`var(--color-${key})`} // Uses the color from dynamic config
+                                    radius={4}
+                                />
                             ))}
                         </BarChart>
                     </ChartContainer>
                 ) : (
-                    <div className="text-center py-10">
-                        <H3 className="text-xl font-bold mb-2">
-                            You will be able to create chart after all validation are clear and normalized
+                    <div className="text-center py-20">
+                        <H3 className="text-lg font-medium text-gray-600">
+                            Drag and drop fields into 'Rows' and 'Columns' to build a chart.
                         </H3>
-                        <Button variant="link" className="font-bold" style={{ color: "#2168AB" }}>
-                            Edit Data Sets
-                        </Button>
                     </div>
                 )}
             </div>

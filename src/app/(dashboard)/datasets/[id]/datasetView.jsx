@@ -60,7 +60,6 @@ export default function DataSetView(props) {
     // console.log("dataTable", dataTable)
     console.log("chartData", chartData)
 
-
     return (
         <>
             <div className="flex justify-between px-4 lg:px-6">

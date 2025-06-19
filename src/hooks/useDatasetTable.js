@@ -32,7 +32,7 @@ export function useDatasetTable(datasetId, pagination) {
             if (chartData.length <= 0) {
                 const res = await services.dataset.getAllDatasetById(
                     datasetId,
-                    100,
+                    10,
                     1
                 );
 
