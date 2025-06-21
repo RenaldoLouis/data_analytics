@@ -149,9 +149,6 @@ const DatasetsChartView = ({ chartData }) => {
         return config;
     }, {});
 
-
-    console.log("processedData", processedData)
-
     const handleRemoveItem = (item, type) => {
         if (type === 'column') {
             setSelectedColumn((prev) => prev.filter(i => i !== item));

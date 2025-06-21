@@ -18,8 +18,8 @@ export default function DataSetView(props) {
     const [currentView, setCurrentView] = useState(DatasetViewConst.chart);
     const [dataToUpdate, setDataToUpdate] = useState([]);
     const [pagination, setPagination] = useState({
-        pageIndex: 1,
-        pageLimit: 10,
+        pageIndex: 0,
+        pageSize: 10,
     })
 
     const {
@@ -97,6 +97,9 @@ export default function DataSetView(props) {
                         <DataTable
                             data={dataTable}
                             setDataToUpdate={setDataToUpdate}
+                            pagination={pagination}
+                            setPagination={setPagination}
+                            pageCount={data?.totalPages}
                         />
                     )}
                 </div>

@@ -17,8 +17,8 @@ export function useDatasetTable(datasetId, pagination) {
         try {
             const res = await services.dataset.getAllDatasetById(
                 datasetId,
-                pagination.pageLimit,
-                pagination.pageIndex
+                pagination.pageSize,
+                pagination.pageIndex + 1
             );
 
             const cleanedArray = res.data.datasets.map((item) => ({
@@ -26,7 +26,7 @@ export function useDatasetTable(datasetId, pagination) {
                 id: item.id,
             }));
 
-            setData(res.data.datasets);
+            setData(res.data);
             setDataTable(cleanedArray);
 
             if (chartData.length <= 0) {

@@ -30,9 +30,8 @@ import {
   getFacetedRowModel,
   getFacetedUniqueValues,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
+  useReactTable
 } from "@tanstack/react-table";
 import * as React from "react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
@@ -113,7 +112,10 @@ function DraggableRow({
 
 export function DataTable({
   data: initialData,
-  setDataToUpdate
+  setDataToUpdate,
+  pageCount,
+  pagination,
+  setPagination
 }) {
   const excludeKeys = ["transaction_id", "customer_id", "id"];
 
@@ -123,10 +125,6 @@ export function DataTable({
     React.useState({})
   const [columnFilters, setColumnFilters] = React.useState([])
   const [sorting, setSorting] = React.useState([])
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  })
   const sortableId = React.useId()
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -207,7 +205,9 @@ export function DataTable({
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    pageCount: pageCount ?? -1,
+    manualPagination: true,
+    // getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
