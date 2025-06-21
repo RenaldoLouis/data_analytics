@@ -66,6 +66,11 @@ export default function LoginForm() {
         router.push("/register");
     }
 
+    const handleClickDemoVideo = (e) => {
+        e.preventDefault();   // stop the form from submitting
+        router.push("/requestdemo");
+    }
+
     return (
         <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-center">Login</h2>
@@ -129,7 +134,7 @@ export default function LoginForm() {
                         <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
                             Try Free Trial
                         </Button>
-                        <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600">
+                        <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600" onClick={handleClickDemoVideo}>
                             Request Free Demo Video
                         </Button>
                     </div>

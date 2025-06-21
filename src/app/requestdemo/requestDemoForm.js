@@ -18,23 +18,26 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { industryOptions } from "@/constant/IndustryOptions";
 import services from "@/services";
 
 const registrationSchema = z.object({
-    // firstName: z.string().min(1, "Enter first name"),
-    // lastName: z.string().min(1, "Enter last name"),
-    // phone: z.string().min(8, "Enter valid phone number"),
-    // email: z.string().email("Invalid email address"),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     phone: z.string().optional(),
     email: z.string().email("Invalid email address"),
-    username: z.string().optional(),
-    // username: z.string().min(3, "Username too short"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    companyName: z.string().optional(),
+    industry: z.string({ required_error: "Please select an industry." }),
 });
 
-export default function RegistrationForm() {
+export default function RequestDemoForm() {
     const router = useRouter();
 
     const form = useForm({
@@ -44,8 +47,8 @@ export default function RegistrationForm() {
             lastName: "",
             phone: "",
             email: "",
-            username: "",
-            password: "",
+            companyName: "",
+            industry: "",
         },
     });
 
@@ -53,6 +56,8 @@ export default function RegistrationForm() {
         const tempData = {
             email: data.email,
             password: data.password,
+            companyName: data.companyName,
+            industry: data.industry,
             first_name: data.firstName,
             last_name: data.lastName,
             phone: data.phone,
@@ -81,7 +86,7 @@ export default function RegistrationForm() {
     return (
         <div className="w-full max-w-md">
             <button onClick={() => router.back()} className="text-sm text-gray-500 mb-4">&larr; Back</button>
-            <h2 className="text-2xl font-bold">Try Free Trial</h2>
+            <h2 className="text-2xl font-bold">Request Free Demo</h2>
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
@@ -135,14 +140,16 @@ export default function RegistrationForm() {
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
-                        )}
+                        )
+                        }
                     />
 
-                    <FormField
+                    < FormField
                         control={form.control}
                         name="email"
                         render={({ field }) => (
-                            <FormItem className="mb-6">
+                            <FormItem
+                                className="mb-6">
                                 <FormLabel>Email</FormLabel>
                                 <FormControl>
                                     <Input placeholder="Enter email" {...field} />
@@ -152,15 +159,15 @@ export default function RegistrationForm() {
                         )}
                     />
 
-                    <FormField
+                    < FormField
                         control={form.control}
-                        name="username"
+                        name="companyName"
                         render={({ field }) => (
                             <FormItem
                                 className="mb-6">
-                                <FormLabel>Create username</FormLabel>
+                                <FormLabel>Company Name</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Enter username" {...field} />
+                                    <Input placeholder="Enter Company Name" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -169,22 +176,35 @@ export default function RegistrationForm() {
 
                     <FormField
                         control={form.control}
-                        name="password"
+                        name="industry"
                         render={({ field }) => (
-                            <FormItem
-                                className="mb-12">
-                                <FormLabel>Create Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" placeholder="Enter password" {...field} />
-                                </FormControl>
+                            <FormItem className="mb-12">
+                                <FormLabel>Industry</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select an industry" />
+                                        </SelectTrigger>
+                                    </FormControl>
+
+                                    <SelectContent position="popper">
+                                        {industryOptions.map((industry) => (
+                                            <SelectItem key={industry} value={industry}>
+                                                {industry}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
 
-                    {form.formState.errors.root?.message && (
-                        <p className="text-red-500 font-bold text-center">{form.formState.errors.root.message}</p>
-                    )}
+                    {
+                        form.formState.errors.root?.message && (
+                            <p className="text-red-500 font-bold text-center">{form.formState.errors.root.message}</p>
+                        )
+                    }
 
                     <Button type="submit" className="w-full bg-gray-500 text-white">
                         Submit Form
@@ -193,8 +213,8 @@ export default function RegistrationForm() {
                     <div className="pt-8 flex justify-center">
                         <Image src="/logo.svg" alt="Daya Cipta Tech" width={180} height={28} />
                     </div>
-                </form>
-            </Form>
-        </div>
+                </form >
+            </Form >
+        </div >
     );
 }
