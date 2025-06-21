@@ -1,184 +1,18 @@
 "use client";
 
 import {
-    ChartContainer,
-    ChartLegend,
-    ChartLegendContent,
-    ChartTooltip,
-    ChartTooltipContent,
+    ChartContainer
 } from "@/components/ui/chart";
 import { H3 } from "@/components/ui/typography";
+import { ChartTypes } from "@/constant/ChartTypes";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
+import { transformChartData, transformForPieChart } from "@/lib/transformChartData";
 import { cn } from "@/lib/utils";
-import {
-    AreaChart as AreaChartIcon,
-    BarChart2,
-    LayoutGrid,
-    LineChart as LineChartIcon,
-    PieChart as PieChartIcon
-} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
-import {
-    Area,
-    AreaChart,
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Line,
-    LineChart,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    XAxis
-} from "recharts";
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
+import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComponent } from "./ChartComponent";
 
-const BarChartComponent = ({ data, xAxisKey, seriesKeys }) => (
-    <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            {seriesKeys.map((key, index) => (
-                <Bar key={key} dataKey={key} fill={COLORS[index % COLORS.length]} radius={4} />
-            ))}
-        </BarChart>
-    </ResponsiveContainer>
-);
-
-const LineChartComponent = ({ data, xAxisKey, seriesKeys }) => (
-    <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            {seriesKeys.map((key, index) => (
-                <Line key={key} type="monotone" dataKey={key} stroke={COLORS[index % COLORS.length]} strokeWidth={2} />
-            ))}
-        </LineChart>
-    </ResponsiveContainer>
-);
-
-const AreaChartComponent = ({ data, xAxisKey, seriesKeys }) => (
-    <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            {seriesKeys.map((key, index) => (
-                <Area key={key} type="monotone" dataKey={key} stackId="1" stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} fillOpacity={0.6} />
-            ))}
-        </AreaChart>
-    </ResponsiveContainer>
-);
-
-const PieChartComponent = ({ data }) => (
-    <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-            <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={120}>
-                {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-            </Pie>
-        </PieChart>
-    </ResponsiveContainer>
-);
-
-const chartConfig = {
-    desktop: {
-        label: "Desktop",
-        color: "#2563eb",
-    },
-    mobile: {
-        label: "Mobile",
-        color: "#60a5fa",
-    },
-};
-
-const chartTypes = [
-    { icon: <BarChart2 />, label: "Bar" },
-    { icon: <LineChartIcon />, label: "Line" },
-    { icon: <AreaChartIcon />, label: "Area" },
-    { icon: <PieChartIcon />, label: "Pie" },
-    { icon: <LayoutGrid />, label: "Grid" },
-];
-
-function transformForPieChart(rawData, dimension, measure) {
-    if (!dimension || !measure) return [];
-
-    const dimensionKey = dimension.name;
-    const measureKey = measure.name;
-    const isSumming = measure.type === ItemTypes.MEASURE;
-
-    const grouped = {};
-
-    rawData.forEach((item) => {
-        const dimensionValue = item[dimensionKey];
-        if (!dimensionValue) return;
-
-        if (!grouped[dimensionValue]) {
-            grouped[dimensionValue] = 0;
-        }
-
-        if (isSumming) {
-            grouped[dimensionValue] += Number(item[measureKey]) || 0;
-        } else {
-            // If the measure is a dimension, we count it.
-            grouped[dimensionValue] += 1;
-        }
-    });
-
-    return Object.entries(grouped).map(([name, value]) => ({
-        name,
-        value,
-    }));
-}
-
-function transformChartData(rawData, selectedRow, selectedColumn) {
-    if (selectedRow.length === 0 || selectedColumn.length === 0) return [];
-
-    // Access the name and type from the selectedRow object
-    const rowField = selectedRow[0].name; // The field name its Metrics / Values (e.g., 'Customer Age', 'Quantity')
-    const rowType = selectedRow[0].type; // The type (e.g., ItemTypes.DIMENSION, ItemTypes.MEASURE)
-    const colKey = selectedColumn[0].name; // The field name for the column (always a dimension/grouping)
-
-    const grouped = {};
-    // Determine aggregation type based on the ItemType of the field in 'Rows'
-    const isSumming = rowType === ItemTypes.MEASURE; // True if it's a measure, false if it's a dimension
-
-    rawData.forEach((item) => {
-        const xAxisDimensionValue = item[colKey];
-        const measureValue = item[rowField]; // Use rowField here
-
-        if (!grouped[xAxisDimensionValue]) {
-            grouped[xAxisDimensionValue] = 0; // Initialize for both sum and count
-        }
-
-        if (isSumming) {
-            // Aggregate by summing for MEASURES
-            grouped[xAxisDimensionValue] += Number(measureValue) || 0;
-        } else {
-            // Aggregate by counting for DIMENSIONS (when they are in the 'Rows' slot)
-            grouped[xAxisDimensionValue] += 1;
-        }
-    });
-
-    const aggregatedKeySuffix = isSumming ? '_Sum' : '_Count';
-    const finalAggregatedKey = rowField + aggregatedKeySuffix; // Use rowField here
-
-    return Object.entries(grouped).map(([xAxisValue, aggregatedValue]) => ({
-        [colKey]: xAxisValue,
-        [finalAggregatedKey]: aggregatedValue,
-    }));
-}
 
 const DatasetsChartView = ({ chartData }) => {
     const [isShowChart, setIsShowChart] = useState(true);
@@ -340,10 +174,9 @@ const DatasetsChartView = ({ chartData }) => {
                 </div>
             </div>
 
-
             {/* Chart Type Picker */}
             <div className="mb-6 flex gap-4 overflow-x-auto">
-                {chartTypes.map((type) => (
+                {ChartTypes.map((type) => (
                     <button
                         key={type.label}
                         onClick={() => setSelectedChartType(type.label)}
