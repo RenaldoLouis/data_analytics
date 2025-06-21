@@ -7,7 +7,7 @@ import { H3 } from "@/components/ui/typography";
 import { ChartTypes } from "@/constant/ChartTypes";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
-import { transformChartData, transformForPieChart } from "@/lib/transformChartData";
+import { transformChartData, transformForPieChart, transformForStackedChart } from "@/lib/transformChartData";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
@@ -68,25 +68,41 @@ const DatasetsChartView = ({ chartData }) => {
     });
 
     const processedData = useMemo(() => {
-        const dimension = selectedColumn[0]; // For grouping (e.g., product_category)
-        const measure = selectedRow[0];     // For aggregating (e.g., quantity)
+        const dimensions = selectedColumn;
+        const measuresOrSecondDimension = selectedRow;
 
-        if (!dimension || !measure) return [];
+        if (measuresOrSecondDimension.length === 0 || dimensions.length === 0) return [];
 
-        if (selectedChartType === 'Pie') {
-            return transformForPieChart(chartData, dimension, measure);
+        const primaryDimension = dimensions[0];
+        const secondItem = measuresOrSecondDimension[0];
+
+        // SCENARIO 1: Dimension vs. Dimension (e.g., product_category vs. customer_region)
+        // We will create a stacked chart by COUNTING records.
+        if (primaryDimension.type === ItemTypes.DIMENSION && secondItem.type === ItemTypes.DIMENSION) {
+            return transformForStackedChart(
+                chartData,
+                primaryDimension.name,
+                secondItem.name,
+                { type: 'count' } // Pass our special "measure" to tell the function to count
+            );
         }
 
-        // Bar, Line, and Area charts use the same data structure
+        // SCENARIO 2: Pie Chart (works as before)
+        if (selectedChartType === 'Pie') {
+            return transformForPieChart(chartData, primaryDimension, secondItem);
+        }
+
+        // SCENARIO 3: Default Dimension vs. Measure (works as before)
         return transformChartData(chartData, selectedRow, selectedColumn);
 
     }, [chartData, selectedRow, selectedColumn, selectedChartType]);
 
     // --- DYNAMIC KEYS FOR CHARTS ---
     const xAxisKey = selectedColumn[0]?.name;
-    const seriesKeys = (processedData[0] && selectedChartType !== 'Pie')
-        ? Object.keys(processedData[0]).filter(key => key !== xAxisKey)
-        : [];
+    const seriesKeys = useMemo(() => {
+        if (!processedData || processedData.length === 0) return [];
+        return Object.keys(processedData[0]).filter(key => key !== xAxisKey);
+    }, [processedData, xAxisKey]);
 
     // Create a dynamic chart config for the legend and tooltips
     const dynamicChartConfig = useMemo(() => {
@@ -110,6 +126,8 @@ const DatasetsChartView = ({ chartData }) => {
             setSelectedRow((prev) => prev.filter(i => i.name !== item.name));
         }
     };
+
+    console.log("processedData", processedData)
 
     return (
         <div className="w-full p-6">

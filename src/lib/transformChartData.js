@@ -70,3 +70,37 @@ export function transformChartData(rawData, selectedRow, selectedColumn) {
         [finalAggregatedKey]: aggregatedValue,
     }));
 }
+
+export function transformForStackedChart(rawData, primaryDimensionKey, breakdownDimensionKey, measure) {
+    if (!primaryDimensionKey || !breakdownDimensionKey || !measure) return [];
+
+    const isCounting = measure.type === 'count'; // Check for our special 'count' type
+    const measureKey = measure.name;
+
+    const grouped = {};
+    const breakdownValues = [...new Set(rawData.map(item => item[breakdownDimensionKey]).filter(Boolean))];
+
+    rawData.forEach(item => {
+        const primaryValue = item[primaryDimensionKey];
+        const breakdownValue = item[breakdownDimensionKey];
+
+        if (!primaryValue || !breakdownValue) return; // Skip if categories are null/undefined
+
+        if (!grouped[primaryValue]) {
+            grouped[primaryValue] = { [primaryDimensionKey]: primaryValue };
+            breakdownValues.forEach(val => {
+                grouped[primaryValue][val] = 0;
+            });
+        }
+
+        // THIS IS THE NEW LOGIC
+        if (isCounting) {
+            grouped[primaryValue][breakdownValue] += 1; // Simply add 1 to the count
+        } else {
+            // This is the original logic for summing a measure
+            grouped[primaryValue][breakdownValue] += Number(item[measureKey]) || 0;
+        }
+    });
+
+    return Object.values(grouped);
+}
