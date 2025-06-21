@@ -56,7 +56,7 @@ export default function DataSetView(props) {
         setCurrentView(view)
     }
 
-    // console.log("data", data)
+    console.log("data", data)
     // console.log("dataTable", dataTable)
     console.log("chartData", chartData)
 

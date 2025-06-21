@@ -12,38 +12,85 @@ import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
 import {
+    AreaChart as AreaChartIcon,
     BarChart2,
-    BarChartBig,
     LayoutGrid,
-    PieChart,
-    Rows3,
-} from "lucide-react"; // icons used as chart options
-import { useState } from "react";
+    LineChart as LineChartIcon,
+    PieChart as PieChartIcon
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import {
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Line,
+    LineChart,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    XAxis
+} from "recharts";
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
 
+const BarChartComponent = ({ data, xAxisKey, seriesKeys }) => (
+    <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            {seriesKeys.map((key, index) => (
+                <Bar key={key} dataKey={key} fill={COLORS[index % COLORS.length]} radius={4} />
+            ))}
+        </BarChart>
+    </ResponsiveContainer>
+);
 
-const renderChart = () => {
-    switch (selectedChartType) {
-        case 'Bar':
-        case 'Stacked Bar':
-        case 'Horizontal': // You'll need to adjust the BarChart component for horizontal
-            return (
-                <BarChart data={processedData} /* ... your dynamic props ... */ >
-                    {/* ... */}
-                </BarChart>
-            );
-        case 'Pie':
-            // You would need a different data transformation for Pie charts
-            // and would render <PieChart> from recharts here.
-            return <p>Pie Chart coming soon!</p>;
-        case 'Grid':
-            // This would likely be your <DataTable> component
-            return <p>Grid view coming soon!</p>;
-        default:
-            return <p>Select a chart type.</p>;
-    }
-}
+const LineChartComponent = ({ data, xAxisKey, seriesKeys }) => (
+    <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            {seriesKeys.map((key, index) => (
+                <Line key={key} type="monotone" dataKey={key} stroke={COLORS[index % COLORS.length]} strokeWidth={2} />
+            ))}
+        </LineChart>
+    </ResponsiveContainer>
+);
+
+const AreaChartComponent = ({ data, xAxisKey, seriesKeys }) => (
+    <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            {seriesKeys.map((key, index) => (
+                <Area key={key} type="monotone" dataKey={key} stackId="1" stroke={COLORS[index % COLORS.length]} fill={COLORS[index % COLORS.length]} fillOpacity={0.6} />
+            ))}
+        </AreaChart>
+    </ResponsiveContainer>
+);
+
+const PieChartComponent = ({ data }) => (
+    <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+            <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={120}>
+                {data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+            </Pie>
+        </PieChart>
+    </ResponsiveContainer>
+);
 
 const chartConfig = {
     desktop: {
@@ -58,11 +105,42 @@ const chartConfig = {
 
 const chartTypes = [
     { icon: <BarChart2 />, label: "Bar" },
-    { icon: <BarChartBig />, label: "Stacked Bar" },
-    { icon: <Rows3 />, label: "Horizontal" },
-    { icon: <PieChart />, label: "Pie" },
+    { icon: <LineChartIcon />, label: "Line" },
+    { icon: <AreaChartIcon />, label: "Area" },
+    { icon: <PieChartIcon />, label: "Pie" },
     { icon: <LayoutGrid />, label: "Grid" },
 ];
+
+function transformForPieChart(rawData, dimension, measure) {
+    if (!dimension || !measure) return [];
+
+    const dimensionKey = dimension.name;
+    const measureKey = measure.name;
+    const isSumming = measure.type === ItemTypes.MEASURE;
+
+    const grouped = {};
+
+    rawData.forEach((item) => {
+        const dimensionValue = item[dimensionKey];
+        if (!dimensionValue) return;
+
+        if (!grouped[dimensionValue]) {
+            grouped[dimensionValue] = 0;
+        }
+
+        if (isSumming) {
+            grouped[dimensionValue] += Number(item[measureKey]) || 0;
+        } else {
+            // If the measure is a dimension, we count it.
+            grouped[dimensionValue] += 1;
+        }
+    });
+
+    return Object.entries(grouped).map(([name, value]) => ({
+        name,
+        value,
+    }));
+}
 
 function transformChartData(rawData, selectedRow, selectedColumn) {
     if (selectedRow.length === 0 || selectedColumn.length === 0) return [];
@@ -104,8 +182,36 @@ function transformChartData(rawData, selectedRow, selectedColumn) {
 
 const DatasetsChartView = ({ chartData }) => {
     const [isShowChart, setIsShowChart] = useState(true);
-    const [selectedChartType, setSelectedChartType] = useState("Stacked Bar");
+    const [selectedChartType, setSelectedChartType] = useState("Bar");
     const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow } = useDashboardContext();
+
+    const renderSelectedChart = () => {
+        const hasData = processedData && processedData.length > 0;
+        if (!hasData) return (
+            <div className="text-center py-20">
+                <H3 className="text-lg font-medium text-gray-600">
+                    Drag and drop fields to build a chart.
+                </H3>
+            </div>
+        );
+
+        switch (selectedChartType) {
+            case 'Bar':
+                return <BarChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+            case 'Line':
+                return <LineChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+            case 'Area':
+                return <AreaChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+            case 'Pie':
+                // Pie chart has specific requirements
+                if (selectedRow.length > 1) {
+                    return <p className="text-center p-4">Pie charts can only visualize one measure at a time.</p>
+                }
+                return <PieChartComponent data={processedData} />;
+            default:
+                return <p>Select a chart type.</p>;
+        }
+    };
 
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
@@ -127,27 +233,40 @@ const DatasetsChartView = ({ chartData }) => {
         }),
     });
 
-    const processedData = transformChartData(chartData, selectedRow, selectedColumn);
+    const processedData = useMemo(() => {
+        const dimension = selectedColumn[0]; // For grouping (e.g., product_category)
+        const measure = selectedRow[0];     // For aggregating (e.g., quantity)
 
-    // seriesKeys will now represent the summed measure, e.g., ['Quantity_Sum']
-    const seriesKeys = processedData.length > 0
-        ? Object.keys(processedData[0]).filter(key => key !== selectedColumn[0].name)
-        : [];
+        if (!dimension || !measure) return [];
 
-    const dynamicChartConfig = seriesKeys.reduce((config, key) => {
-        let label = key;
-        if (key.endsWith('_Sum')) {
-            label = key.replace('_Sum', ' (Sum)');
-        } else if (key.endsWith('_Count')) {
-            label = key.replace('_Count', ' (Count)');
+        if (selectedChartType === 'Pie') {
+            return transformForPieChart(chartData, dimension, measure);
         }
 
-        config[key] = {
-            label: key.replace('_Sum', ''), // Clean up label for legend/tooltip
-            color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-        };
-        return config;
-    }, {});
+        // Bar, Line, and Area charts use the same data structure
+        return transformChartData(chartData, selectedRow, selectedColumn);
+
+    }, [chartData, selectedRow, selectedColumn, selectedChartType]);
+
+    // --- DYNAMIC KEYS FOR CHARTS ---
+    const xAxisKey = selectedColumn[0]?.name;
+    const seriesKeys = (processedData[0] && selectedChartType !== 'Pie')
+        ? Object.keys(processedData[0]).filter(key => key !== xAxisKey)
+        : [];
+
+    // Create a dynamic chart config for the legend and tooltips
+    const dynamicChartConfig = useMemo(() => {
+        if (selectedChartType === 'Pie') {
+            return processedData.reduce((acc, entry) => {
+                acc[entry.name] = { label: entry.name };
+                return acc;
+            }, {});
+        }
+        return seriesKeys.reduce((acc, key) => {
+            acc[key] = { label: key.replace(/_Sum|_Count/g, '') };
+            return acc;
+        }, {});
+    }, [seriesKeys, processedData, selectedChartType]);
 
     const handleRemoveItem = (item, type) => {
         if (type === 'column') {
@@ -243,27 +362,8 @@ const DatasetsChartView = ({ chartData }) => {
             {/* Chart View */}
             <div className="bg-white rounded-md p-4 shadow-sm">
                 {isShowChart ? (
-                    <ChartContainer config={dynamicChartConfig} className="min-h-[300px] w-full">
-                        <BarChart data={processedData}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis
-                                dataKey={selectedColumn[0]?.name} // X-axis is now the dimension from `selectedColumn` (e.g., 'Storage Location')
-                                tickLine={false}
-                                tickMargin={10}
-                                axisLine={false}
-                            />
-                            <ChartTooltip content={<ChartTooltipContent />} />
-                            <ChartLegend content={<ChartLegendContent />} />
-
-                            {seriesKeys.map((key) => (
-                                <Bar
-                                    key={key}
-                                    dataKey={key}
-                                    fill={`var(--color-${key})`} // Uses the color from dynamic config
-                                    radius={4}
-                                />
-                            ))}
-                        </BarChart>
+                    <ChartContainer config={dynamicChartConfig} className="min-h-[400px] w-full flex items-center justify-center">
+                        {renderSelectedChart()}
                     </ChartContainer>
                 ) : (
                     <div className="text-center py-20">
