@@ -17,7 +17,7 @@ export async function PUT(request, context) {
         const body = await request.json();
 
         const backendRes = await axios.put(
-            `${process.env.BACKEND_URL}/dataset/updateDatasetContents/${id}`,
+            `${process.env.BACKEND_URL}/dataset/contents/${id}`,
             body,
             {
                 headers: {

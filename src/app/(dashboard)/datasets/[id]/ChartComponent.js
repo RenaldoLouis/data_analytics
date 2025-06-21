@@ -29,6 +29,13 @@ export const BarChartComponent = ({ data, xAxisKey, seriesKeys }) => (
             <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
+            {/* {seriesKeys.map((key) => (
+                <Bar key={key} dataKey={key} radius={4}>
+                    {data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                </Bar>
+            ))} */}
             {seriesKeys.map((key, index) => (
                 <Bar key={key} dataKey={key} fill={COLORS[index % COLORS.length]} radius={4} />
             ))}
