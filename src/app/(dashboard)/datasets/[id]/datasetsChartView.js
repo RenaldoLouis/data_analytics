@@ -82,18 +82,17 @@ const DatasetsChartView = ({ chartData }) => {
             return transformForStackedChart(
                 chartData,
                 primaryDimension.name,
-                secondItem.name,
-                { type: 'count' } // Pass our special "measure" to tell the function to count
+                secondItem
             );
         }
 
         // SCENARIO 2: Pie Chart (works as before)
         if (selectedChartType === 'Pie') {
-            return transformForPieChart(chartData, primaryDimension, secondItem);
+            return transformForPieChart(chartData, secondItem, primaryDimension);
         }
 
         // SCENARIO 3: Default Dimension vs. Measure (works as before)
-        return transformChartData(chartData, selectedRow, selectedColumn);
+        return transformChartData(chartData, selectedColumn, selectedRow);
 
     }, [chartData, selectedRow, selectedColumn, selectedChartType]);
 

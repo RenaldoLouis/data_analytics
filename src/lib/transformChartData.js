@@ -2,12 +2,12 @@
 
 import { ItemTypes } from "@/constant/DragTypes";
 
-export function transformForPieChart(rawData, dimension, measure) {
+export function transformForPieChart(rawData, measure, dimension) {
     if (!dimension || !measure) return [];
 
-    const dimensionKey = dimension.name;
     const measureKey = measure.name;
     const isSumming = measure.type === ItemTypes.MEASURE;
+    const dimensionKey = dimension.name;
 
     const grouped = {};
 
@@ -33,8 +33,8 @@ export function transformForPieChart(rawData, dimension, measure) {
     }));
 }
 
-export function transformChartData(rawData, selectedRow, selectedColumn) {
-    if (selectedRow.length === 0 || selectedColumn.length === 0) return [];
+export function transformChartData(rawData, selectedColumn, selectedRow) {
+    if (selectedColumn.length === 0 || selectedRow.length === 0) return [];
 
     // Access the name and type from the selectedRow object
     const rowField = selectedRow[0].name; // The field name its Metrics / Values (e.g., 'Customer Age', 'Quantity')
@@ -71,18 +71,18 @@ export function transformChartData(rawData, selectedRow, selectedColumn) {
     }));
 }
 
-export function transformForStackedChart(rawData, primaryDimensionKey, breakdownDimensionKey, measure) {
-    if (!primaryDimensionKey || !breakdownDimensionKey || !measure) return [];
+export function transformForStackedChart(rawData, primaryDimensionKey, measuresOrSecondDimension) {
+    if (!primaryDimensionKey || !measuresOrSecondDimension.name) return [];
 
-    const isCounting = measure.type === 'count'; // Check for our special 'count' type
-    const measureKey = measure.name;
+    const isCounting = measuresOrSecondDimension.type === ItemTypes.DIMENSION;
+    const measureKey = measuresOrSecondDimension.name;
 
     const grouped = {};
-    const breakdownValues = [...new Set(rawData.map(item => item[breakdownDimensionKey]).filter(Boolean))];
+    const breakdownValues = [...new Set(rawData.map(item => item[measuresOrSecondDimension.name]).filter(Boolean))];
 
     rawData.forEach(item => {
         const primaryValue = item[primaryDimensionKey];
-        const breakdownValue = item[breakdownDimensionKey];
+        const breakdownValue = item[measuresOrSecondDimension.name];
 
         if (!primaryValue || !breakdownValue) return; // Skip if categories are null/undefined
 
