@@ -4,7 +4,6 @@ import checkMark from "@/assets/logo/checkmark.svg"
 import { Button } from "@/components/ui/button"
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { H3 } from "@/components/ui/typography"
-import { SideMenubarUrl } from "@/constant/SideMenubar"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useRef } from "react"
@@ -18,7 +17,7 @@ const SuccessUpload = (props) => {
 
     const handleClickNext = () => {
         closeRef.current?.click()
-        router.push(SideMenubarUrl.DataSets);
+        // router.push(SideMenubarUrl.DataSets);
     }
 
     return (

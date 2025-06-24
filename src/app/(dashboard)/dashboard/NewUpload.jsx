@@ -54,7 +54,6 @@ const NewUpload = (props) => {
     };
 
     const NewUploadContent = () => {
-
         switch (currentStep) {
             case 1:
                 return <NewUploadStep1
