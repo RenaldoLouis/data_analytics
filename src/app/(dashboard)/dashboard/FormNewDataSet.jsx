@@ -3,17 +3,20 @@
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { UploadStatus } from "@/constant/UploadStatus"
+import { useDashboardContext } from "@/context/dashboard-context"
 import services from "@/services"
 import { useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import * as XLSX from 'xlsx'
+import FailedUpload from "./FailedUpload"
 import NewUpload from "./NewUpload"
 import SuccessUpload from "./SuccesUpload"
 import WarningUpload from "./WarningUpload"
-import FailedUpload from "./FailedUpload"
 
 const FormNewDataSet = () => {
+    const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset } = useDashboardContext();
+
     const methods = useForm({
         defaultValues: {
             name: "",
@@ -136,9 +139,9 @@ const FormNewDataSet = () => {
     }
 
     return (
-        <Dialog>
+        <Dialog open={isDialogOpenAddNewDataset} onOpenChange={setIsDialogOpenAddNewDataSet}>
             <FormProvider {...methods}>
-                <DialogTrigger asChild>
+                <DialogTrigger asChild >
                     <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>
                 </DialogTrigger>
                 <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false}>

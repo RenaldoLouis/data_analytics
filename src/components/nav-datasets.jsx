@@ -8,6 +8,7 @@ import {
   SidebarMenuItem,
   useSidebar
 } from "@/components/ui/sidebar";
+import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
 import { IconPlus } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,7 @@ const predefinedColors = [
 export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, dataSetsList }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
-
+  const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset } = useDashboardContext();
 
   useEffect(() => {
     async function fetchData() {
@@ -55,12 +56,16 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
 
   if (dataSetsList.length === 0) return null;
 
+  const handleOpenAddDataset = () => {
+    setIsDialogOpenAddNewDataSet(true)
+  }
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>
         <div className="flex justify-between w-100">
           Data Sets
-          <IconPlus className="w-4 h-4 cursor-pointer" />
+          <IconPlus className="w-4 h-4 cursor-pointer" onClick={handleOpenAddDataset} />
         </div>
       </SidebarGroupLabel>
       <SidebarMenu>

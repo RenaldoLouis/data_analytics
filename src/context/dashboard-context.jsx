@@ -11,9 +11,10 @@ export const useDashboardContext = () => useContext(DashboardContext);
 export const DashboardProvider = ({ children }) => {
     const [selectedColumn, setSelectedColumn] = useState([]);
     const [selectedRow, setSelectedRow] = useState([]);
+    const [isDialogOpenAddNewDataset, setIsDialogOpenAddNewDataSet] = useState(false);
 
     return (
-        <DashboardContext.Provider value={{ selectedColumn, setSelectedColumn, setSelectedRow, selectedRow }}>
+        <DashboardContext.Provider value={{ selectedColumn, setSelectedColumn, selectedRow, setSelectedRow, setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset }}>
             {children}
         </DashboardContext.Provider>
     );
