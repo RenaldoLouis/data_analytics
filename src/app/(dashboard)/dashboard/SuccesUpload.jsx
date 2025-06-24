@@ -39,7 +39,7 @@ const SuccessUpload = (props) => {
                 <DialogClose asChild>
                     <Button ref={closeRef} variant="outline" type="button" className="cursor-pointer">Close</Button>
                 </DialogClose>
-                <Button onClick={handleClickNext} type="submit" className="cursor-pointer">Next</Button>
+                {/* <Button onClick={handleClickNext} type="submit" className="cursor-pointer">Next</Button> */}
             </DialogFooter>
         </div>
     )

@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx'
 import NewUpload from "./NewUpload"
 import SuccessUpload from "./SuccesUpload"
 import WarningUpload from "./WarningUpload"
+import FailedUpload from "./FailedUpload"
 
 const FormNewDataSet = () => {
     const methods = useForm({
@@ -78,7 +79,7 @@ const FormNewDataSet = () => {
                 });
                 setUploadDone(UploadStatus.dataClear);
             } else {
-                setUploadDone(UploadStatus.dataNotClear);
+                setUploadDone(UploadStatus.uploadFailed);
                 throw new Error("Upload failed with status " + res.status);
             }
 
@@ -106,6 +107,15 @@ const FormNewDataSet = () => {
 
             case UploadStatus.dataNotClear:
                 return <WarningUpload
+                    handleSubmit={handleSubmit}
+                    onSubmit={onSubmit}
+                    register={register}
+                    errors={errors}
+                    setUploadDone={setUploadDone}
+                />;
+
+            case UploadStatus.uploadFailed:
+                return <FailedUpload
                     handleSubmit={handleSubmit}
                     onSubmit={onSubmit}
                     register={register}
