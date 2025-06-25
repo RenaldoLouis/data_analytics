@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { UploadStatus } from "@/constant/UploadStatus"
 import { useDashboardContext } from "@/context/dashboard-context"
 import services from "@/services"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import * as XLSX from 'xlsx'
@@ -27,6 +27,7 @@ const FormNewDataSet = () => {
         register,
         handleSubmit,
         watch,
+        reset,
         formState: { errors },
     } = methods
 
@@ -160,6 +161,12 @@ const FormNewDataSet = () => {
                 />;
         }
     }
+
+    useEffect(() => {
+        if (!isDialogOpenAddNewDataset) {
+            reset();
+        }
+    }, [isDialogOpenAddNewDataset])
 
     return (
         <Dialog open={isDialogOpenAddNewDataset} onOpenChange={setIsDialogOpenAddNewDataSet}>
