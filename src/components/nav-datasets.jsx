@@ -12,7 +12,8 @@ import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
 import { IconPlus } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Skeleton } from "./ui/skeleton";
 
 const predefinedColors = [
   "#FF6B6B",
@@ -32,7 +33,10 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
   const router = useRouter();
   const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset } = useDashboardContext();
 
+  const [isLoadingListDataset, setIsLoadingListDataSet] = useState();
+
   useEffect(() => {
+    setIsLoadingListDataSet(true)
     async function fetchData() {
       const res = await services.dataset.getAllDataset();
 
@@ -43,6 +47,7 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
         }));
 
         setDataSetsList(dataWithColors);
+        setIsLoadingListDataSet(false)
       }
     }
 
@@ -69,19 +74,29 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
         </div>
       </SidebarGroupLabel>
       <SidebarMenu>
-        {dataSetsList.map((item, index) => (
-          <SidebarMenuItem key={`${item.name} ${index}`}>
-            <SidebarMenuButton asChild>
-              <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item)} className="flex items-center space-x-3 cursor-pointer" style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
-                <span
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
-                <span>{item.name}</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
+        {isLoadingListDataset ? (
+          <div className="flex flex-col space-y-3">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-4 w-[150px]" />
+            </div>
+          </div>
+        ) : (
+          dataSetsList.map((item, index) => (
+            <SidebarMenuItem key={`${item.name} ${index}`}>
+              <SidebarMenuButton asChild>
+                <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item)} className="flex items-center space-x-3 cursor-pointer" style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span>{item.name}</span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))
+        )}
       </SidebarMenu>
     </SidebarGroup>
   );

@@ -1,18 +1,23 @@
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { FileText, FileX, Trash2, Upload } from "lucide-react"
+import { useState } from "react"
 import { Controller, useFormContext, useWatch } from "react-hook-form"
 import * as XLSX from "xlsx"
+import { Progress } from "./ui/progress"
 
-const readSheetNames = (file) => {
+const readSheetNames = (file, setUploadProgress) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
+        setUploadProgress(40)
 
         reader.onload = (evt) => {
             try {
                 const data = evt.target.result;
+                setUploadProgress(50)
                 const workbook = XLSX.read(data, { type: "binary" });
                 const sheetNames = workbook.SheetNames;
+                setUploadProgress(60)
                 resolve(sheetNames);
             } catch (err) {
                 reject(err);
@@ -29,6 +34,8 @@ const readSheetNames = (file) => {
 
 export function FileUpload(props) {
     const { setSheetList, setIsLoading } = props
+
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const fileWatch = useWatch({ name: "file" });
     const file = fileWatch?.[0];
@@ -78,8 +85,9 @@ export function FileUpload(props) {
                                     <div>
                                         <p className="text-sm font-medium">{fileName}</p>
                                         <p className="text-xs text-muted-foreground">
-                                            {fileSize} • Complete
+                                            {fileSize} • {uploadProgress !== 100 ? "Loading" : "Complete"}
                                         </p>
+                                        <Progress value={uploadProgress} className="mt-1" />
                                     </div>
                                 </div>
                                 <button
@@ -125,16 +133,20 @@ export function FileUpload(props) {
                                     onChange={async (e) => {
                                         setIsLoading(true);
 
+                                        setUploadProgress(10)
                                         const fileList = e.target.files;
                                         const file = fileList?.[0];
                                         const validationResult = validateFile(file);
+                                        setUploadProgress(20)
 
                                         if (validationResult === true) {
                                             clearErrors("file");
                                             onChange(fileList);
 
                                             try {
-                                                const sheetNames = await readSheetNames(file);
+                                                setUploadProgress(30)
+                                                const sheetNames = await readSheetNames(file, setUploadProgress);
+                                                setUploadProgress(100)
                                                 setSheetList(sheetNames);
                                             } catch (err) {
                                                 console.error("Error reading file:", err);

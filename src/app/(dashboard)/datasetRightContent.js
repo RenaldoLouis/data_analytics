@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { H3 } from "@/components/ui/typography";
 import { ItemTypes } from "@/constant/DragTypes";
@@ -57,6 +58,7 @@ export default function DatasetRightContent() {
     const {
         availableDimensions,
         availableMeasures,
+        loading
     } = useDatasetRightContent(datasetId);
 
     useEffect(() => {
@@ -100,26 +102,47 @@ export default function DatasetRightContent() {
                             <p className="text-sm font-semibold text-gray-500 mb-2">
                                 Dimensions
                             </p>
-                            {/* <ScrollArea className="h-auto max-h-28 rounded-md p-2"> */}
-                            <ul id="dimensionList" className="space-y-1">
-                                {availableDimensions.map((dim) => (
-                                    <DraggableItem key={dim.name} item={dim} type={ItemTypes.DIMENSION} />
-                                ))}
-                            </ul>
-                            {/* </ScrollArea> */}
+                            {loading ? (
+                                <div className="flex flex-col space-y-3">
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-[120px]" />
+                                        <Skeleton className="h-4 w-[120px]" />
+                                        <Skeleton className="h-4 w-[120px]" />
+                                    </div>
+                                </div>
+                            ) : (
+                                //  <ScrollArea className="h-auto max-h-28 rounded-md p-2">
+                                < ul id="dimensionList" className="space-y-1">
+                                    {availableDimensions.map((dim) => (
+                                        <DraggableItem key={dim.name} item={dim} type={ItemTypes.DIMENSION} />
+                                    ))}
+                                </ul>
+                                // </ScrollArea> 
+                            )}
+
                         </div>
 
                         <div>
                             <p className="text-sm font-semibold text-gray-500 mb-2">
                                 Measures
                             </p>
-                            {/* <ScrollArea className="h-auto max-h-28 rounded-md p-2"> */}
-                            <ul id="measuresList" className="space-y-1">
-                                {availableMeasures.map((m) => (
-                                    <DraggableItem key={m.name} item={m} type={ItemTypes.MEASURE} />
-                                ))}
-                            </ul>
-                            {/* </ScrollArea> */}
+                            {loading ? (
+                                <div className="flex flex-col space-y-3">
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-[120px]" />
+                                        <Skeleton className="h-4 w-[120px]" />
+                                        <Skeleton className="h-4 w-[120px]" />
+                                    </div>
+                                </div>
+                            ) : (
+                                // <ScrollArea className="h-auto max-h-28 rounded-md p-2"> 
+                                < ul id="measuresList" className="space-y-1">
+                                    {availableMeasures.map((m) => (
+                                        <DraggableItem key={m.name} item={m} type={ItemTypes.MEASURE} />
+                                    ))}
+                                </ul>
+                                // </ScrollArea> 
+                            )}
                         </div>
                     </CardContent>
 
@@ -163,7 +186,8 @@ export default function DatasetRightContent() {
                         </div>
                     </CardFooter>
                 </motion.div>
-            )}
-        </AnimatePresence>
+            )
+            }
+        </AnimatePresence >
     );
 }

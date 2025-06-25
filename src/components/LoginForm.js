@@ -134,7 +134,7 @@ export default function LoginForm() {
                         <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
                             Try Free Trial
                         </Button>
-                        <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600" onClick={handleClickDemoVideo}>
+                        <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickDemoVideo}>
                             Request Free Demo Video
                         </Button>
                     </div>

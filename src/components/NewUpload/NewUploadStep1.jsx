@@ -3,16 +3,15 @@
 import { FileUpload } from "@/components/fileUpload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import LoadingScreen from "../ui/loadingScreen";
 
 const NewUploadStep1 = (props) => {
     const { register, errors, setSheetList, setIsLoading, isLoading } = props;
 
     return (
         <div className="relative">
-            {isLoading && (
+            {/* {isLoading && (
                 <LoadingScreen />
-            )}
+            )} */}
 
             <div className={`grid gap-3 mb-3 ${isLoading ? 'pointer-events-none opacity-50' : ''}`}>
                 <Label htmlFor="name">Name</Label>

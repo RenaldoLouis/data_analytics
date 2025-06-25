@@ -10,7 +10,7 @@ const Stepper = (props) => {
                 {[1, 2, 3].map(step => (
                     <div
                         key={step}
-                        className={`h-2.5 rounded-full ${step <= currentStep ? "bg-blue-600" : "bg-gray-300"
+                        className={`h-1.5 rounded-full ${step <= currentStep ? "bg-blue-400" : "bg-gray-300"
                             }`}
                     />
                 ))}
