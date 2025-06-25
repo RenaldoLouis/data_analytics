@@ -1,6 +1,9 @@
 // src/hooks/useDatasetRightContent.js
+import DimensionStringIcon from "@/assets/logo/dimensionStringIcon.svg";
+import MeasureIcon from "@/assets/logo/measureIcon.svg";
 import { ItemTypes } from '@/constant/DragTypes';
 import services from '@/services';
+import Image from 'next/image'; // 1. Impor komponen Image
 import { useCallback, useEffect, useState } from 'react';
 
 export function useDatasetRightContent(datasetId) {
@@ -32,10 +35,18 @@ export function useDatasetRightContent(datasetId) {
 
             for (const [key, value] of Object.entries(cleanedArray[0])) {
                 if (typeof value === "number") {
-                    const tempObject = { name: key, icon: "🔢", type: ItemTypes.MEASURE };
+                    const tempObject = {
+                        name: key,
+                        icon: <Image src={MeasureIcon} alt="Measure icon" className="w-5 h-5" />,
+                        type: ItemTypes.MEASURE
+                    };
                     measures.push(tempObject);
                 } else {
-                    const tempObject = { name: key, icon: "🔘", type: ItemTypes.DIMENSION };
+                    const tempObject = {
+                        name: key,
+                        icon: <Image src={DimensionStringIcon} alt="Measure icon" className="w-5 h-5" />,
+                        type: ItemTypes.DIMENSION
+                    };
                     dimensions.push(tempObject);
                 }
             }

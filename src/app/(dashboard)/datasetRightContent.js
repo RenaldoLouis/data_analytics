@@ -1,5 +1,6 @@
 "use client";
 
+import syncIcon from "@/assets/logo/syncIcon.svg";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import { ItemTypes } from "@/constant/DragTypes";
 import { useDatasetRightContent } from "@/hooks/useDatasetRightContent";
 import { AnimatePresence, motion } from "framer-motion";
 import { Pencil } from "lucide-react";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDrag } from "react-dnd";
@@ -73,7 +75,7 @@ export default function DatasetRightContent() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 50 }}
                     transition={{ duration: 0.3 }}
-                    className="p-4 w-full max-w-sm h-full bg-white border-l"
+                    className="px-2 py-4 w-full max-w-sm h-full bg-white border-l"
                 >
                     {/* Header */}
                     <CardHeader className="pb-2">
@@ -85,7 +87,7 @@ export default function DatasetRightContent() {
                                 <Pencil className="w-4 h-4 text-muted-foreground" />
                             </Button>
                         </div>
-                        <div className="flex items-center gap-2 mt-3">
+                        <div className="flex items-center gap-2 my-3">
                             <Switch id="show-dashboard" defaultChecked />
                             <Label
                                 htmlFor="show-dashboard"
@@ -99,7 +101,7 @@ export default function DatasetRightContent() {
                     {/* Dimensions and Measures */}
                     <CardContent className="pb-2">
                         <div className="mb-5">
-                            <p className="text-sm font-semibold text-gray-500 mb-2">
+                            <p className="text-sm font-semibold text-gray-500 mb-3">
                                 Dimensions
                             </p>
                             {loading ? (
@@ -112,7 +114,7 @@ export default function DatasetRightContent() {
                                 </div>
                             ) : (
                                 //  <ScrollArea className="h-auto max-h-28 rounded-md p-2">
-                                < ul id="dimensionList" className="space-y-1">
+                                < ul id="dimensionList" className="space-y-2">
                                     {availableDimensions.map((dim) => (
                                         <DraggableItem key={dim.name} item={dim} type={ItemTypes.DIMENSION} />
                                     ))}
@@ -123,7 +125,7 @@ export default function DatasetRightContent() {
                         </div>
 
                         <div>
-                            <p className="text-sm font-semibold text-gray-500 mb-2">
+                            <p className="text-sm font-semibold text-gray-500 mb-3">
                                 Measures
                             </p>
                             {loading ? (
@@ -136,7 +138,7 @@ export default function DatasetRightContent() {
                                 </div>
                             ) : (
                                 // <ScrollArea className="h-auto max-h-28 rounded-md p-2"> 
-                                < ul id="measuresList" className="space-y-1">
+                                < ul id="measuresList" className="space-y-2">
                                     {availableMeasures.map((m) => (
                                         <DraggableItem key={m.name} item={m} type={ItemTypes.MEASURE} />
                                     ))}
@@ -149,26 +151,27 @@ export default function DatasetRightContent() {
                     {/* Footer: Details & Actions */}
                     <CardFooter className="flex flex-col items-start gap-4 border-t pt-4 text-sm text-gray-600">
                         <div className="space-y-1 w-full">
-                            <p>
+                            <p className="mb-4" style={{ fontWeight: 700, fontSize: 12 }}>DATA SET DETAILS</p>
+                            <p className="mb-3">
                                 <span className="font-medium">Data Source:</span>{" "}
                                 <a href="#" className="text-blue-600 underline">
                                     Data_Penjualan_P...
                                 </a>
                             </p>
-                            <p>
+                            <p className="mb-3">
                                 <span className="font-medium">Created on:</span> 04/05/2025
                             </p>
-                            <p>
+                            <p className="mb-3">
                                 <span className="font-medium">Last edited on:</span> -
                             </p>
-                            <p>
+                            <p className="mb-3">
                                 <span className="font-medium">Last edited by:</span> Renaldo
                             </p>
-                            <p>
+                            <p className="mb-3">
                                 <span className="font-medium">Data status:</span>{" "}
                                 <span className="text-green-600">Ready for Visualization</span>
                             </p>
-                            <p>
+                            <p className="mb-3">
                                 <span className="font-medium">Quality Score:</span>{" "}
                                 <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                                     100%
@@ -176,9 +179,10 @@ export default function DatasetRightContent() {
                             </p>
                         </div>
 
-                        <div className="flex gap-2 w-full">
-                            <Button variant="secondary" className="flex-1">
-                                🔄 Sync Changes
+                        <div className="flex flex-col gap-2 w-full">
+
+                            <Button variant="secondary" className="flex-1" style={{ background: "#0B2238", color: "white" }}>
+                                <Image src={syncIcon} alt="Measure icon" className="w-5 h-5" />   Sync Changes
                             </Button>
                             <Button variant="destructive" className="flex-1">
                                 Delete Data Set
