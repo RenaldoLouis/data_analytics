@@ -47,7 +47,11 @@ const FormNewDataSet = () => {
         XLSX.utils.book_append_sheet(newWorkbook, selectedSheet, selectedSheetName);
 
         // Write it to binary string
-        const wbout = XLSX.write(newWorkbook, { bookType: "xlsx", type: "array" });
+        const wbout = XLSX.write(newWorkbook, {
+            bookType: "xlsx",
+            type: "array",
+            compression: true
+        });
 
         // Create a new Blob (or File)
         const newFile = new File([wbout], `sheet_${selectedSheetName}.xlsx`, {
@@ -57,11 +61,30 @@ const FormNewDataSet = () => {
         return newFile;
     };
 
+    const createSingleSheetCSV = async (file, selectedSheetIndex) => {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: "array" });
+
+        const sheetNames = workbook.SheetNames;
+        const selectedSheetName = sheetNames[selectedSheetIndex];
+        const selectedSheet = workbook.Sheets[selectedSheetName];
+
+        // Convert the sheet directly to a CSV string
+        const csvString = XLSX.utils.sheet_to_csv(selectedSheet);
+
+        // Create a new Blob/File from the CSV string
+        const newFile = new File([csvString], `sheet_${selectedSheetName}.csv`, {
+            type: "text/csv",
+        });
+
+        return newFile;
+    };
+
     const onSubmit = async (data) => {
         setIsLoading(true)
         //recreate the sheet
         const selectedSheetIndex = parseInt(data.sheetSelection)
-        const fileToSend = await createSingleSheetFile(data.file[0], selectedSheetIndex);
+        const fileToSend = await createSingleSheetCSV(data.file[0], selectedSheetIndex);
 
         const formData = new FormData();
         formData.append("file", fileToSend);
@@ -92,7 +115,7 @@ const FormNewDataSet = () => {
                 description: error.message,
             });
 
-            setUploadDone(UploadStatus.dataNotClear);
+            setUploadDone(UploadStatus.uploadFailed);
             setIsLoading(false)
         }
     };
