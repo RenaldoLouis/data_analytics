@@ -85,7 +85,7 @@ export default function RequestDemoForm() {
 
     return (
         <div className="w-full max-w-md">
-            <button onClick={() => router.back()} className="text-sm text-gray-500 mb-4">&larr; Back</button>
+            <button onClick={() => router.back()} className="text-sm text-gray-500 mb-4 cursor-pointer">&larr; Back</button>
             <h2 className="text-2xl font-bold">Request Free Demo</h2>
 
             <Form {...form}>

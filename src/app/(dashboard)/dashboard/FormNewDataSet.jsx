@@ -15,7 +15,7 @@ import SuccessUpload from "./SuccesUpload"
 import WarningUpload from "./WarningUpload"
 
 const FormNewDataSet = () => {
-    const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset } = useDashboardContext();
+    const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
 
     const methods = useForm({
         defaultValues: {
@@ -83,12 +83,12 @@ const FormNewDataSet = () => {
 
     const onSubmit = async (data) => {
         setIsLoading(true)
-        //recreate the sheet
+        //TODO : add with CSV later on 
         const selectedSheetIndex = parseInt(data.sheetSelection)
-        const fileToSend = await createSingleSheetCSV(data.file[0], selectedSheetIndex);
+        // const fileToSend = await createSingleSheetCSV(data.file[0], selectedSheetIndex);
 
         const formData = new FormData();
-        formData.append("file", fileToSend);
+        formData.append("file", data.file[0]);
         formData.append("name", data.name);
         formData.append("dateFormat", data.dateFormat);
         formData.append("timeFormat", data.timeFormat);
@@ -110,6 +110,7 @@ const FormNewDataSet = () => {
                 throw new Error("Upload failed with status " + res.status);
             }
 
+            setIsFetchDataSetLists(!isFetchDataSetLists)
             setIsLoading(false)
         } catch (error) {
             toast("Upload failed", {
@@ -179,7 +180,6 @@ const FormNewDataSet = () => {
                 </DialogContent>
             </FormProvider>
         </Dialog>
-
     )
 }
 
