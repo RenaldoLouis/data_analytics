@@ -22,6 +22,7 @@ const NewUpload = (props) => {
 
     const [currentStep, setCurrentStep] = useState(1); // Starting from step 1
     const [sheetList, setSheetList] = useState([])
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const goToNextStep = (e) => {
         e.preventDefault();   // stop the form from submitting
@@ -62,6 +63,8 @@ const NewUpload = (props) => {
                     setSheetList={setSheetList}
                     setIsLoading={setIsLoading}
                     isLoading={isLoading}
+                    setUploadProgress={setUploadProgress}
+                    uploadProgress={uploadProgress}
                 />;
             case 2:
                 return <NewUploadStep2 />;

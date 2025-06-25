@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const NewUploadStep1 = (props) => {
-    const { register, errors, setSheetList, setIsLoading, isLoading } = props;
+    const { register, errors, setSheetList, setIsLoading, isLoading, setUploadProgress, uploadProgress } = props;
 
     return (
         <div className="relative">
@@ -24,7 +24,7 @@ const NewUploadStep1 = (props) => {
                 )}
             </div>
 
-            <FileUpload setSheetList={setSheetList} setIsLoading={setIsLoading} />
+            <FileUpload setSheetList={setSheetList} setIsLoading={setIsLoading} setUploadProgress={setUploadProgress} uploadProgress={uploadProgress} />
         </div>
     );
 };

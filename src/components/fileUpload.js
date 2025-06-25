@@ -1,7 +1,6 @@
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { FileText, FileX, Trash2, Upload } from "lucide-react"
-import { useState } from "react"
 import { Controller, useFormContext, useWatch } from "react-hook-form"
 import * as XLSX from "xlsx"
 import { Progress } from "./ui/progress"
@@ -33,9 +32,7 @@ const readSheetNames = (file, setUploadProgress) => {
 };
 
 export function FileUpload(props) {
-    const { setSheetList, setIsLoading } = props
-
-    const [uploadProgress, setUploadProgress] = useState(0);
+    const { setSheetList, setIsLoading, setUploadProgress, uploadProgress } = props
 
     const fileWatch = useWatch({ name: "file" });
     const file = fileWatch?.[0];
