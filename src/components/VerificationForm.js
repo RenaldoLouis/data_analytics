@@ -1,7 +1,6 @@
 "use client"
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { verifyEmail } from '@/services/auth';
+import { useState } from 'react';
 
 const VerificationForm = () => {
     const router = useRouter();
@@ -19,19 +18,19 @@ const VerificationForm = () => {
     }
     const handleSubmit = async (e) => {
         e.preventDefault();
-        verifyEmail(email, password)
-            .then(res => {
-                if (res.status === 201) {
-                    clearInputs();
-                    router.push('/login');
-                }
-                else {
-                    setError(res.message);
-                }
-            })
-            .catch(e => {
-                console.error(e);
-            })
+        // verifyEmail(email, password)
+        //     .then(res => {
+        //         if (res.status === 201) {
+        //             clearInputs();
+        //             router.push('/login');
+        //         }
+        //         else {
+        //             setError(res.message);
+        //         }
+        //     })
+        //     .catch(e => {
+        //         console.error(e);
+        //     })
     }
 
     return (
