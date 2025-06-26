@@ -1,5 +1,5 @@
 "use client"
-import { Alert, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -7,23 +7,30 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent
-} from "@/components/ui/chart"
+} from "@/components/ui/chart";
+import { useRef } from 'react';
 
-import { TrendingUp } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
+import { TrendingUp } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
 
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { H3 } from "@/components/ui/typography"
-import { Area, AreaChart } from "recharts"
-import FormNewDataSet from "./FormNewDataSet"
+import downloadIcon from "@/assets/logo/downloadIcon.svg";
+import editIcon from "@/assets/logo/editIcon.svg";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { H3 } from "@/components/ui/typography";
+import { saveAs } from 'file-saver';
+import html2canvas from 'html2canvas-pro';
+import Image from "next/image";
+import { Area, AreaChart } from "recharts";
+import FormNewDataSet from "./FormNewDataSet";
+
 
 export default function Page() {
   const chartData = [
@@ -69,6 +76,34 @@ export default function Page() {
     },
   }
 
+  const cardRef = useRef(null);
+
+  const handleDownloadImage = async () => {
+    const element = cardRef.current;
+    if (!element) {
+      return;
+    }
+
+    try {
+      // The html2canvas library returns a promise that resolves with the canvas
+      const canvas = await html2canvas(element, {
+        // Options to improve image quality and handle external content
+        useCORS: true, // For images from other domains
+        scale: 2,      // Renders at a higher resolution
+      });
+
+      // Convert the canvas to a Blob (a file-like object)
+      canvas.toBlob((blob) => {
+        if (blob) {
+          // Use file-saver to trigger the download
+          saveAs(blob, 'chart-card.png');
+        }
+      });
+    } catch (error) {
+      console.error("Error capturing component: ", error);
+    }
+  };
+
   return (
     <>
       <div className="flex justify-between px-4 lg:px-6">
@@ -93,7 +128,7 @@ export default function Page() {
         </Alert>
       </div>
       <div className="px-4 lg:px-6">
-        <Card>
+        <Card ref={cardRef}>
           <CardHeader>
             <CardTitle>Area Chart - Legend</CardTitle>
             <CardDescription>
@@ -143,7 +178,7 @@ export default function Page() {
             </ChartContainer>
           </CardContent>
           <CardFooter>
-            <div className="flex w-full items-start gap-2 text-sm">
+            <div className="flex w-full items-start gap-2 text-sm justify-between">
               <div className="grid gap-2">
                 <div className="flex items-center gap-2 leading-none font-medium">
                   Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
@@ -151,6 +186,13 @@ export default function Page() {
                 <div className="text-muted-foreground flex items-center gap-2 leading-none">
                   January - June 2024
                 </div>
+              </div>
+              <div className="flex">
+                <Image src={downloadIcon} alt="Measure icon" className="w-5 h-5 mr-3 cursor-pointer"
+                  onClick={handleDownloadImage}
+
+                />
+                <Image src={editIcon} alt="Measure icon" className="w-5 h-5" />
               </div>
             </div>
           </CardFooter>
