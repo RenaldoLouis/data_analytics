@@ -41,10 +41,12 @@ export default function DataSetView(props) {
             datasetContents,
         });
 
-        if (res.success) {
-            toast("Dataset Updated successfully");
-            refetch();
-        } else {
+        try {
+            if (res?.success) {
+                toast("Dataset Updated successfully");
+                refetch();
+            }
+        } catch (e) {
             toast("Upload failed", {
                 description: error.message,
             });

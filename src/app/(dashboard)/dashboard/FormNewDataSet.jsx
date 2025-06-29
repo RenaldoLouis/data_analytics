@@ -74,7 +74,7 @@ const FormNewDataSet = () => {
         const csvString = XLSX.utils.sheet_to_csv(selectedSheet);
 
         // Create a new Blob/File from the CSV string
-        const newFile = new File([csvString], `sheet_${selectedSheetName}.csv`, {
+        const newFile = new File([csvString], `${selectedSheetName}.csv`, {
             type: "text/csv",
         });
 
@@ -85,10 +85,10 @@ const FormNewDataSet = () => {
         setIsLoading(true)
         //TODO : add with CSV later on 
         const selectedSheetIndex = parseInt(data.sheetSelection)
-        // const fileToSend = await createSingleSheetCSV(data.file[0], selectedSheetIndex);
+        const fileToSend = await createSingleSheetCSV(data.file[0], selectedSheetIndex);
 
         const formData = new FormData();
-        formData.append("file", data.file[0]);
+        formData.append("file", fileToSend);
         formData.append("name", data.name);
         formData.append("dateFormat", data.dateFormat);
         formData.append("timeFormat", data.timeFormat);
@@ -96,7 +96,7 @@ const FormNewDataSet = () => {
         try {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
 
-            if (res.success) {
+            if (res?.success) {
                 toast("Dataset uploaded successfully", {
                     description: "File has been uploaded.",
                     action: {

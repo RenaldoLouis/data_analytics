@@ -40,13 +40,18 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
     async function fetchData() {
       const res = await services.dataset.getAllDataset();
 
-      if (res.success && res.data.length > 0) {
-        const dataWithColors = res.data.map((item, index) => ({
-          ...item,
-          color: predefinedColors[index % predefinedColors.length], // cycle through colors
-        }));
+      try {
+        if (res?.success && res?.data.length > 0) {
+          const dataWithColors = res.data.map((item, index) => ({
+            ...item,
+            color: predefinedColors[index % predefinedColors.length], // cycle through colors
+          }));
 
-        setDataSetsList(dataWithColors);
+          setDataSetsList(dataWithColors);
+          setIsLoadingListDataSet(false)
+        }
+      } catch (e) {
+        setDataSetsList([])
         setIsLoadingListDataSet(false)
       }
     }
