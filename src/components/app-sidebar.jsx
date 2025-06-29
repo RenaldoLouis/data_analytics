@@ -1,25 +1,24 @@
 "use client"
 
 import {
-  IconInnerShadowTop,
   IconListDetails
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
-import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem,
+  SidebarMenuItem
 } from "@/components/ui/sidebar"
 import { SideMenubarTitle, SideMenubarUrl } from "@/constant/SideMenubar"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { NavDatasets } from "./nav-datasets"
+import { Separator } from "./ui/separator"
 
 const data = {
   user: {
@@ -163,22 +162,17 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-              <a href="#">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
-              </a>
+              <Image src="/logo.svg" alt="Daya Cipta Tech" width={180} height={28} style={{ width: "fit-content" }} />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+      <Separator />
       <SidebarContent>
         <NavMain items={data.navMain} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
         <NavDatasets setDataSetsList={setDataSetsList} dataSetsList={dataSetsList} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
         {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter>
     </Sidebar>
   );
 }
