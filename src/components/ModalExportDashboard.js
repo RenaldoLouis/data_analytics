@@ -18,7 +18,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Download } from "lucide-react";
+import { CheckCircle2, Download } from "lucide-react";
+import { toast } from "sonner";
 
 export const ModalExportDashboard = () => {
     return (
@@ -33,20 +34,16 @@ export const ModalExportDashboard = () => {
                 </Button>
             </DialogTrigger>
 
-            {/* The Dialog Content, styled to match the screenshot */}
             <DialogContent className="sm:max-w-4xl p-0">
                 <DialogHeader className="p-6 pb-4">
                     <DialogTitle className="text-2xl font-bold text-left">
                         Export Visualization
                     </DialogTitle>
                 </DialogHeader>
-                {/* The separator line */}
                 <div className="border-t" />
 
-                {/* Main content area with a two-column grid layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6">
 
-                    {/* Left Column: Settings */}
                     <div className="flex flex-col gap-8">
                         <div className="grid gap-3">
                             <Label htmlFor="format">File Format</Label>
@@ -76,7 +73,6 @@ export const ModalExportDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Right Column: Preview */}
                     <div className="grid gap-3">
                         <Label>Preview</Label>
                         <div className="flex items-center justify-center rounded-lg border bg-slate-100 p-4 min-h-[300px] w-full">
@@ -91,15 +87,29 @@ export const ModalExportDashboard = () => {
                     </div>
                 </div>
 
-                {/* The styled footer */}
                 <DialogFooter className="bg-slate-50 border-t p-6 sm:justify-end">
                     <DialogClose asChild>
                         <Button type="button" variant="outline" className="w-full sm:w-auto">
                             Cancel
                         </Button>
                     </DialogClose>
-                    <Button type="submit" className="w-full sm:w-auto bg-slate-800 text-white hover:bg-slate-700">
-                        Export
+                    <Button
+                        type="submit"
+                        className="w-full sm:w-auto bg-slate-800 text-white hover:bg-slate-700"
+                        variant="outline"
+                        onClick={() =>
+                            toast("Image has been downloaded.", {
+                                unstyled: true,
+                                icon: <CheckCircle2 className="text-blue-600" />,
+                                classNames: {
+                                    toast:
+                                        "flex items-center w-full p-3 pl-4 bg-emerald-50 border border-emerald-200 rounded-full gap-2",
+                                    title: "text-emerald-900 font-medium",
+                                },
+                            })
+                        }
+                    >
+                        Show Toast
                     </Button>
                 </DialogFooter>
             </DialogContent>
