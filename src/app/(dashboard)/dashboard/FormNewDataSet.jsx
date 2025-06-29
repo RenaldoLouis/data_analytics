@@ -14,8 +14,10 @@ import NewUpload from "./NewUpload"
 import SuccessUpload from "./SuccesUpload"
 import WarningUpload from "./WarningUpload"
 
-const FormNewDataSet = () => {
+const FormNewDataSet = (props) => {
     const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
+
+    const { isShowText = true } = props
 
     const methods = useForm({
         defaultValues: {
@@ -172,7 +174,7 @@ const FormNewDataSet = () => {
     return (
         <Dialog open={isDialogOpenAddNewDataset} onOpenChange={setIsDialogOpenAddNewDataSet}>
             <FormProvider {...methods}>
-                <DialogTrigger asChild >
+                <DialogTrigger style={{ display: !isShowText ? "none" : "" }} asChild>
                     <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>
                 </DialogTrigger>
                 <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false}>

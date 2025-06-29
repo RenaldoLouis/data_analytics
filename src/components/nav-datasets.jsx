@@ -31,7 +31,7 @@ const predefinedColors = [
 export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, dataSetsList }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
-  const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
+  const { setIsDialogOpenAddNewDataSet, isFetchDataSetLists } = useDashboardContext();
 
   const [isLoadingListDataset, setIsLoadingListDataSet] = useState();
 
