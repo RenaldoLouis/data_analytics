@@ -77,9 +77,9 @@ export function FileUpload(props) {
                     <>
                         {fileName ? (
                             <div className="border rounded-md p-4 flex items-center justify-between bg-gray-50">
-                                <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-3 w-full">
                                     <FileText className="text-blue-600 w-5 h-5" />
-                                    <div>
+                                    <div className="w-full">
                                         <p className="text-sm font-medium">{fileName}</p>
                                         <p className="text-xs text-muted-foreground">
                                             {fileSize} • {uploadProgress !== 100 ? "Loading" : "Complete"}
@@ -94,7 +94,7 @@ export function FileUpload(props) {
                                         clearErrors("file")
                                     }}
                                 >
-                                    <Trash2 className="w-4 h-4 text-red-500 cursor-pointer" />
+                                    <Trash2 className="w-4 h-4 text-red-500 cursor-pointer ml-4" />
                                 </button>
                             </div>
                         ) : (

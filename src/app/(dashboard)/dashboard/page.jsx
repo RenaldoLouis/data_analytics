@@ -5,12 +5,14 @@ import DashboardLayout2 from "@/components/DashboardLayout/DashboardLayout2";
 import DashboardLayout3 from "@/components/DashboardLayout/DashboardLayout3";
 import { ModalExportDashboard } from "@/components/ModalExportDashboard";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { H3, P } from "@/components/ui/typography";
+import { useDashboardContext } from "@/context/dashboard-context";
 import { useState } from "react";
-import FormNewDataSet from "./FormNewDataSet";
 
 export default function Page() {
+  const { setIsDialogOpenAddNewDataSet } = useDashboardContext();
 
   const [selectedLayout, setSelectedLayout] = useState("layout1")
 
@@ -51,18 +53,15 @@ export default function Page() {
           <P>
             You don’t have any data sets. Add data sets first in order to make chart
           </P>
-          <FormNewDataSet />
+          <Button
+            onClick={() => setIsDialogOpenAddNewDataSet(true)}
+            variant="link"
+            className="cursor-pointer"
+          >
+            Add data sets
+          </Button>
         </Alert>
       </div>
-
-      {/* <div class="grid grid-cols-2">
-        <div className="px-4 lg:px-6" >
-          <DashboardCardAreaChart />
-        </div>
-        <div className="px-4 lg:px-6" >
-          <DashboardCardBarChart />
-        </div>
-      </div> */}
 
       {renderlayout()}
     </>

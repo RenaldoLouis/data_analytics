@@ -8,13 +8,14 @@ import { DialogClose, DialogFooter, DialogHeader, DialogTitle } from "@/componen
 import { Separator } from "@/components/ui/separator"
 import Stepper from "@/components/ui/stepper"
 import { H3 } from "@/components/ui/typography"
+import _ from 'lodash'
 import { useState } from "react"
 import { useFormContext } from "react-hook-form"
 
 const totalSteps = 3
 
 const NewUpload = (props) => {
-    const { watch, setError } = useFormContext()
+    const { watch, setError, clearErrors } = useFormContext()
 
     const { handleSubmit, onSubmit, register, errors, isLoading, setIsLoading } = props
     const file = watch("file")
@@ -33,7 +34,7 @@ const NewUpload = (props) => {
             });
             return;
         }
-        else if (currentStep === 1 && !name) {
+        else if (currentStep === 1 && _.isEmpty(name)) {
             setError("name", {
                 type: "manual",
                 message: "Please input name for the dataset.",
@@ -41,6 +42,7 @@ const NewUpload = (props) => {
             return;
         }
         else {
+            clearErrors();
             if (currentStep < totalSteps) {
                 setCurrentStep(prev => prev + 1);
             }
@@ -98,16 +100,16 @@ const NewUpload = (props) => {
             <DialogFooter className="px-6 py-3">
                 {currentStep === 1 ? (
                     <DialogClose asChild>
-                        <Button id="buttonDiscard" variant="outline" type="button" className="cursor-pointer">Discard</Button>
+                        <Button disabled={isLoading ? true : false} id="buttonDiscard" variant="outline" type="button" className="cursor-pointer">Discard</Button>
                     </DialogClose>
                 ) : (
-                    <Button id="buttonBack" type="button" className="cursor-pointer" onClick={goToPreviousStep}>Back</Button>
+                    <Button disabled={isLoading ? true : false} id="buttonBack" type="button" className="cursor-pointer" onClick={goToPreviousStep}>Back</Button>
 
                 )}
                 {currentStep !== 3 ? (
-                    <Button id="buttonNext" type="button" className="cursor-pointer" onClick={goToNextStep}>Next</Button>
+                    <Button disabled={isLoading ? true : false} id="buttonNext" type="button" className="cursor-pointer" onClick={goToNextStep}>Next</Button>
                 ) : (
-                    <Button id="buttonSubmit" type="submit" className="cursor-pointer">Add</Button>
+                    <Button disabled={isLoading ? true : false} id="buttonSubmit" type="submit" className="cursor-pointer">Add</Button>
                 )}
             </DialogFooter>
         </form>

@@ -172,12 +172,12 @@ const FormNewDataSet = (props) => {
     }, [isDialogOpenAddNewDataset])
 
     return (
-        <Dialog open={isDialogOpenAddNewDataset} onOpenChange={setIsDialogOpenAddNewDataSet}>
+        <Dialog open={isDialogOpenAddNewDataset} onOpenChange={setIsDialogOpenAddNewDataSet} >
             <FormProvider {...methods}>
                 <DialogTrigger style={{ display: !isShowText ? "none" : "" }} asChild>
                     <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>
                 </DialogTrigger>
-                <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false}>
+                <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false} style={{ height: 500 }}>
                     {dialogContent()}
                 </DialogContent>
             </FormProvider>

@@ -7,8 +7,8 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardProvider } from "@/context/dashboard-context";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import DatasetRightContent from "./datasetRightContent";
 import FormNewDataSet from "./dashboard/FormNewDataSet";
+import DatasetRightContent from "./datasetRightContent";
 
 // TODO : we can try to move DashboardProvider we do not need this layout to be use client, but yes for dataset page, if somehow the performance suffer greatly
 export default function DashboardLayout({ children }) {
