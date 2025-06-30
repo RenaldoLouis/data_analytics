@@ -53,11 +53,22 @@ const postFormRequest = async (path, payload /* this is FormData */) => {
     }
 };
 
-const putRequestMiddleware = async (path, payload /* this is FormData */) => {
+const putRequestMiddleware = async (path, payload) => {
     try {
         return apiClient(path, {
             method: 'PUT',
             body: payload,
+            form: false,
+        });
+    } catch (err) {
+        return handleErrors(err);
+    }
+};
+
+const deleteRequestMiddleware = async (path) => {
+    try {
+        return apiClient(path, {
+            method: 'DELETE',
             form: false,
         });
     } catch (err) {
@@ -113,5 +124,6 @@ export default {
         getAllDataset: () => getRequest(`/api/dataset`),
         getAllDatasetById: (id, limit, page) => getRequest(`/api/dataset/${id}?limit=${limit}&page=${page}`),
         updateDataset: (id, datasetContents) => putRequestMiddleware(`/api/dataset/updateDatasetContents/${id}`, datasetContents),
+        deleteDataset: (id) => deleteRequestMiddleware(`/api/dataset/${id}`),
     }
 };

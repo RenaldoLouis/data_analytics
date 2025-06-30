@@ -28,7 +28,7 @@ export default function DataSetView(props) {
         chartData,
         loading,
         error,
-        refetch, // <- call this after updates
+        refetch,
     } = useDatasetTable(datasetId, pagination);
 
     const handleUpdateData = async () => {

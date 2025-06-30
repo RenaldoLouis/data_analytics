@@ -10,9 +10,10 @@ import {
 } from "@/components/ui/sidebar";
 import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Skeleton } from "./ui/skeleton";
 
 const predefinedColors = [
@@ -31,7 +32,7 @@ const predefinedColors = [
 export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, dataSetsList }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
-  const { setIsDialogOpenAddNewDataSet, isFetchDataSetLists } = useDashboardContext();
+  const { setIsDialogOpenAddNewDataSet, isFetchDataSetLists, setIsFetchDataSetLists } = useDashboardContext();
 
   const [isLoadingListDataset, setIsLoadingListDataSet] = useState();
 
@@ -70,6 +71,24 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
     setIsDialogOpenAddNewDataSet(true)
   }
 
+  const handleDeleteDataset = async (e, datasetId) => {
+    e.stopPropagation();
+    console.log("Delete dataset:", datasetId);
+    const res = await services.dataset.deleteDataset(datasetId);
+
+    try {
+      if (res?.success) {
+        toast("Dataset Deleted");
+        setIsFetchDataSetLists(!isFetchDataSetLists)
+      }
+    } catch (e) {
+      toast("Delete failed", {
+        description: e.message,
+      });
+      throw new Error("Delete failed with status " + res.status);
+    }
+  };
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>
@@ -89,14 +108,25 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
           </div>
         ) : (
           dataSetsList.map((item, index) => (
-            <SidebarMenuItem key={`${item.name} ${index}`}>
+            <SidebarMenuItem
+              key={`${item.name} ${index}`}
+              className="group/item rounded-md"
+            >
               <SidebarMenuButton asChild>
-                <div key={`${item.name} ${index}`} onClick={() => handleClickNavigateDataSets(item)} className="flex items-center space-x-3 cursor-pointer" style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
+                <div
+                  key={`${item.name} ${index}`}
+                  onClick={() => handleClickNavigateDataSets(item)}
+                  className="group flex items-center space-x-3 cursor-pointer"
+                  style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
                   <span
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
                   <span>{item.name}</span>
+                  <IconTrash
+                    onClick={(e) => handleDeleteDataset(e, item.id)}
+                    className="w-4 h-4 text-muted-foreground invisible group-hover/item:visible hover:text-red-800"
+                  />
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
