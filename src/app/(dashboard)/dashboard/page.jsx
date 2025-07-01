@@ -1,5 +1,6 @@
 "use client"
 
+import DashboardCardAreaChart from "@/components/DashboardCard/DashboardCardAreaChart";
 import DashboardLayout1 from "@/components/DashboardLayout/DashboardLayout1";
 import DashboardLayout2 from "@/components/DashboardLayout/DashboardLayout2";
 import DashboardLayout3 from "@/components/DashboardLayout/DashboardLayout3";
@@ -9,10 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { H3, P } from "@/components/ui/typography";
 import { useDashboardContext } from "@/context/dashboard-context";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export default function Page() {
   const { setIsDialogOpenAddNewDataSet } = useDashboardContext();
+  const layoutRef = useRef(null);
 
   const [selectedLayout, setSelectedLayout] = useState("layout1")
 
@@ -45,7 +47,7 @@ export default function Page() {
               <TabsTrigger value="layout3">Layout 3</TabsTrigger>
             </TabsList>
           </Tabs>
-          <ModalExportDashboard />
+          <ModalExportDashboard layoutRef={layoutRef} />
         </div>
       </div>
       <div className="px-4 lg:px-6" >
@@ -62,8 +64,11 @@ export default function Page() {
           </Button>
         </Alert>
       </div>
+      <DashboardCardAreaChart />
 
-      {renderlayout()}
+      <div ref={layoutRef}>
+        {renderlayout()}
+      </div>
     </>
   );
 }

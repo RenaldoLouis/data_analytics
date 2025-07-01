@@ -10,7 +10,7 @@ const WarningUpload = (props) => {
     const { setUploadDone } = props
 
     return (
-        <div className="py-8">
+        <div className="py-8 content-center">
             <DialogHeader className="items-center">
                 <Image src={checkMark} alt="checkMark" />
                 <DialogTitle className="">

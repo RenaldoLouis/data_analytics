@@ -18,10 +18,51 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { saveAs } from 'file-saver';
+import html2canvas from "html2canvas-pro";
 import { CheckCircle2, Download } from "lucide-react";
 import { toast } from "sonner";
 
-export const ModalExportDashboard = () => {
+export const ModalExportDashboard = (props) => {
+    const { layoutRef } = props
+
+    const handleDownloadImage = async () => {
+        console.log("layoutRef", layoutRef)
+        const element = layoutRef.current;
+        console.log("element", element)
+        if (!element) {
+            return;
+        }
+
+        try {
+            // The html2canvas library returns a promise that resolves with the canvas
+            const canvas = await html2canvas(element, {
+                // Options to improve image quality and handle external content
+                useCORS: true, // For images from other domains
+                scale: 2,      // Renders at a higher resolution
+            });
+
+            // Convert the canvas to a Blob (a file-like object)
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    // Use file-saver to trigger the download
+                    saveAs(blob, 'chart-Layout.png');
+                }
+            });
+            toast("Image has been downloaded.", {
+                unstyled: true,
+                icon: <CheckCircle2 className="text-blue-600" />,
+                classNames: {
+                    toast:
+                        "flex items-center w-full p-3 pl-4 bg-emerald-50 border border-emerald-200 rounded-full gap-2",
+                    title: "text-emerald-900 font-medium",
+                },
+            })
+        } catch (error) {
+            console.error("Error capturing component: ", error);
+        }
+    };
+
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -97,19 +138,9 @@ export const ModalExportDashboard = () => {
                         type="submit"
                         className="w-full sm:w-auto bg-slate-800 text-white hover:bg-slate-700"
                         variant="outline"
-                        onClick={() =>
-                            toast("Image has been downloaded.", {
-                                unstyled: true,
-                                icon: <CheckCircle2 className="text-blue-600" />,
-                                classNames: {
-                                    toast:
-                                        "flex items-center w-full p-3 pl-4 bg-emerald-50 border border-emerald-200 rounded-full gap-2",
-                                    title: "text-emerald-900 font-medium",
-                                },
-                            })
-                        }
+                        onClick={() => handleDownloadImage()}
                     >
-                        Show Toast
+                        Download Layout
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -28,6 +28,7 @@ const FormNewDataSet = (props) => {
     const {
         register,
         handleSubmit,
+        clearErrors,
         watch,
         reset,
         formState: { errors },
@@ -168,6 +169,8 @@ const FormNewDataSet = (props) => {
     useEffect(() => {
         if (!isDialogOpenAddNewDataset) {
             reset();
+            clearErrors();
+            setUploadDone(null);
         }
     }, [isDialogOpenAddNewDataset])
 
