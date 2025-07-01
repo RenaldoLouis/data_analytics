@@ -1,6 +1,5 @@
 "use client"
 
-import DashboardCardAreaChart from "@/components/DashboardCard/DashboardCardAreaChart";
 import DashboardLayout1 from "@/components/DashboardLayout/DashboardLayout1";
 import DashboardLayout2 from "@/components/DashboardLayout/DashboardLayout2";
 import DashboardLayout3 from "@/components/DashboardLayout/DashboardLayout3";
@@ -64,7 +63,6 @@ export default function Page() {
           </Button>
         </Alert>
       </div>
-      <DashboardCardAreaChart />
 
       <div ref={layoutRef}>
         {renderlayout()}

@@ -21,50 +21,67 @@ import {
 import { saveAs } from 'file-saver';
 import html2canvas from "html2canvas-pro";
 import { CheckCircle2, Download } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 export const ModalExportDashboard = (props) => {
     const { layoutRef } = props
 
-    const handleDownloadImage = async () => {
-        console.log("layoutRef", layoutRef)
+    const [previewUrl, setPreviewUrl] = useState("");
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+    const [downloadableBlob, setDownloadableBlob] = useState(null);
+
+
+    const generatePreview = async () => {
         const element = layoutRef.current;
-        console.log("element", element)
-        if (!element) {
-            return;
-        }
+        if (!element) return;
 
+        setIsPreviewLoading(true);
         try {
-            // The html2canvas library returns a promise that resolves with the canvas
             const canvas = await html2canvas(element, {
-                // Options to improve image quality and handle external content
-                useCORS: true, // For images from other domains
-                scale: 2,      // Renders at a higher resolution
+                useCORS: true,
+                scale: 2,
             });
-
-            // Convert the canvas to a Blob (a file-like object)
+            // Convert the canvas to a data URL to use in the <img> tag
+            setPreviewUrl(canvas.toDataURL('image/png'));
+            // Create a Blob for the download and store it in state
             canvas.toBlob((blob) => {
-                if (blob) {
-                    // Use file-saver to trigger the download
-                    saveAs(blob, 'chart-Layout.png');
-                }
+                setDownloadableBlob(blob);
             });
-            toast("Image has been downloaded.", {
-                unstyled: true,
-                icon: <CheckCircle2 className="text-blue-600" />,
-                classNames: {
-                    toast:
-                        "flex items-center w-full p-3 pl-4 bg-emerald-50 border border-emerald-200 rounded-full gap-2",
-                    title: "text-emerald-900 font-medium",
-                },
-            })
         } catch (error) {
-            console.error("Error capturing component: ", error);
+            console.error("Error generating preview:", error);
+        } finally {
+            setIsPreviewLoading(false);
         }
     };
 
+    const handleDownloadImage = () => {
+        if (!downloadableBlob) {
+            toast.error("Image data is not ready yet. Please wait.");
+            return;
+        }
+        // Use the blob from state to trigger the download instantly
+        saveAs(downloadableBlob, 'dashboard-layout.png');
+        toast("Image has been downloaded.", {
+            unstyled: true,
+            icon: <CheckCircle2 className="text-blue-600" />,
+            classNames: {
+                toast: "flex items-center w-full p-3 pl-4 bg-emerald-50 border border-emerald-200 rounded-full gap-2",
+                title: "text-emerald-900 font-medium",
+            },
+        });
+    };
+
     return (
-        <Dialog>
+        <Dialog onOpenChange={(isOpen) => {
+            if (isOpen) {
+                // Generate the preview when the dialog is opened
+                generatePreview();
+            } else {
+                // Clear the preview when it's closed to save memory
+                setPreviewUrl("");
+            }
+        }}>
             <DialogTrigger asChild>
                 <Button
                     variant="outline"
@@ -117,13 +134,19 @@ export const ModalExportDashboard = (props) => {
                     <div className="grid gap-3">
                         <Label>Preview</Label>
                         <div className="flex items-center justify-center rounded-lg border bg-slate-100 p-4 min-h-[300px] w-full">
-                            <div className="bg-white p-2 shadow-lg rounded-sm w-full max-w-[250px]">
-                                <img
-                                    src="https://placehold.co/250x350/f0f0f0/666?text=Chart+Preview"
-                                    alt="Preview of the visualization to be exported"
-                                    className="w-full h-auto"
-                                />
-                            </div>
+                            {isPreviewLoading ? (
+                                <div className="text-sm text-muted-foreground">Generating Preview...</div>
+                            ) : previewUrl ? (
+                                <div className="bg-white p-2 shadow-lg rounded-sm w-full max-w-[250px]">
+                                    <img
+                                        src={previewUrl}
+                                        alt="Live preview of the dashboard layout"
+                                        className="w-full h-auto"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">Preview will appear here.</div>
+                            )}
                         </div>
                     </div>
                 </div>
