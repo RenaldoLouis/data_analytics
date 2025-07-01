@@ -10,7 +10,14 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
 import {
     Select,
     SelectContent,
@@ -20,17 +27,26 @@ import {
 } from "@/components/ui/select";
 import { saveAs } from 'file-saver';
 import html2canvas from "html2canvas-pro";
+import jsPDF from 'jspdf';
 import { CheckCircle2, Download } from "lucide-react";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+
 
 export const ModalExportDashboard = (props) => {
     const { layoutRef } = props
 
     const [previewUrl, setPreviewUrl] = useState("");
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
-    const [downloadableBlob, setDownloadableBlob] = useState(null);
+    const [canvasElement, setCanvasElement] = useState(null);
 
+    const form = useForm({
+        defaultValues: {
+            format: "png",
+            margin: "a4",
+        },
+    });
 
     const generatePreview = async () => {
         const element = layoutRef.current;
@@ -42,12 +58,8 @@ export const ModalExportDashboard = (props) => {
                 useCORS: true,
                 scale: 2,
             });
-            // Convert the canvas to a data URL to use in the <img> tag
+            setCanvasElement(canvas);
             setPreviewUrl(canvas.toDataURL('image/png'));
-            // Create a Blob for the download and store it in state
-            canvas.toBlob((blob) => {
-                setDownloadableBlob(blob);
-            });
         } catch (error) {
             console.error("Error generating preview:", error);
         } finally {
@@ -55,14 +67,55 @@ export const ModalExportDashboard = (props) => {
         }
     };
 
-    const handleDownloadImage = () => {
-        if (!downloadableBlob) {
-            toast.error("Image data is not ready yet. Please wait.");
+    const handleDownload = (data) => {
+        if (!canvasElement) {
+            toast.error("Image data is not ready yet. Please generate a preview first.");
             return;
         }
-        // Use the blob from state to trigger the download instantly
-        saveAs(downloadableBlob, 'dashboard-layout.png');
-        toast("Image has been downloaded.", {
+
+        const fileName = `dashboard-layout.${data.format}`;
+
+        // --- PDF Generation Logic ---
+        if (data.format === 'pdf') {
+            const imgData = canvasElement.toDataURL('image/jpeg', 0.9); // Use JPEG for smaller PDF size
+            const pdf = new jsPDF({
+                orientation: 'landscape', // or 'portrait'
+                unit: 'px',
+                format: data.margin === 'none' ? [canvasElement.width, canvasElement.height] : data.margin,
+            });
+
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+
+            // Fit the image to the page size while maintaining aspect ratio
+            const canvasAspectRatio = canvasElement.width / canvasElement.height;
+            const pageAspectRatio = pdfWidth / pdfHeight;
+
+            let imgWidth, imgHeight;
+
+            if (canvasAspectRatio > pageAspectRatio) {
+                imgWidth = pdfWidth;
+                imgHeight = pdfWidth / canvasAspectRatio;
+            } else {
+                imgHeight = pdfHeight;
+                imgWidth = pdfHeight * canvasAspectRatio;
+            }
+
+            // Center the image on the page
+            const x = (pdfWidth - imgWidth) / 2;
+            const y = (pdfHeight - imgHeight) / 2;
+
+            pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
+            pdf.save(fileName);
+
+            // --- Image Generation Logic (PNG/JPEG) ---
+        } else {
+            canvasElement.toBlob((blob) => {
+                saveAs(blob, fileName);
+            }, `image/${data.format}`);
+        }
+
+        toast("Export has been downloaded.", {
             unstyled: true,
             icon: <CheckCircle2 className="text-blue-600" />,
             classNames: {
@@ -75,11 +128,10 @@ export const ModalExportDashboard = (props) => {
     return (
         <Dialog onOpenChange={(isOpen) => {
             if (isOpen) {
-                // Generate the preview when the dialog is opened
                 generatePreview();
             } else {
-                // Clear the preview when it's closed to save memory
                 setPreviewUrl("");
+                setCanvasElement(null); // Clear canvas to save memory
             }
         }}>
             <DialogTrigger asChild>
@@ -93,79 +145,98 @@ export const ModalExportDashboard = (props) => {
             </DialogTrigger>
 
             <DialogContent className="sm:max-w-4xl p-0">
-                <DialogHeader className="p-6 pb-4">
-                    <DialogTitle className="text-2xl font-bold text-left">
-                        Export Visualization
-                    </DialogTitle>
-                </DialogHeader>
-                <div className="border-t" />
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleDownload)}>
+                        <DialogHeader className="p-6 pb-4">
+                            <DialogTitle className="text-2xl font-bold text-left">
+                                Export Visualization
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="border-t" />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6">
+                            <div className="flex flex-col gap-8">
+                                <FormField
+                                    control={form.control}
+                                    name="format"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>File Format</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger id="format" className="w-full">
+                                                        <SelectValue placeholder="Select format" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="png">PNG</SelectItem>
+                                                    <SelectItem value="jpeg">JPEG</SelectItem>
+                                                    <SelectItem value="pdf">PDF</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="margin"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Margin Settings</FormLabel>
+                                            <Select onValuechange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger id="margin" className="w-full">
+                                                        <SelectValue placeholder="Select margin" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="letter">Letter</SelectItem>
+                                                    <SelectItem value="a4">A4</SelectItem>
+                                                    <SelectItem value="none">No Margin</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
 
-                    <div className="flex flex-col gap-8">
-                        <div className="grid gap-3">
-                            <Label htmlFor="format">File Format</Label>
-                            <Select defaultValue="pdf">
-                                <SelectTrigger id="format" className="w-full">
-                                    <SelectValue placeholder="Select format" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="pdf">PDF</SelectItem>
-                                    <SelectItem value="png">PNG</SelectItem>
-                                    <SelectItem value="jpeg">JPEG</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-3">
-                            <Label htmlFor="margin">Margin Settings</Label>
-                            <Select defaultValue="letter">
-                                <SelectTrigger id="margin" className="w-full">
-                                    <SelectValue placeholder="Select margin" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="letter">Letter</SelectItem>
-                                    <SelectItem value="a4">A4</SelectItem>
-                                    <SelectItem value="none">No Margin</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-3">
-                        <Label>Preview</Label>
-                        <div className="flex items-center justify-center rounded-lg border bg-slate-100 p-4 min-h-[300px] w-full">
-                            {isPreviewLoading ? (
-                                <div className="text-sm text-muted-foreground">Generating Preview...</div>
-                            ) : previewUrl ? (
-                                <div className="bg-white p-2 shadow-lg rounded-sm w-full max-w-[250px]">
-                                    <img
-                                        src={previewUrl}
-                                        alt="Live preview of the dashboard layout"
-                                        className="w-full h-auto"
-                                    />
+                            <div className="grid gap-3">
+                                <FormLabel>Preview</FormLabel>
+                                <div className="flex items-center justify-center rounded-lg border bg-slate-100 p-4 min-h-[300px] w-full">
+                                    {isPreviewLoading ? (
+                                        <div className="text-sm text-muted-foreground">Generating Preview...</div>
+                                    ) : previewUrl ? (
+                                        <div className="bg-white p-2 shadow-lg rounded-sm w-full max-w-[250px]">
+                                            <img
+                                                src={previewUrl}
+                                                alt="Live preview of the dashboard layout"
+                                                className="w-full h-auto"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-muted-foreground">Preview will appear here.</div>
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="text-sm text-muted-foreground">Preview will appear here.</div>
-                            )}
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <DialogFooter className="bg-slate-50 border-t p-6 sm:justify-end">
-                    <DialogClose asChild>
-                        <Button type="button" variant="outline" className="w-full sm:w-auto">
-                            Cancel
-                        </Button>
-                    </DialogClose>
-                    <Button
-                        type="submit"
-                        className="w-full sm:w-auto bg-slate-800 text-white hover:bg-slate-700"
-                        variant="outline"
-                        onClick={() => handleDownloadImage()}
-                    >
-                        Download Layout
-                    </Button>
-                </DialogFooter>
+                        <DialogFooter className="bg-slate-50 border-t p-6 sm:justify-end">
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline" className="w-full sm:w-auto">
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button
+                                type="submit"
+                                className="w-full sm:w-auto bg-slate-800 text-white hover:bg-slate-700"
+                            >
+                                Download Layout
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     );
