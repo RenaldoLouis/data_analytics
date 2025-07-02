@@ -3,6 +3,7 @@
 import {
     AreaChart as AreaChartIcon,
     BarChart2,
+    ChartColumnBig,
     LayoutGrid,
     LineChart as LineChartIcon,
     PieChart as PieChartIcon
@@ -10,6 +11,7 @@ import {
 
 export const ChartTypes = [
     { icon: <BarChart2 />, label: "Bar" },
+    { icon: <ChartColumnBig />, label: "Groupbar" },
     { icon: <LineChartIcon />, label: "Line" },
     { icon: <AreaChartIcon />, label: "Area" },
     { icon: <PieChartIcon />, label: "Pie" },

@@ -32,6 +32,8 @@ const DatasetsChartView = ({ chartData }) => {
         switch (selectedChartType) {
             case 'Bar':
                 return <BarChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+            case 'Groupbar':
+                return <BarChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} isGrouped={true} />;
             case 'Line':
                 return <LineChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
             case 'Area':
@@ -198,7 +200,7 @@ const DatasetsChartView = ({ chartData }) => {
                         key={type.label}
                         onClick={() => setSelectedChartType(type.label)}
                         className={cn(
-                            "border rounded-md p-3 flex items-center justify-center w-24 h-20 transition",
+                            "border rounded-md p-3 flex items-center justify-center w-24 h-20 transition cursor-pointer",
                             selectedChartType === type.label
                                 ? "border-blue-500 bg-blue-100"
                                 : "border-gray-300 hover:bg-gray-100"

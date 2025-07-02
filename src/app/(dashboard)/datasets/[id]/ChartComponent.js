@@ -22,7 +22,7 @@ import {
 } from "recharts";
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
 
-export const BarChartComponent = ({ data, xAxisKey, seriesKeys }) => (
+export const BarChartComponent = ({ data, xAxisKey, seriesKeys, isGrouped = false }) => (
     <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
             <CartesianGrid vertical={false} />
@@ -34,7 +34,8 @@ export const BarChartComponent = ({ data, xAxisKey, seriesKeys }) => (
                     key={key}
                     dataKey={key}
                     // This ID tells Recharts to stack the bars
-                    stackId="a"
+                    // stackId="a"
+                    stackId={isGrouped ? undefined : "a"}
                     fill={COLORS[index % COLORS.length]}
                     radius={4}
                 />
