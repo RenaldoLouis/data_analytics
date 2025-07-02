@@ -195,20 +195,31 @@ const DatasetsChartView = ({ chartData }) => {
 
             {/* Chart Type Picker */}
             <div className="mb-6 flex gap-4 overflow-x-auto">
-                {ChartTypes.map((type) => (
-                    <button
-                        key={type.label}
-                        onClick={() => setSelectedChartType(type.label)}
-                        className={cn(
-                            "border rounded-md p-3 flex items-center justify-center w-24 h-20 transition cursor-pointer",
-                            selectedChartType === type.label
-                                ? "border-blue-500 bg-blue-100"
-                                : "border-gray-300 hover:bg-gray-100"
-                        )}
-                    >
-                        {type.icon}
-                    </button>
-                ))}
+                {ChartTypes.map((type) => {
+                    let isDisabled = false
+                    if (type.label === "Groupbar") {
+                        if (selectedRow[0]?.type === "measure") {
+                            isDisabled = true
+                        }
+                    }
+
+                    return (
+                        <button
+                            key={type.label}
+                            onClick={() => setSelectedChartType(type.label)}
+                            disabled={isDisabled}
+                            className={cn(
+                                "border rounded-md p-3 flex items-center justify-center w-24 h-20 transition cursor-pointer",
+                                selectedChartType === type.label
+                                    ? "border-blue-500 bg-blue-100"
+                                    : "border-gray-300 hover:bg-gray-100",
+                                "disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:hover:bg-slate-100"
+                            )}
+                        >
+                            {type.icon}
+                        </button>
+                    )
+                })}
             </div>
 
             {/* Chart View */}
