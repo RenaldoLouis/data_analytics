@@ -197,8 +197,14 @@ const DatasetsChartView = ({ chartData }) => {
             <div className="mb-6 flex gap-4 overflow-x-auto">
                 {ChartTypes.map((type) => {
                     let isDisabled = false
+
                     if (type.label === "Groupbar") {
                         if (selectedRow[0]?.type === "measure") {
+                            isDisabled = true
+                        }
+                    }
+                    if (type.label === "Pie") {
+                        if (selectedRow[0]?.type === "dimension") {
                             isDisabled = true
                         }
                     }
