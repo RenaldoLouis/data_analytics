@@ -1,5 +1,7 @@
 "use client"
 
+import DashboardCardAreaChart from "@/components/DashboardCard/DashboardCardAreaChart";
+import DashboardCardBarChart from "@/components/DashboardCard/DashboardCardBarChart";
 import DashboardLayout1 from "@/components/DashboardLayout/DashboardLayout1";
 import DashboardLayout2 from "@/components/DashboardLayout/DashboardLayout2";
 import DashboardLayout3 from "@/components/DashboardLayout/DashboardLayout3";
@@ -9,22 +11,173 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { H3, P } from "@/components/ui/typography";
 import { useDashboardContext } from "@/context/dashboard-context";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function Page() {
   const { setIsDialogOpenAddNewDataSet } = useDashboardContext();
   const layoutRef = useRef(null);
 
   const [selectedLayout, setSelectedLayout] = useState("layout1")
+  const [listOfChart, setListOfChart] = useState([]);
+
+  const chartComponents = {
+    barChart: DashboardCardBarChart,
+    areaChart: DashboardCardAreaChart,
+    // pieChart: DashboardCardPieChart,
+    // lineChart: DashboardCardLineChart,
+  };
+
+  useEffect(() => {
+    setListOfChart([
+      {
+        chartType: "barChart",
+        data: [
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+        ]
+      },
+      {
+        chartType: "barChart",
+        data: [
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+          [
+            { month: "January", desktop: 186, mobile: 80 },
+            { month: "February", desktop: 305, mobile: 200 },
+            { month: "March", desktop: 237, mobile: 120 },
+            { month: "April", desktop: 73, mobile: 190 },
+            { month: "May", desktop: 209, mobile: 130 },
+            { month: "June", desktop: 214, mobile: 140 },
+          ],
+        ]
+      },
+    ])
+  }, [])
 
   const renderlayout = () => {
     switch (selectedLayout) {
       case "layout1":
-        return <DashboardLayout1 />
+        return <DashboardLayout1 listOfChart={listOfChart} chartComponents={chartComponents} />
       case "layout2":
-        return <DashboardLayout2 />
+        return <DashboardLayout2 listOfChart={listOfChart} chartComponents={chartComponents} />
       case "layout3":
-        return <DashboardLayout3 />
+        return <DashboardLayout3 listOfChart={listOfChart} chartComponents={chartComponents} />
 
       default:
         return <DashboardLayout1 />

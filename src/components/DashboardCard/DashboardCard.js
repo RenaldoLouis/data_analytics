@@ -56,7 +56,6 @@ const AddedChartItem = ({ label, chartImageUrl }) => {
 
 // Main Component
 export const DashboardCard = ({ className = "" }) => {
-    // Mock data - replace this with your actual data fetching
     const availableCharts = [
         { id: "chart-1", name: "Penjualan Maret 2024", imageUrl: "https://placehold.co/96x56/a0c4ff/ffffff?text=Chart1" },
         { id: "chart-2", name: "User Engagement Q1", imageUrl: "https://placehold.co/96x56/bde0fe/ffffff?text=Chart2" },
@@ -76,7 +75,6 @@ export const DashboardCard = ({ className = "" }) => {
                     </button>
                 </DialogTrigger>
 
-                {/* The Dialog Content, styled to match the screenshot */}
                 <DialogContent className="sm:max-w-2xl p-0">
                     <DialogHeader className="p-6 pb-4">
                         <DialogTitle className="text-xl font-bold text-left">
@@ -122,9 +120,9 @@ export const DashboardCard = ({ className = "" }) => {
                     {/* The styled footer */}
                     <DialogFooter className="bg-slate-50 p-6 sm:justify-end">
                         <DialogClose asChild>
-                            <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
+                            <Button variant="outline" className="w-full sm:w-auto cursor-pointer">Cancel</Button>
                         </DialogClose>
-                        <Button type="submit" className="w-full sm:w-auto">Add to Dashboard</Button>
+                        <Button type="submit" className="w-full sm:w-auto cursor-pointer">Add to Dashboard</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -21,13 +21,13 @@ import { CartesianGrid, XAxis } from "recharts";
 
 import downloadIcon from "@/assets/logo/downloadIcon.svg";
 import editIcon from "@/assets/logo/editIcon.svg";
+import { cn } from "@/lib/utils"; // 1. Import the cn utility
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas-pro';
 import Image from "next/image";
 import { Area, AreaChart } from "recharts";
 
-
-export default function DashboardCardAreaChart() {
+export default function DashboardCardAreaChart({ className }) {
     const chartData = [
         { month: "January", desktop: 186, mobile: 80 },
         { month: "February", desktop: 305, mobile: 200 },
@@ -57,17 +57,13 @@ export default function DashboardCardAreaChart() {
         }
 
         try {
-            // The html2canvas library returns a promise that resolves with the canvas
             const canvas = await html2canvas(element, {
-                // Options to improve image quality and handle external content
-                useCORS: true, // For images from other domains
-                scale: 2,      // Renders at a higher resolution
+                useCORS: true,
+                scale: 2,
             });
 
-            // Convert the canvas to a Blob (a file-like object)
             canvas.toBlob((blob) => {
                 if (blob) {
-                    // Use file-saver to trigger the download
                     saveAs(blob, 'chart-card.png');
                 }
             });
@@ -77,7 +73,7 @@ export default function DashboardCardAreaChart() {
     };
 
     return (
-        <Card ref={cardRef}>
+        <Card ref={cardRef} className={cn("h-full", className)}>
             <CardHeader>
                 <CardTitle>Area Chart - Legend</CardTitle>
                 <CardDescription>
