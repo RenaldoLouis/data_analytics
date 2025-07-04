@@ -1,16 +1,28 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import services from "@/services";
 import { IconBell, IconSettings } from '@tabler/icons-react';
+import { useEffect, useState } from "react";
 import { NavUser } from "./nav-user";
 import { SearchBar } from "./searchBar";
 
-
-const user = {
-  name: "shadcn",
-  role: "admin"
-}
-
 export function SiteHeader() {
+
+  const [userInfo, setUserInfo] = useState(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await services.auth.authenticate();
+        setUserInfo(res.data)
+      } catch (e) {
+        console.error(e)
+      }
+    };
+
+    checkAuth();
+  }, []);
+
   return (
     <header
       className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
@@ -25,7 +37,7 @@ export function SiteHeader() {
           <IconSettings className="size-6 mr-6" />
           <IconBell className="size-6" />
           <Separator orientation="vertical" className="mx-5 data-[orientation=vertical]:h-8" />
-          <NavUser user={user} />
+          <NavUser user={userInfo} />
         </div>
       </div>
     </header>

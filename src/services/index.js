@@ -19,6 +19,17 @@ const getRequest = async (path) => {
     }
 };
 
+const postAPIRequest = async (path) => {
+    try {
+        return apiClient(path, {
+            method: 'POST',
+            form: false,
+        });
+    } catch (err) {
+        return handleErrors(err);
+    }
+};
+
 const postRequest = async (path, payload) => {
     try {
         const res = await http.post(path, payload);
@@ -114,6 +125,7 @@ const deleteRequest = async (path) => {
 export default {
     auth: {
         register: (payload) => postRequest('/auth/register', payload),
+        authenticate: () => postAPIRequest('/api/authenticate'),
     },
     aws: {
         postSignedUrl: (directoryname, fileName) => postRequest(`/api/v1/apcs/signed-url-images?directoryname=${directoryname}&fileName=${fileName}`),

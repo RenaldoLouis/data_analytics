@@ -99,7 +99,7 @@ export default function Page() {
         ]
       },
       {
-        chartType: "barChart",
+        chartType: "areaChart",
         data: [
           [
             { month: "January", desktop: 186, mobile: 80 },
@@ -194,9 +194,9 @@ export default function Page() {
             onValueChange={setSelectedLayout}
             className="w-[400px] items-end mr-3">
             <TabsList>
-              <TabsTrigger value="layout1">Layout 1</TabsTrigger>
-              <TabsTrigger value="layout2">Layout 2</TabsTrigger>
-              <TabsTrigger value="layout3">Layout 3</TabsTrigger>
+              <TabsTrigger className="cursor-pointer" value="layout1">Layout 1</TabsTrigger>
+              <TabsTrigger className="cursor-pointer" value="layout2">Layout 2</TabsTrigger>
+              <TabsTrigger className="cursor-pointer" value="layout3">Layout 3</TabsTrigger>
             </TabsList>
           </Tabs>
           <ModalExportDashboard layoutRef={layoutRef} />
