@@ -18,7 +18,7 @@ export default function Page() {
   const layoutRef = useRef(null);
 
   const [selectedLayout, setSelectedLayout] = useState("layout1")
-  const [listOfChart, setListOfChart] = useState([]);
+  const [listOfChart, setListOfChart] = useState(Array(8).fill({}));
 
   const chartComponents = {
     barChart: DashboardCardBarChart,
@@ -167,17 +167,23 @@ export default function Page() {
           ],
         ]
       },
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
     ])
   }, [])
 
   const renderlayout = () => {
     switch (selectedLayout) {
       case "layout1":
-        return <DashboardLayout1 listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayout1 setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
       case "layout2":
-        return <DashboardLayout2 listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayout2 setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
       case "layout3":
-        return <DashboardLayout3 listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayout3 setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
 
       default:
         return <DashboardLayout1 />

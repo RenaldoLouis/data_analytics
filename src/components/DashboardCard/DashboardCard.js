@@ -10,11 +10,13 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import _ from 'lodash';
 import { Plus } from "lucide-react";
+import { useForm } from "react-hook-form";
 
-// A reusable component for each item in the "Available" list
 const ChartSelectItem = ({ value, label, chartImageUrl }) => {
     return (
         <Label
@@ -27,7 +29,6 @@ const ChartSelectItem = ({ value, label, chartImageUrl }) => {
                     src={chartImageUrl}
                     alt={label}
                     className="h-full w-full object-contain"
-                    // Fallback image in case the provided one fails to load
                     onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/96x56/e2e8f0/e2e8f0?text=Img'; }}
                 />
             </div>
@@ -55,7 +56,91 @@ const AddedChartItem = ({ label, chartImageUrl }) => {
 
 
 // Main Component
-export const DashboardCard = ({ className = "" }) => {
+export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listOfChart }) => {
+    const form = useForm({
+        defaultValues: {
+            selectedChartId: "chart-1",
+        },
+    });
+
+    const onSubmit = (data) => {
+        console.log("data", data)
+
+        let clonedData = _.cloneDeep(listOfChart);
+        const tempObj = {
+            chartType: "areaChart",
+            data: [
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+                [
+                    { month: "January", desktop: 186, mobile: 80 },
+                    { month: "February", desktop: 305, mobile: 200 },
+                    { month: "March", desktop: 237, mobile: 120 },
+                    { month: "April", desktop: 73, mobile: 190 },
+                    { month: "May", desktop: 209, mobile: 130 },
+                    { month: "June", desktop: 214, mobile: 140 },
+                ],
+            ]
+        };
+        clonedData[cardIndex] = tempObj;
+        setListOfChart(clonedData)
+
+    };
+
     const availableCharts = [
         { id: "chart-1", name: "Penjualan Maret 2024", imageUrl: "https://placehold.co/96x56/a0c4ff/ffffff?text=Chart1" },
         { id: "chart-2", name: "User Engagement Q1", imageUrl: "https://placehold.co/96x56/bde0fe/ffffff?text=Chart2" },
@@ -76,54 +161,62 @@ export const DashboardCard = ({ className = "" }) => {
                 </DialogTrigger>
 
                 <DialogContent className="sm:max-w-2xl p-0">
-                    <DialogHeader className="p-6 pb-4">
-                        <DialogTitle className="text-xl font-bold text-left">
-                            Choose Chart
-                        </DialogTitle>
-                    </DialogHeader>
-                    {/* The separator line */}
-                    <div className="border-t"></div>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)}>
+                            <DialogHeader className="p-6 pb-4">
+                                <DialogTitle className="text-xl font-bold text-left">
+                                    Choose Chart
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="border-t"></div>
 
-                    {/* Main content area with padding */}
-                    <div className="grid gap-8 p-6">
+                            <div className="grid gap-8 p-6">
+                                <FormField
+                                    control={form.control}
+                                    name="selectedChartId"
+                                    render={({ field }) => (
+                                        <FormItem className="grid gap-3">
+                                            <FormLabel className="font-semibold text-muted-foreground">Available</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup
+                                                    onValueChange={field.onChange}
+                                                    value={field.value}
+                                                    className="grid gap-3"
+                                                >
+                                                    {availableCharts.map((chart) => (
+                                                        <ChartSelectItem
+                                                            key={chart.id}
+                                                            value={chart.id}
+                                                            label={chart.name}
+                                                            chartImageUrl={chart.imageUrl}
+                                                        />
+                                                    ))}
+                                                </RadioGroup>
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
 
-                        {/* "Available" Section */}
-                        <div className="grid gap-3">
-                            <h3 className="font-semibold text-muted-foreground">Available</h3>
-                            <RadioGroup defaultValue={availableCharts[0].id}>
                                 <div className="grid gap-3">
-                                    {availableCharts.map((chart) => (
-                                        <ChartSelectItem
+                                    <h3 className="font-semibold text-muted-foreground">Added</h3>
+                                    {addedCharts.map((chart) => (
+                                        <AddedChartItem
                                             key={chart.id}
-                                            value={chart.id}
                                             label={chart.name}
                                             chartImageUrl={chart.imageUrl}
                                         />
                                     ))}
                                 </div>
-                            </RadioGroup>
-                        </div>
+                            </div>
 
-                        {/* "Added" Section */}
-                        <div className="grid gap-3">
-                            <h3 className="font-semibold text-muted-foreground">Added</h3>
-                            {addedCharts.map((chart) => (
-                                <AddedChartItem
-                                    key={chart.id}
-                                    label={chart.name}
-                                    chartImageUrl={chart.imageUrl}
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* The styled footer */}
-                    <DialogFooter className="bg-slate-50 p-6 sm:justify-end">
-                        <DialogClose asChild>
-                            <Button variant="outline" className="w-full sm:w-auto cursor-pointer">Cancel</Button>
-                        </DialogClose>
-                        <Button type="submit" className="w-full sm:w-auto cursor-pointer">Add to Dashboard</Button>
-                    </DialogFooter>
+                            <DialogFooter className="bg-slate-50 p-6 sm:justify-end">
+                                <DialogClose asChild>
+                                    <Button variant="outline" className="w-full sm:w-auto cursor-pointer">Cancel</Button>
+                                </DialogClose>
+                                <Button type="submit" className="w-full sm:w-auto cursor-pointer">Add to Dashboard</Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
                 </DialogContent>
             </Dialog>
         </div>
