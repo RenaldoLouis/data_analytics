@@ -8,13 +8,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { H3 } from "@/components/ui/typography";
 import { ItemTypes } from "@/constant/DragTypes";
+import { useDashboardContext } from "@/context/dashboard-context";
 import { useDatasetRightContent } from "@/hooks/useDatasetRightContent";
+import services from "@/services";
 import { AnimatePresence, motion } from "framer-motion";
 import { Pencil } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDrag } from "react-dnd";
+import { toast } from "sonner";
 
 const testGetterObj = {
     firstName: "bob",
@@ -43,6 +46,8 @@ const DraggableItem = ({ item, type }) => {
 
 export default function DatasetRightContent() {
     const pathname = usePathname();
+    const { setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+
     const [isShowsideContent, setIsShowsideContent] = useState(false);
     const [datasetId, setDatasetId] = useState(null);
 
@@ -66,6 +71,29 @@ export default function DatasetRightContent() {
     useEffect(() => {
         setIsShowsideContent(pathname !== "/dashboard");
     }, [pathname]);
+
+    const handleUpdateData = async () => {
+        const datasetContents = dataToUpdate.map((eachData) => ({
+            id: eachData.id,
+            data: eachData,
+        }));
+
+        const res = await services.dataset.updateDataset(datasetId, {
+            datasetContents,
+        });
+
+        try {
+            if (res?.success) {
+                toast("Dataset Updated successfully");
+                setIsFetchDataSetContents(!isFetchDataSetContents)
+            }
+        } catch (e) {
+            toast("Upload failed", {
+                description: error.message,
+            });
+            throw new Error("Upload failed with status " + res.status);
+        }
+    };
 
     return (
         <AnimatePresence>
@@ -181,10 +209,10 @@ export default function DatasetRightContent() {
 
                         <div className="flex flex-col gap-2 w-full">
 
-                            <Button variant="secondary" className="flex-1" style={{ background: "#0B2238", color: "white" }}>
+                            <Button onClick={handleUpdateData} variant="secondary" className="flex-1 cursor-pointer" style={{ background: "#0B2238", color: "white" }}>
                                 <Image src={syncIcon} alt="Measure icon" className="w-5 h-5" />   Sync Changes
                             </Button>
-                            <Button variant="destructive" className="flex-1">
+                            <Button variant="destructive" className="flex-1 cursor-pointer">
                                 Delete Data Set
                             </Button>
                         </div>

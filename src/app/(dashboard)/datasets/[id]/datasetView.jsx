@@ -1,22 +1,21 @@
 'use client'
 
 import { DataTable } from "@/components/data-table"
-import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { H3 } from "@/components/ui/typography"
 import { DatasetViewConst } from "@/constant/DatasetViewConst"
+import { useDashboardContext } from "@/context/dashboard-context"
 import { useDatasetTable } from "@/hooks/useDatasetTable"
-import services from "@/services"
-import { useState } from "react"
-import { toast } from "sonner"
+import { useEffect, useState } from "react"
 import DatasetsChartView from "./datasetsChartView"
 
 export default function DataSetView(props) {
     const { datasetId } = props
 
+    const { setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
     const [currentView, setCurrentView] = useState(DatasetViewConst.chart);
-    const [dataToUpdate, setDataToUpdate] = useState([]);
+    // const [dataToUpdate, setDataToUpdate] = useState([]);
     const [pagination, setPagination] = useState({
         pageIndex: 0,
         pageSize: 10,
@@ -31,28 +30,32 @@ export default function DataSetView(props) {
         refetch,
     } = useDatasetTable(datasetId, pagination);
 
-    const handleUpdateData = async () => {
-        const datasetContents = dataToUpdate.map((eachData) => ({
-            id: eachData.id,
-            data: eachData,
-        }));
+    useEffect(() => {
+        refetch()
+    }, [isFetchDataSetContents])
 
-        const res = await services.dataset.updateDataset(datasetId, {
-            datasetContents,
-        });
+    // const handleUpdateData = async () => {
+    //     const datasetContents = dataToUpdate.map((eachData) => ({
+    //         id: eachData.id,
+    //         data: eachData,
+    //     }));
 
-        try {
-            if (res?.success) {
-                toast("Dataset Updated successfully");
-                refetch();
-            }
-        } catch (e) {
-            toast("Upload failed", {
-                description: error.message,
-            });
-            throw new Error("Upload failed with status " + res.status);
-        }
-    };
+    //     const res = await services.dataset.updateDataset(datasetId, {
+    //         datasetContents,
+    //     });
+
+    //     try {
+    //         if (res?.success) {
+    //             toast("Dataset Updated successfully");
+    //             refetch();
+    //         }
+    //     } catch (e) {
+    //         toast("Upload failed", {
+    //             description: error.message,
+    //         });
+    //         throw new Error("Upload failed with status " + res.status);
+    //     }
+    // };
 
     const handleTabView = (view) => {
         setCurrentView(view)
@@ -66,9 +69,9 @@ export default function DataSetView(props) {
         <>
             <div className="flex justify-between px-4 lg:px-6">
                 <H3>All chart</H3>
-                <Button onClick={handleUpdateData}>
+                {/* <Button onClick={handleUpdateData}>
                     Update Data
-                </Button>
+                </Button> */}
 
                 <Tabs
                     defaultValue="chart"
