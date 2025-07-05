@@ -9,7 +9,8 @@ import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { transformChartData, transformForPieChart, transformForStackedChart } from "@/lib/transformChartData";
 import { cn } from "@/lib/utils";
-import { useMemo, useState } from "react";
+import services from "@/services";
+import { useEffect, useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
 import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComponent } from "./ChartComponent";
 
@@ -48,6 +49,45 @@ const DatasetsChartView = ({ chartData }) => {
                 return <p>Select a chart type.</p>;
         }
     };
+
+    useEffect(() => {
+        console.log("selectedChartType", selectedChartType)
+
+        const fetchChartData = async () => {
+            try {
+                const tempObj = {
+                    // "chart_id": "f29e8075-60a1-4c2d-990a-add5f755cccd", // Stacked
+                    "chart_id": "5c72b1a2-615b-4bd0-b259-bb995c1d0704", //Bar
+                    "dataset_id": "d7addb6d-26f5-42d7-bf5a-2ec59e8c6603",
+                    "selected_row": [
+                        {
+                            "name": "payment_method",
+                            "type": "dimension"
+                        }
+                        // {
+                        //     "name": "Domain",
+                        //     "type": "dimension"
+                        // }
+                    ],
+                    "selected_column": [
+                        {
+                            "name": "quantity",
+                            "type": "measure"
+                        }
+                    ]
+                }
+
+                console.log("trigger")
+
+                const res = await services.chart.getChartData(tempObj)
+                console.log("res akhir", res)
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        fetchChartData();
+    }, [selectedChartType])
 
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],

@@ -64,8 +64,6 @@ export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listO
     });
 
     const onSubmit = (data) => {
-        console.log("data", data)
-
         let clonedData = _.cloneDeep(listOfChart);
         const tempObj = {
             chartType: "areaChart",

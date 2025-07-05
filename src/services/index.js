@@ -19,10 +19,11 @@ const getRequest = async (path) => {
     }
 };
 
-const postAPIRequest = async (path) => {
+const postAPIRequest = async (path, payload = {}) => {
     try {
         return apiClient(path, {
             method: 'POST',
+            body: payload,
             form: false,
         });
     } catch (err) {
@@ -41,19 +42,6 @@ const postRequest = async (path, payload) => {
 
 const postFormRequest = async (path, payload /* this is FormData */) => {
     try {
-        // const res = await fetch(path, {
-        //     method: 'POST',
-        //     body: payload, // This is your FormData object
-        //     credentials: 'include', // Ensures cookies (like HttpOnly token) are sent
-        //     // headers: {
-        //     //     'Content-Type': 'multipart/form-data',
-        //     // },
-        // });
-
-        // const json = await res.json();
-        // if (!res.ok) throw new Error(json.message || 'Something went wrong');
-
-        // return json;
         return apiClient(path, {
             method: 'POST',
             body: payload,
@@ -137,5 +125,9 @@ export default {
         getAllDatasetById: (id, limit, page) => getRequest(`/api/dataset/${id}?limit=${limit}&page=${page}`),
         updateDataset: (id, datasetContents) => putRequestMiddleware(`/api/dataset/updateDatasetContents/${id}`, datasetContents),
         deleteDataset: (id) => deleteRequestMiddleware(`/api/dataset/${id}`),
+    },
+    chart: {
+        getChart: () => getRequest(`/api/chart`),
+        getChartData: (data) => postAPIRequest(`/api/chart`, data)
     }
 };

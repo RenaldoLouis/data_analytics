@@ -73,7 +73,6 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
 
   const handleDeleteDataset = async (e, datasetId) => {
     e.stopPropagation();
-    console.log("Delete dataset:", datasetId);
     const res = await services.dataset.deleteDataset(datasetId);
 
     try {
