@@ -37,7 +37,7 @@ export default function LoginForm() {
 
     const onSubmit = async (data) => {
         try {
-            const res = await fetch("/api/login", {
+            const res = await fetch("/next-api/login", {
                 method: "POST",
                 body: JSON.stringify(data),
                 headers: { "Content-Type": "application/json" },

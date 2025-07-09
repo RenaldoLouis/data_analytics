@@ -113,21 +113,21 @@ const deleteRequest = async (path) => {
 export default {
     auth: {
         register: (payload) => postRequest('/auth/register', payload),
-        authenticate: () => postAPIRequest('/api/authenticate'),
+        authenticate: () => postAPIRequest('/next-api/authenticate'),
     },
     aws: {
-        postSignedUrl: (directoryname, fileName) => postRequest(`/api/v1/apcs/signed-url-images?directoryname=${directoryname}&fileName=${fileName}`),
-        downloadFiles: (files) => postBlobRequest(`/api/v1/apcs/download-files-aws`, files),
+        postSignedUrl: (directoryname, fileName) => postRequest(`/next-api/v1/apcs/signed-url-images?directoryname=${directoryname}&fileName=${fileName}`),
+        downloadFiles: (files) => postBlobRequest(`/next-api/v1/apcs/download-files-aws`, files),
     },
     dataset: {
-        addNewDataSet: (files) => postFormRequest(`/api/dataset`, files),
-        getAllDataset: () => getRequest(`/api/dataset`),
-        getAllDatasetById: (id, limit, page) => getRequest(`/api/dataset/${id}?limit=${limit}&page=${page}`),
-        updateDataset: (id, datasetContents) => putRequestMiddleware(`/api/dataset/updateDatasetContents/${id}`, datasetContents),
-        deleteDataset: (id) => deleteRequestMiddleware(`/api/dataset/${id}`),
+        addNewDataSet: (files) => postFormRequest(`/next-api/dataset`, files),
+        getAllDataset: () => getRequest(`/next-api/dataset`),
+        getAllDatasetById: (id, limit, page) => getRequest(`/next-api/dataset/${id}?limit=${limit}&page=${page}`),
+        updateDataset: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDatasetContents/${id}`, datasetContents),
+        deleteDataset: (id) => deleteRequestMiddleware(`/next-api/dataset/${id}`),
     },
     chart: {
-        getChart: () => getRequest(`/api/chart`),
-        getChartData: (data) => postAPIRequest(`/api/chart`, data)
+        getChart: () => getRequest(`/next-api/chart`),
+        getChartData: (data) => postAPIRequest(`/next-api/chart`, data)
     }
 };
