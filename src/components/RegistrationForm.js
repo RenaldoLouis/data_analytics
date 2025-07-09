@@ -1,14 +1,20 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import moment from "moment";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useState } from "react"; // 1. Import useState
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     Form,
     FormControl,
@@ -19,6 +25,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import services from "@/services";
+import { Check } from "lucide-react"; // 2. Import a check icon
 
 const registrationSchema = z.object({
     // firstName: z.string().min(1, "Enter first name"),
@@ -36,6 +43,7 @@ const registrationSchema = z.object({
 
 export default function RegistrationForm() {
     const router = useRouter();
+    const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
     const form = useForm({
         resolver: zodResolver(registrationSchema),
@@ -56,17 +64,16 @@ export default function RegistrationForm() {
             first_name: data.firstName,
             last_name: data.lastName,
             phone: data.phone,
-        }
+        };
         try {
             const res = await services.auth.register(tempData);
 
             if (res.status === 200) {
-                toast("Register success", {
-                    description: moment().format("dddd, MMMM DD, YYYY [at] h:mm A"),
-                });
-                router.push("/login");
-            } else {
-                const errData = await res.json();
+                setIsSuccessModalOpen(true);
+                setTimeout(router.push("/login"), 500)
+            }
+            else {
+                const errData = await res.error.data;
                 form.setError("root", {
                     message: errData?.message || "Registration failed. Try again.",
                 });
@@ -195,6 +202,30 @@ export default function RegistrationForm() {
                     </div>
                 </form>
             </Form>
+
+            <Dialog open={true} onOpenChange={setIsSuccessModalOpen}>
+                <DialogContent className="sm:max-w-md p-8 text-center">
+                    <DialogHeader className="space-y-4 items-center">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                            <Check className="h-10 w-10 text-green-600" />
+                        </div>
+                        <DialogTitle className="text-2xl font-bold">
+                            Thank you for Signing Up!
+                        </DialogTitle>
+                        <DialogDescription>
+                            We&apos;ll contact through your registered email.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-6">
+                        <Button
+                            onClick={() => router.push("/")} // Navigate to home or another page
+                            className="w-full bg-slate-800 hover:bg-slate-700 cursor-pointer"
+                        >
+                            Back to Home
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
