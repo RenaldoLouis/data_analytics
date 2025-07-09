@@ -29,6 +29,7 @@ export function useDatasetTable(datasetId, pagination) {
             setData(res.data);
             setDataTable(cleanedArray);
 
+            //TO DO: might be remove later only to mock to test draw chart on FE before
             if (chartData.length <= 0) {
                 const res = await services.dataset.getAllDatasetById(
                     datasetId,

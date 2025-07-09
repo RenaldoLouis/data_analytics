@@ -34,7 +34,9 @@ export function useDatasetRightContent(datasetId) {
             const measures = [];
 
             for (const [key, value] of Object.entries(cleanedArray[0])) {
-                if (typeof value === "number") {
+                const isNumeric = value !== null && !isNaN(Number(value));
+
+                if (isNumeric) {
                     const tempObject = {
                         name: key,
                         icon: <Image src={MeasureIcon} alt="Measure icon" className="w-5 h-5" />,

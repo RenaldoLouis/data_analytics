@@ -61,10 +61,6 @@ export default function DataSetView(props) {
         setCurrentView(view)
     }
 
-    console.log("data", data)
-    // console.log("dataTable", dataTable)
-    console.log("chartData", chartData)
-
     return (
         <>
             <div className="flex justify-between px-4 lg:px-6">
@@ -97,6 +93,7 @@ export default function DataSetView(props) {
                     {currentView === DatasetViewConst.chart ? (
                         <DatasetsChartView
                             chartData={chartData}
+                            datasetId={datasetId}
                         />
                     ) : (
                         <DataTable

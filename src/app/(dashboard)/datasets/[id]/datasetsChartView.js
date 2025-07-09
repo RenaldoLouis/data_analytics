@@ -4,24 +4,26 @@ import {
     ChartContainer
 } from "@/components/ui/chart";
 import { H3 } from "@/components/ui/typography";
-import { ChartTypes } from "@/constant/ChartTypes";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { transformChartData, transformForPieChart, transformForStackedChart } from "@/lib/transformChartData";
 import { cn } from "@/lib/utils";
 import services from "@/services";
+import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
 import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComponent } from "./ChartComponent";
 
 
-const DatasetsChartView = ({ chartData }) => {
-    const [isShowChart, setIsShowChart] = useState(true);
-    const [selectedChartType, setSelectedChartType] = useState("Bar");
+const DatasetsChartView = ({ chartData, datasetId }) => {
     const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow } = useDashboardContext();
 
+    const [selectedChartType, setSelectedChartType] = useState(null);
+    const [chartListType, setChartListType] = useState([])
+    const [chartDrawData, setChartDrawData] = useState([]);
+
     const renderSelectedChart = () => {
-        const hasData = processedData && processedData.length > 0;
+        const hasData = chartDrawData && chartDrawData.length > 0;
         if (!hasData) return (
             <div className="text-center py-20">
                 <H3 className="text-lg font-medium text-gray-600">
@@ -30,63 +32,94 @@ const DatasetsChartView = ({ chartData }) => {
             </div>
         );
 
-        switch (selectedChartType) {
+        switch (selectedChartType?.name) {
             case 'Bar':
-                return <BarChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+                return <BarChartComponent data={chartDrawData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+            case 'StackedBar':
+                return <BarChartComponent data={chartDrawData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
             case 'Groupbar':
-                return <BarChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} isGrouped={true} />;
+                return <BarChartComponent data={chartDrawData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} isGrouped={true} />;
             case 'Line':
-                return <LineChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+                return <LineChartComponent data={chartDrawData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
             case 'Area':
-                return <AreaChartComponent data={processedData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
+                return <AreaChartComponent data={chartDrawData} xAxisKey={xAxisKey} seriesKeys={seriesKeys} />;
             case 'Pie':
                 // Pie chart has specific requirements
                 if (selectedRow.length > 1) {
                     return <p className="text-center p-4">Pie charts can only visualize one measure at a time.</p>
                 }
-                return <PieChartComponent data={processedData} />;
+                return <PieChartComponent data={chartDrawData} />;
             default:
                 return <p>Select a chart type.</p>;
         }
     };
 
     useEffect(() => {
-        console.log("selectedChartType", selectedChartType)
-
-        const fetchChartData = async () => {
+        const fetchChartType = async () => {
             try {
-                const tempObj = {
-                    // "chart_id": "f29e8075-60a1-4c2d-990a-add5f755cccd", // Stacked
-                    "chart_id": "5c72b1a2-615b-4bd0-b259-bb995c1d0704", //Bar
-                    "dataset_id": "d7addb6d-26f5-42d7-bf5a-2ec59e8c6603",
-                    "selected_row": [
-                        {
-                            "name": "payment_method",
-                            "type": "dimension"
+                const res = await services.chart.getChart()
+                if (res?.success) {
+                    const modifiedList = res.data.map((eachData) => {
+                        const updatedData = { ...eachData };
+
+                        updatedData.name = updatedData.name.replace(/\s+/g, '');
+
+                        switch (updatedData.name) {
+                            case "Bar":
+                                updatedData.icon = <BarChart2 />;
+                                break;
+                            case "StackedBar":
+                                updatedData.icon = <BarChart />;
+                                break;
+                            case "Groupbar":
+                                updatedData.icon = <ChartColumnBig />;
+                                break;
+                            case "Line":
+                                updatedData.icon = <LineChartIcon />;
+                                break;
+                            case "Area":
+                                updatedData.icon = <AreaChartIcon />;
+                                break;
+                            case "Pie":
+                                updatedData.icon = <PieChartIcon />;
+                                break;
+                            default:
+                                updatedData.icon = null;
+                                break;
                         }
-                        // {
-                        //     "name": "Domain",
-                        //     "type": "dimension"
-                        // }
-                    ],
-                    "selected_column": [
-                        {
-                            "name": "quantity",
-                            "type": "measure"
-                        }
-                    ]
+                        return updatedData;
+                    });
+
+                    setChartListType(modifiedList)
                 }
-
-                console.log("trigger")
-
-                const res = await services.chart.getChartData(tempObj)
-                console.log("res akhir", res)
             } catch (e) {
                 console.error(e)
             }
         }
 
-        fetchChartData();
+        fetchChartType();
+    }, [selectedChartType, datasetId])
+
+    useEffect(() => {
+        if (selectedChartType) {
+            const fetchChartData = async () => {
+                try {
+                    const tempObj = {
+                        "chart_id": selectedChartType?.id,
+                        "dataset_id": datasetId,
+                        "selected_row": selectedRow,
+                        "selected_column": selectedColumn
+                    }
+
+                    const res = await services.chart.getChartData(tempObj)
+                    setChartDrawData(res.data)
+                } catch (e) {
+                    console.error("Fetch Chart Data Fail", e)
+                }
+            }
+
+            fetchChartData();
+        }
     }, [selectedChartType])
 
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
@@ -109,6 +142,7 @@ const DatasetsChartView = ({ chartData }) => {
         }),
     });
 
+    //TO DO: might be remove one day This is the working frontend Logic Before for testing only
     const processedData = useMemo(() => {
         const dimensions = selectedColumn;
         const measuresOrSecondDimension = selectedRow;
@@ -129,7 +163,7 @@ const DatasetsChartView = ({ chartData }) => {
         }
 
         // SCENARIO 2: Pie Chart (works as before)
-        if (selectedChartType === 'Pie') {
+        if (selectedChartType?.name === 'Pie') {
             return transformForPieChart(chartData, secondItem, primaryDimension);
         }
 
@@ -141,14 +175,14 @@ const DatasetsChartView = ({ chartData }) => {
     // --- DYNAMIC KEYS FOR CHARTS ---
     const xAxisKey = selectedColumn[0]?.name;
     const seriesKeys = useMemo(() => {
-        if (!processedData || processedData.length === 0) return [];
-        return Object.keys(processedData[0]).filter(key => key !== xAxisKey);
-    }, [processedData, xAxisKey]);
+        if (!chartDrawData || chartDrawData.length === 0) return [];
+        return Object.keys(chartDrawData[0]).filter(key => key !== xAxisKey);
+    }, [chartDrawData, xAxisKey]);
 
     // Create a dynamic chart config for the legend and tooltips
     const dynamicChartConfig = useMemo(() => {
-        if (selectedChartType === 'Pie') {
-            return processedData.reduce((acc, entry) => {
+        if (selectedChartType?.name === 'Pie') {
+            return chartDrawData.reduce((acc, entry) => {
                 acc[entry.name] = { label: entry.name };
                 return acc;
             }, {});
@@ -157,7 +191,7 @@ const DatasetsChartView = ({ chartData }) => {
             acc[key] = { label: key.replace(/_Sum|_Count/g, '') };
             return acc;
         }, {});
-    }, [seriesKeys, processedData, selectedChartType]);
+    }, [seriesKeys, chartDrawData, selectedChartType]);
 
     const handleRemoveItem = (item, type) => {
         if (type === 'column') {
@@ -167,8 +201,6 @@ const DatasetsChartView = ({ chartData }) => {
             setSelectedRow((prev) => prev.filter(i => i.name !== item.name));
         }
     };
-
-    console.log("processedData", processedData)
 
     return (
         <div className="w-full p-6">
@@ -235,28 +267,39 @@ const DatasetsChartView = ({ chartData }) => {
 
             {/* Chart Type Picker */}
             <div className="mb-6 flex gap-4 overflow-x-auto">
-                {ChartTypes.map((type) => {
+                {chartListType.map((type) => {
                     let isDisabled = false
 
-                    if (type.label === "Groupbar") {
+                    if (type.name === "Groupbar") {
                         if (selectedRow[0]?.type === "measure") {
                             isDisabled = true
                         }
                     }
-                    if (type.label === "Pie") {
+                    if (type.name === "Pie") {
                         if (selectedRow[0]?.type === "dimension") {
+                            isDisabled = true
+                        }
+                    }
+
+                    if (type.name === "Bar") {
+                        if ((selectedRow[0]?.type === "dimension" && selectedColumn[0]?.type === "dimension")) {
+                            isDisabled = true
+                        }
+                    }
+                    if (type.name === "StackedBar") {
+                        if (!(selectedRow[0]?.type === "dimension" && selectedColumn[0]?.type === "dimension")) {
                             isDisabled = true
                         }
                     }
 
                     return (
                         <button
-                            key={type.label}
-                            onClick={() => setSelectedChartType(type.label)}
+                            key={type.name}
+                            onClick={() => setSelectedChartType(type)}
                             disabled={isDisabled}
                             className={cn(
                                 "border rounded-md p-3 flex items-center justify-center w-24 h-20 transition cursor-pointer",
-                                selectedChartType === type.label
+                                selectedChartType?.name === type.name
                                     ? "border-blue-500 bg-blue-100"
                                     : "border-gray-300 hover:bg-gray-100",
                                 "disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:hover:bg-slate-100"
@@ -270,17 +313,9 @@ const DatasetsChartView = ({ chartData }) => {
 
             {/* Chart View */}
             <div className="bg-white rounded-md p-4 shadow-sm">
-                {isShowChart ? (
-                    <ChartContainer config={dynamicChartConfig} className="min-h-[400px] w-full flex items-center justify-center">
-                        {renderSelectedChart()}
-                    </ChartContainer>
-                ) : (
-                    <div className="text-center py-20">
-                        <H3 className="text-lg font-medium text-gray-600">
-                            Drag and drop fields into 'Rows' and 'Columns' to build a chart.
-                        </H3>
-                    </div>
-                )}
+                <ChartContainer config={dynamicChartConfig} className="min-h-[400px] w-full flex items-center justify-center">
+                    {renderSelectedChart()}
+                </ChartContainer>
             </div>
         </div>
     );

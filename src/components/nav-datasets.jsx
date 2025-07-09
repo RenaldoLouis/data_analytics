@@ -50,6 +50,9 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
 
           setDataSetsList(dataWithColors);
           setIsLoadingListDataSet(false)
+        } else {
+          setDataSetsList([])
+          setIsLoadingListDataSet(false)
         }
       } catch (e) {
         setDataSetsList([])
