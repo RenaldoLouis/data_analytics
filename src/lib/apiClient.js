@@ -28,9 +28,9 @@ export async function apiClient(path, { method = 'GET', body, headers = {}, form
         }
 
         const data = await res.json();
-        if (!res.ok) {
-            throw new Error(data.message || 'Unexpected error');
-        }
+        // if (!res.ok) {
+        //     throw new Error(data.message || 'Unexpected error');
+        // }
 
         return data;
     } catch (error) {

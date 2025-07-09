@@ -86,7 +86,6 @@ const FormNewDataSet = (props) => {
 
     const onSubmit = async (data) => {
         setIsLoading(true)
-        //TODO : add with CSV later on 
         const selectedSheetIndex = parseInt(data.sheetSelection)
         const fileToSend = await createSingleSheetCSV(data.file[0], selectedSheetIndex);
 

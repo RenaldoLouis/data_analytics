@@ -40,7 +40,7 @@ const postRequest = async (path, payload) => {
     }
 };
 
-const postFormRequest = async (path, payload /* this is FormData */) => {
+const postFormRequest = async (path, payload) => {
     try {
         return apiClient(path, {
             method: 'POST',
