@@ -181,16 +181,18 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
 
     // Create a dynamic chart config for the legend and tooltips
     const dynamicChartConfig = useMemo(() => {
-        if (selectedChartType?.name === 'Pie') {
-            return chartDrawData.reduce((acc, entry) => {
-                acc[entry.name] = { label: entry.name };
+        if (chartDrawData) {
+            if (selectedChartType?.name === 'Pie') {
+                return chartDrawData?.reduce((acc, entry) => {
+                    acc[entry.name] = { label: entry.name };
+                    return acc;
+                }, {});
+            }
+            return seriesKeys.reduce((acc, key) => {
+                acc[key] = { label: key.replace(/_Sum|_Count/g, '') };
                 return acc;
             }, {});
         }
-        return seriesKeys.reduce((acc, key) => {
-            acc[key] = { label: key.replace(/_Sum|_Count/g, '') };
-            return acc;
-        }, {});
     }, [seriesKeys, chartDrawData, selectedChartType]);
 
     const handleRemoveItem = (item, type) => {
