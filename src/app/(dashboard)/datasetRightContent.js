@@ -77,11 +77,11 @@ export default function DatasetRightContent() {
             data: eachData,
         }));
 
-        const res = await services.dataset.updateDataset(datasetId, {
-            datasetContents,
-        });
-
         try {
+            const res = await services.dataset.updateDatasetContents(datasetId, {
+                datasetContents,
+            });
+
             if (res?.success) {
                 toast("Dataset Updated successfully");
                 setIsFetchDataSetContents(!isFetchDataSetContents)
@@ -113,19 +113,35 @@ export default function DatasetRightContent() {
         }
     }, [currentDataset])
 
-    console.log("currentDataset", currentDataset)
-    const handleNameSave = (newName) => {
-        if (newName === currentDataset.sheet_name) return;
+    const handleNameSave = async (newName) => {
+        if (newName.trim() === currentDataset.sheet_name.trim()) {
+            toast("No change detected after trimming whitespace. Not saving.");
+            return; // Exit the function if the names are the same after trimming
+        }
+        if (newName.trim() === "") {
+            toast("Name cannot be empty.");
+            return;
+        }
 
-        console.log("Saving new name:", newName);
         const tempData = {
             "name": currentDataset.name,
             "sheet_name": newName,
             "status": currentDataset.status
         }
-        // Here you would update your state and/or make an API call
-        // For example:
-        // setCurrentDataset(prev => ({ ...prev, sheet_name: newName }));
+
+        try {
+            const res = await services.dataset.updateDataset(datasetId, tempData);
+
+            if (res?.success) {
+                toast("Dataset Updated successfully");
+                setIsFetchDataSetContents(!isFetchDataSetContents)
+            }
+        } catch (e) {
+            toast("Upload failed", {
+                description: e.message,
+            });
+            throw new Error("Upload failed with status " + res.status);
+        }
 
         // and then refectch the dataste on the left side
     };

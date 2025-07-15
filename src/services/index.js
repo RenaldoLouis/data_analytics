@@ -123,7 +123,8 @@ export default {
         addNewDataSet: (files) => postFormRequest(`/next-api/dataset`, files),
         getAllDataset: () => getRequest(`/next-api/dataset`),
         getAllDatasetById: (id, limit, page) => getRequest(`/next-api/dataset/${id}?limit=${limit}&page=${page}`),
-        updateDataset: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDatasetContents/${id}`, datasetContents),
+        updateDatasetContents: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDatasetContents/${id}`, datasetContents),
+        updateDataset: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDataset/${id}`, datasetContents),
         deleteDataset: (id) => deleteRequestMiddleware(`/next-api/dataset/${id}`),
     },
     chart: {
