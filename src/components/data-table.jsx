@@ -141,12 +141,15 @@ export function DataTable({
   }, [initialData]);
 
   const columns = Object.keys(initialData[0] || {})
-    .filter((key) => !excludeKeys.includes(key)) // Exclude specific keys
+    .filter((key) => !excludeKeys.includes(key))
     .map((key) => ({
       accessorKey: key,
       header: key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
       cell: ({ row }) => {
         const [localValue, setLocalValue] = React.useState(row.original[key]);
+
+        // Check if the initial value is empty (null, undefined, or empty string)
+        const isInitiallyEmpty = row.original[key] === null || row.original[key] === undefined || row.original[key] === '';
 
         const handleChange = (e) => {
           setLocalValue(e.target.value);
@@ -154,34 +157,36 @@ export function DataTable({
 
         const handleBlur = () => {
           const updatedRow = { ...data[row.index], [key]: localValue };
-
-          // 1. Update the main table data
           const newData = [...data];
           newData[row.index] = updatedRow;
           setData(newData);
 
-          // 2. Update the modified rows list
           setDataToUpdate((prev) => {
             const existingIndex = prev.findIndex((r) => r.id === updatedRow.id);
             if (existingIndex !== -1) {
-              // Row already exists, update it
               const updated = [...prev];
               updated[existingIndex] = updatedRow;
               return updated;
             } else {
-              // New edited row
               return [...prev, updatedRow];
             }
           });
         };
 
         return (
-          <Input
-            value={localValue ?? ""}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            className="h-8 w-full bg-transparent border border-input rounded px-2"
-          />
+          // 1. Wrap the input in a relative container
+          <div className="relative w-full">
+            <Input
+              value={localValue ?? ""}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              className="h-8 w-full bg-transparent border border-input rounded px-2"
+            />
+            {/* 2. Conditionally render the red dot */}
+            {isInitiallyEmpty && (
+              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-white" />
+            )}
+          </div>
         );
       },
     }));
