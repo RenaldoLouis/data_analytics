@@ -30,19 +30,19 @@ export function useDatasetTable(datasetId, pagination) {
             setDataTable(cleanedArray);
 
             //TO DO: might be remove later only to mock to test draw chart on FE before
-            if (chartData.length <= 0) {
-                const res = await services.dataset.getAllDatasetById(
-                    datasetId,
-                    10,
-                    1
-                );
+            // if (chartData.length <= 0) {
+            //     const res = await services.dataset.getAllDatasetById(
+            //         datasetId,
+            //         10,
+            //         1
+            //     );
 
-                const cleanedArray = res.data.datasets.map((item) => ({
-                    ...item.data,
-                    id: item.id,
-                }));
-                setChartdata(cleanedArray)
-            }
+            //     const cleanedArray = res.data.datasets.map((item) => ({
+            //         ...item.data,
+            //         id: item.id,
+            //     }));
+            //     setChartdata(cleanedArray)
+            // }
 
         } catch (err) {
             console.error("Failed to fetch dataset:", err);

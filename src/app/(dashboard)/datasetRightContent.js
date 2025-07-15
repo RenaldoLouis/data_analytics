@@ -1,21 +1,20 @@
 "use client";
 
 import syncIcon from "@/assets/logo/syncIcon.svg";
+import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { H3 } from "@/components/ui/typography";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { useDatasetRightContent } from "@/hooks/useDatasetRightContent";
 import services from "@/services";
 import { AnimatePresence, motion } from "framer-motion";
-import { Pencil } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDrag } from "react-dnd";
 import { toast } from "sonner";
 
@@ -46,7 +45,7 @@ const DraggableItem = ({ item, type }) => {
 
 export default function DatasetRightContent() {
     const pathname = usePathname();
-    const { setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+    const { dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
 
     const [isShowsideContent, setIsShowsideContent] = useState(false);
     const [datasetId, setDatasetId] = useState(null);
@@ -95,6 +94,42 @@ export default function DatasetRightContent() {
         }
     };
 
+    const currentDataset = useMemo(() => {
+        if (datasetId) {
+            const filteredData = dataSetsList.filter((eachData) => eachData.id === datasetId)
+            return filteredData[0]
+        }
+    }, [dataSetsList, datasetId])
+
+    const dataStaus = useMemo(() => {
+        if (currentDataset) {
+            switch (currentDataset.status) {
+                case 0:
+                    return "Draft"
+                case 1:
+                    return "Ready for Visualization"
+            }
+
+        }
+    }, [currentDataset])
+
+    console.log("currentDataset", currentDataset)
+    const handleNameSave = (newName) => {
+        if (newName === currentDataset.sheet_name) return;
+
+        console.log("Saving new name:", newName);
+        const tempData = {
+            "name": currentDataset.name,
+            "sheet_name": newName,
+            "status": currentDataset.status
+        }
+        // Here you would update your state and/or make an API call
+        // For example:
+        // setCurrentDataset(prev => ({ ...prev, sheet_name: newName }));
+
+        // and then refectch the dataste on the left side
+    };
+
     return (
         <AnimatePresence>
             {isShowsideContent && (
@@ -107,16 +142,20 @@ export default function DatasetRightContent() {
                 >
                     {/* Header */}
                     <CardHeader className="pb-2">
-                        <div className="flex justify-between items-start">
+                        {/* <div className="flex justify-between items-start">
                             <H3 className="text-lg font-bold leading-snug">
-                                Penjualan dan Pembelian Januari 2025
+                                {currentDataset?.sheet_name}
                             </H3>
                             <Button variant="outline" size="icon" className="h-7 w-7">
                                 <Pencil className="w-4 h-4 text-muted-foreground" />
                             </Button>
-                        </div>
+                        </div> */}
+                        <EditableText
+                            initialName={currentDataset?.sheet_name}
+                            onSave={handleNameSave}
+                        />
                         <div className="flex items-center gap-2 my-3">
-                            <Switch id="show-dashboard" defaultChecked />
+                            <Switch disabled={currentDataset?.status === 0 ? true : false} id="show-dashboard" defaultChecked />
                             <Label
                                 htmlFor="show-dashboard"
                                 className="text-sm font-medium text-gray-800"
@@ -197,7 +236,7 @@ export default function DatasetRightContent() {
                             </p>
                             <p className="mb-3">
                                 <span className="font-medium">Data status:</span>{" "}
-                                <span className="text-green-600">Ready for Visualization</span>
+                                <span className="text-green-600">{dataStaus}</span>
                             </p>
                             <p className="mb-3">
                                 <span className="font-medium">Quality Score:</span>{" "}

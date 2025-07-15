@@ -34,29 +34,6 @@ export default function DataSetView(props) {
         refetch()
     }, [isFetchDataSetContents])
 
-    // const handleUpdateData = async () => {
-    //     const datasetContents = dataToUpdate.map((eachData) => ({
-    //         id: eachData.id,
-    //         data: eachData,
-    //     }));
-
-    //     const res = await services.dataset.updateDataset(datasetId, {
-    //         datasetContents,
-    //     });
-
-    //     try {
-    //         if (res?.success) {
-    //             toast("Dataset Updated successfully");
-    //             refetch();
-    //         }
-    //     } catch (e) {
-    //         toast("Upload failed", {
-    //             description: error.message,
-    //         });
-    //         throw new Error("Upload failed with status " + res.status);
-    //     }
-    // };
-
     const handleTabView = (view) => {
         setCurrentView(view)
     }

@@ -14,6 +14,7 @@ import {
   SidebarMenuItem
 } from "@/components/ui/sidebar"
 import { SideMenubarTitle, SideMenubarUrl } from "@/constant/SideMenubar"
+import { useDashboardContext } from "@/context/dashboard-context"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -139,7 +140,7 @@ export function AppSidebar({
   const pathname = usePathname();
 
   const [selectedNav, setSelectedNav] = useState("1");
-  const [dataSetsList, setDataSetsList] = useState([]);
+  const { dataSetsList, setDataSetsList } = useDashboardContext();
 
   useEffect(() => {
     if (pathname === "/dashboard") {

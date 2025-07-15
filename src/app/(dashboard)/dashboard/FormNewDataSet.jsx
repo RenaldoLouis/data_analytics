@@ -73,10 +73,22 @@ const FormNewDataSet = (props) => {
         const selectedSheetName = sheetNames[selectedSheetIndex];
         const selectedSheet = workbook.Sheets[selectedSheetName];
 
-        // Convert the sheet directly to a CSV string
-        const csvString = XLSX.utils.sheet_to_csv(selectedSheet);
+        // 1. Convert the sheet to JSON first, telling it to skip blank rows.
+        const jsonData = XLSX.utils.sheet_to_json(selectedSheet, {
+            header: 1, // Use this if you want to preserve headers
+            blankrows: false // The magic option to skip empty rows
+        });
 
-        // Create a new Blob/File from the CSV string
+        // 2. Convert the clean JSON data back into a worksheet.
+        const newSheet = XLSX.utils.json_to_sheet(jsonData, {
+            skipHeader: true // We already have the headers
+        });
+
+        // 3. Convert the new, clean sheet into a CSV string.
+        const csvString = XLSX.utils.sheet_to_csv(newSheet);
+        // ----------------------
+
+        // Create a new Blob/File from the clean CSV string
         const newFile = new File([csvString], `${selectedSheetName}.csv`, {
             type: "text/csv",
         });
@@ -100,11 +112,7 @@ const FormNewDataSet = (props) => {
 
             if (res?.success) {
                 toast("Dataset uploaded successfully", {
-                    description: "File has been uploaded.",
-                    action: {
-                        label: "action",
-                        onClick: () => console.log("action"),
-                    },
+                    description: "File has been uploaded."
                 });
                 setUploadDone(UploadStatus.dataClear);
             } else {
