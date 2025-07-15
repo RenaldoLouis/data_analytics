@@ -203,7 +203,7 @@ export default function RegistrationForm() {
                 </form>
             </Form>
 
-            <Dialog open={true} onOpenChange={setIsSuccessModalOpen}>
+            <Dialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
                 <DialogContent className="sm:max-w-md p-8 text-center">
                     <DialogHeader className="space-y-4 items-center">
                         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">

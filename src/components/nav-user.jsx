@@ -28,11 +28,30 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useRouter } from "next/navigation"
 
 export function NavUser({
   user
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter();
+
+  const handleClickSignOut = async () => {
+    try {
+      const res = await fetch('/next-api/logout', {
+        method: 'POST',
+      });
+
+      if (res.ok) {
+        // Redirect to the login page after successful logout
+        router.push('/login');
+      } else {
+        console.error("Logout failed");
+      }
+    } catch (error) {
+      console.error("An error occurred during logout:", error);
+    }
+  };
 
   return (
     <SidebarMenu className="w-fit">
@@ -92,7 +111,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleClickSignOut}>
               <IconLogout />
               Log out
             </DropdownMenuItem>
