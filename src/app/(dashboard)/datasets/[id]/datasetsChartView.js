@@ -21,9 +21,17 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     const [selectedChartType, setSelectedChartType] = useState(null);
     const [chartListType, setChartListType] = useState([])
     const [chartDrawData, setChartDrawData] = useState([]);
+    const [isLoadingChart, setIsLoadingChart] = useState(false);
 
     const renderSelectedChart = () => {
         const hasData = chartDrawData && chartDrawData.length > 0;
+        if (isLoadingChart) {
+            return (
+                <div className="justify-items-center w-full h-full content-center">
+                    <div className="justify-items-center w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            )
+        }
         if (!hasData) return (
             <div className="text-center py-20">
                 <H3 className="text-lg font-medium text-gray-600">
@@ -102,6 +110,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
 
     useEffect(() => {
         if (selectedChartType) {
+            setIsLoadingChart(true)
             const fetchChartData = async () => {
                 try {
                     const tempObj = {
@@ -113,7 +122,9 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
 
                     const res = await services.chart.getChartData(tempObj)
                     setChartDrawData(res.data)
+                    setIsLoadingChart(false)
                 } catch (e) {
+                    setIsLoadingChart(false)
                     console.error("Fetch Chart Data Fail", e)
                 }
             }

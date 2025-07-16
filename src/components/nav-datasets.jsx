@@ -115,13 +115,13 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
               className="group/item rounded-md"
             >
               <SidebarMenuButton asChild>
-                <div className="flex justify-between">
-                  <div>
+                <div className="flex justify-between"
+                  style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
+                  <div style={{ width: "100%" }}>
                     <div
                       key={`${item.name} ${index}`}
                       onClick={() => handleClickNavigateDataSets(item)}
-                      className="group flex items-center space-x-3 cursor-pointer"
-                      style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
+                      className="group flex items-center space-x-3 cursor-pointer">
                       <span
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: item.color }}
@@ -129,10 +129,12 @@ export function NavDatasets({ setSelectedNav, selectedNav, setDataSetsList, data
                       <span>{item.name}</span>
                     </div>
                   </div>
-                  <IconTrash
-                    onClick={(e) => handleDeleteDataset(e, item.id)}
-                    className="w-4 h-4 text-muted-foreground invisible group-hover/item:visible hover:text-red-800 cursor-pointer"
-                  />
+                  <div>
+                    <IconTrash
+                      onClick={(e) => handleDeleteDataset(e, item.id)}
+                      className="w-4 h-4 text-muted-foreground invisible group-hover/item:visible hover:text-red-800 cursor-pointer"
+                    />
+                  </div>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>
