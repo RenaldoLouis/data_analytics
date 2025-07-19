@@ -76,7 +76,6 @@ export default function DatasetRightContent() {
                     const res = await services.chart.getChartRecords(currentDataFromDataSetList?.chart_record_id)
 
                     if (chartDrawData?.length <= 0) {
-                        // tinggal set column and rownnya juga terus done si
                         const selectedChart = chartListType.filter((eachData) => eachData.id === res?.data?.chart_id)
                         setChartDrawData(res?.data?.chart_content)
                         setSelectedChartType(selectedChart[0])

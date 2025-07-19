@@ -6,36 +6,39 @@
 
 import { DashboardCard } from "@/components/DashboardCard/DashboardCard";
 
-export default function DashboardLayout2() {
+export default function DashboardLayout2({ listOfChart = [], setListOfChart, chartComponents }) {
+    // Defines the unique grid structure for Layout 2
+    const layoutConfig = [
+        { className: "md:col-span-2" },
+        { className: "md:col-span-4" },
+        { className: "md:col-span-2" },
+        { className: "md:col-span-4" },
+        { className: "md:col-span-6 md:row-span-2", cardClassName: "min-h-96" },
+        { className: "md:col-span-2" },
+        { className: "md:col-span-2" },
+        { className: "md:col-span-2" },
+    ];
+
     return (
         <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-6 md:gap-6 lg:p-6">
-            <div className="md:col-span-2">
-                <DashboardCard />
-            </div>
-            <div className="md:col-span-4">
-                <DashboardCard />
-            </div>
+            {layoutConfig.map((cell, index) => {
+                const chartInfo = listOfChart[index];
+                const ChartComponent = chartInfo ? chartComponents[chartInfo.chartType] : null;
 
-            <div className="md:col-span-2">
-                <DashboardCard />
-            </div>
-            <div className="md:col-span-4">
-                <DashboardCard />
-            </div>
-
-            <div className="md:col-span-6 md:row-span-2">
-                <DashboardCard className="min-h-96" />
-            </div>
-
-            <div className="md:col-span-2">
-                <DashboardCard />
-            </div>
-            <div className="md:col-span-2">
-                <DashboardCard />
-            </div>
-            <div className="md:col-span-2">
-                <DashboardCard />
-            </div>
+                return (
+                    <div key={index} className={cell.className}>
+                        {chartInfo && ChartComponent ? (
+                            <ChartComponent chartData={chartInfo.data} className={cell.cardClassName} />
+                        ) : (
+                            <DashboardCard
+                                className={cell.cardClassName}
+                                cardIndex={index}
+                                setListOfChart={setListOfChart}
+                            />
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 }

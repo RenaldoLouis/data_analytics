@@ -2,6 +2,7 @@
 
 import DashboardCardAreaChart from "@/components/DashboardCard/DashboardCardAreaChart";
 import DashboardCardBarChart from "@/components/DashboardCard/DashboardCardBarChart";
+import DashboardCardPieChart from "@/components/DashboardCard/DashboardCardPieChart";
 import DashboardLayout1 from "@/components/DashboardLayout/DashboardLayout1";
 import DashboardLayout2 from "@/components/DashboardLayout/DashboardLayout2";
 import DashboardLayout3 from "@/components/DashboardLayout/DashboardLayout3";
@@ -14,23 +15,23 @@ import { useDashboardContext } from "@/context/dashboard-context";
 import { useEffect, useRef, useState } from "react";
 
 export default function Page() {
-  const { setIsDialogOpenAddNewDataSet } = useDashboardContext();
+  const { setIsDialogOpenAddNewDataSet, dataSetsList } = useDashboardContext();
   const layoutRef = useRef(null);
 
   const [selectedLayout, setSelectedLayout] = useState("layout1")
   const [listOfChart, setListOfChart] = useState(Array(8).fill({}));
 
   const chartComponents = {
-    barChart: DashboardCardBarChart,
-    areaChart: DashboardCardAreaChart,
-    // pieChart: DashboardCardPieChart,
+    bar: DashboardCardBarChart,
+    area: DashboardCardAreaChart,
+    pie: DashboardCardPieChart,
     // lineChart: DashboardCardLineChart,
   };
 
   useEffect(() => {
     setListOfChart([
       {
-        chartType: "barChart",
+        chartType: "bar",
         data: [
           [
             { month: "January", desktop: 186, mobile: 80 },
@@ -99,7 +100,7 @@ export default function Page() {
         ]
       },
       {
-        chartType: "areaChart",
+        chartType: "area",
         data: [
           [
             { month: "January", desktop: 186, mobile: 80 },
@@ -176,6 +177,8 @@ export default function Page() {
     ])
   }, [])
 
+  console.log("dataSetsList", dataSetsList)
+
   const renderlayout = () => {
     switch (selectedLayout) {
       case "layout1":
@@ -208,20 +211,22 @@ export default function Page() {
           <ModalExportDashboard layoutRef={layoutRef} />
         </div>
       </div>
-      <div className="px-4 lg:px-6" >
-        <Alert variant="default" className="flex justify-between items-center" style={{ height: 42 }}>
-          <P>
-            You don’t have any data sets. Add data sets first in order to make chart
-          </P>
-          <Button
-            onClick={() => setIsDialogOpenAddNewDataSet(true)}
-            variant="link"
-            className="cursor-pointer"
-          >
-            Add data sets
-          </Button>
-        </Alert>
-      </div>
+      {dataSetsList.lengt <= 0 && (
+        <div className="px-4 lg:px-6" >
+          <Alert variant="default" className="flex justify-between items-center" style={{ height: 42 }}>
+            <P>
+              You don’t have any data sets. Add data sets first in order to make dashboard
+            </P>
+            <Button
+              onClick={() => setIsDialogOpenAddNewDataSet(true)}
+              variant="link"
+              className="cursor-pointer"
+            >
+              Add data sets
+            </Button>
+          </Alert>
+        </div>
+      )}
 
       <div ref={layoutRef}>
         {renderlayout()}
