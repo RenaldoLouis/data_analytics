@@ -16,11 +16,9 @@ import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComp
 
 
 const DatasetsChartView = ({ chartData, datasetId }) => {
-    const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow } = useDashboardContext();
+    const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
 
-    const [selectedChartType, setSelectedChartType] = useState(null);
     const [chartListType, setChartListType] = useState([])
-    const [chartDrawData, setChartDrawData] = useState([]);
     const [isLoadingChart, setIsLoadingChart] = useState(false);
 
     const renderSelectedChart = () => {

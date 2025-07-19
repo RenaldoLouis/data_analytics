@@ -16,9 +16,12 @@ export const DashboardProvider = ({ children }) => {
     const [isFetchDataSetContents, setIsFetchDataSetContents] = useState(false);
     const [dataToUpdate, setDataToUpdate] = useState([]);
     const [dataSetsList, setDataSetsList] = useState([]);
+    const [selectedChartType, setSelectedChartType] = useState(null);
+    const [chartDrawData, setChartDrawData] = useState([]);
+
 
     return (
-        <DashboardContext.Provider value={{ dataSetsList, setDataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, selectedColumn, setSelectedColumn, selectedRow, setSelectedRow, setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists }}>
+        <DashboardContext.Provider value={{ chartDrawData, setChartDrawData, selectedChartType, setSelectedChartType, dataSetsList, setDataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, selectedColumn, setSelectedColumn, selectedRow, setSelectedRow, setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists }}>
             {children}
         </DashboardContext.Provider>
     );

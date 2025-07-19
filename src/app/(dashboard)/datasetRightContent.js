@@ -45,7 +45,7 @@ const DraggableItem = ({ item, type }) => {
 
 export default function DatasetRightContent() {
     const pathname = usePathname();
-    const { dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+    const { setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
 
     const [isShowsideContent, setIsShowsideContent] = useState(false);
     const [datasetId, setDatasetId] = useState(null);
@@ -145,6 +145,31 @@ export default function DatasetRightContent() {
 
         // and then refectch the dataste on the left side
     };
+
+    const handleSaveChart = async () => {
+        const tempObj = {
+            "dataset_id": datasetId,
+            "chart_id": selectedChartType.id,
+            "chart_content": chartDrawData
+        }
+
+        // TODO: we should normalize all API call with try catch
+        try {
+            const res = await services.chart.postChartRecords(tempObj)
+            console.log("res", res)
+            if (res.success) {
+                toast("Chart Saved successfully");
+            } else {
+                // const errorData = await res.json(); // Try to get more details from the response body
+                throw new Error(res.message || `Request failed with status ${res.status}`);
+            }
+        } catch (e) {
+            console.error("An error occurred:", e.message);
+            toast.error("Failed to save chart", {
+                description: e.message
+            });
+        }
+    }
 
     return (
         <AnimatePresence>
@@ -266,6 +291,9 @@ export default function DatasetRightContent() {
 
                             <Button onClick={handleUpdateData} variant="secondary" className="flex-1 cursor-pointer" style={{ background: "#0B2238", color: "white" }}>
                                 <Image src={syncIcon} alt="Measure icon" className="w-5 h-5" />   Sync Changes
+                            </Button>
+                            <Button onClick={handleSaveChart} variant="primary" className="flex-1 cursor-pointer" style={{ background: "blue", color: "white" }}>
+                                Save Chart
                             </Button>
                             <Button variant="destructive" className="flex-1 cursor-pointer">
                                 Delete Data Set
