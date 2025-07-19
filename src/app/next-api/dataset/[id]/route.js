@@ -18,7 +18,7 @@ export async function GET(request, context) {
 
     try {
         const backendRes = await axios.get(
-            `${process.env.BACKEND_URL}/dataset/${id}?limit=${limit}&page=${page}`,
+            `${process.env.BACKEND_URL}/dataset/contents/${id}?limit=${limit}&page=${page}`,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,

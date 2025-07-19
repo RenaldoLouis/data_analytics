@@ -140,7 +140,7 @@ export function AppSidebar({
   const pathname = usePathname();
 
   const [selectedNav, setSelectedNav] = useState("1");
-  const { dataSetsList, setDataSetsList } = useDashboardContext();
+  const { dataSetsList } = useDashboardContext();
 
   useEffect(() => {
     if (pathname === "/dashboard") {
@@ -171,7 +171,7 @@ export function AppSidebar({
       <Separator />
       <SidebarContent>
         <NavMain items={data.navMain} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
-        <NavDatasets setDataSetsList={setDataSetsList} dataSetsList={dataSetsList} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
+        <NavDatasets dataSetsList={dataSetsList} setSelectedNav={setSelectedNav} selectedNav={selectedNav} />
         {/* <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
       </SidebarContent>
     </Sidebar>

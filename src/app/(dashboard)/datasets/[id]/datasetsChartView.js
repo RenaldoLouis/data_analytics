@@ -16,9 +16,8 @@ import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComp
 
 
 const DatasetsChartView = ({ chartData, datasetId }) => {
-    const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
+    const { chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
 
-    const [chartListType, setChartListType] = useState([])
     const [isLoadingChart, setIsLoadingChart] = useState(false);
 
     const renderSelectedChart = () => {
@@ -107,7 +106,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     }, [selectedChartType, datasetId])
 
     useEffect(() => {
-        if (selectedChartType) {
+        if (selectedChartType && selectedColumn.length > 0 && selectedRow.length > 0) {
             setIsLoadingChart(true)
             const fetchChartData = async () => {
                 try {
@@ -129,7 +128,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
 
             fetchChartData();
         }
-    }, [selectedChartType])
+    }, [selectedChartType, selectedRow, selectedColumn])
 
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],

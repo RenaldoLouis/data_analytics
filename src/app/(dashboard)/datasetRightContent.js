@@ -45,7 +45,7 @@ const DraggableItem = ({ item, type }) => {
 
 export default function DatasetRightContent() {
     const pathname = usePathname();
-    const { setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+    const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, chartListType, isFetchDataSetLists, setIsFetchDataSetLists, setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
 
     const [isShowsideContent, setIsShowsideContent] = useState(false);
     const [datasetId, setDatasetId] = useState(null);
@@ -60,6 +60,36 @@ export default function DatasetRightContent() {
             }
         }
     }, [pathname]);
+
+    const currentDataFromDataSetList = useMemo(() => {
+        if (dataSetsList.length > 0 && datasetId) {
+            const tempArray = dataSetsList.filter((eachData) => eachData.id === datasetId)
+            return tempArray[0]
+        }
+    }, [dataSetsList, datasetId])
+
+    // To draw the chart if the user has ever saved the chart
+    useEffect(() => {
+        if (currentDataFromDataSetList && chartListType.length > 0) {
+            const getChartRecords = async () => {
+                try {
+                    const res = await services.chart.getChartRecords(currentDataFromDataSetList?.chart_record_id)
+
+                    if (chartDrawData?.length <= 0) {
+                        // tinggal set column and rownnya juga terus done si
+                        const selectedChart = chartListType.filter((eachData) => eachData.id === res?.data?.chart_id)
+                        setChartDrawData(res?.data?.chart_content)
+                        setSelectedChartType(selectedChart[0])
+                        setSelectedColumn(res?.data?.selected_column)
+                        setSelectedRow(res?.data?.selected_row)
+                    }
+                } catch (e) {
+                    console.error(e)
+                }
+            }
+            getChartRecords()
+        }
+    }, [currentDataFromDataSetList, chartListType, chartDrawData])
 
     const {
         availableDimensions,
@@ -101,7 +131,7 @@ export default function DatasetRightContent() {
         }
     }, [dataSetsList, datasetId])
 
-    const dataStaus = useMemo(() => {
+    const dataStatus = useMemo(() => {
         if (currentDataset) {
             switch (currentDataset.status) {
                 case 0:
@@ -142,15 +172,15 @@ export default function DatasetRightContent() {
             });
             throw new Error("Upload failed with status " + res.status);
         }
-
-        // and then refectch the dataste on the left side
     };
 
     const handleSaveChart = async () => {
         const tempObj = {
             "dataset_id": datasetId,
             "chart_id": selectedChartType.id,
-            "chart_content": chartDrawData
+            "chart_content": chartDrawData,
+            "selected_row": selectedRow,
+            "selected_column": selectedColumn,
         }
 
         // TODO: we should normalize all API call with try catch
@@ -168,6 +198,46 @@ export default function DatasetRightContent() {
             toast.error("Failed to save chart", {
                 description: e.message
             });
+        }
+    }
+
+
+    const handleDeleteDataset = async () => {
+        const res = await services.dataset.deleteDataset(datasetId);
+
+        try {
+            if (res?.success) {
+                toast("Dataset Deleted");
+                setIsFetchDataSetLists(!isFetchDataSetLists)
+            }
+        } catch (e) {
+            toast("Delete failed", {
+                description: e.message,
+            });
+            throw new Error("Delete failed with status " + res.status);
+        }
+    };
+
+    const updateDataSetReadyVisualization = async () => {
+        const tempData = {
+            "name": currentDataset?.name,
+            "sheet_name": currentDataset?.sheet_name,
+            "status": 1
+        }
+
+        try {
+            const res = await services.dataset.updateDataset(datasetId, tempData);
+
+            if (res?.success) {
+                toast("Dataset ready to visualize");
+                setIsFetchDataSetContents(!isFetchDataSetContents)
+                setIsFetchDataSetLists(!isFetchDataSetLists)
+            }
+        } catch (e) {
+            toast("Upload failed", {
+                description: e.message,
+            });
+            throw new Error("Upload failed with status " + res.status);
         }
     }
 
@@ -277,7 +347,7 @@ export default function DatasetRightContent() {
                             </p>
                             <p className="mb-3">
                                 <span className="font-medium">Data status:</span>{" "}
-                                <span className="text-green-600">{dataStaus}</span>
+                                <span className="text-green-600">{dataStatus}</span>
                             </p>
                             <p className="mb-3">
                                 <span className="font-medium">Quality Score:</span>{" "}
@@ -292,10 +362,13 @@ export default function DatasetRightContent() {
                             <Button onClick={handleUpdateData} variant="secondary" className="flex-1 cursor-pointer" style={{ background: "#0B2238", color: "white" }}>
                                 <Image src={syncIcon} alt="Measure icon" className="w-5 h-5" />   Sync Changes
                             </Button>
-                            <Button onClick={handleSaveChart} variant="primary" className="flex-1 cursor-pointer" style={{ background: "blue", color: "white" }}>
+                            <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="primary" className="flex-1 cursor-pointer" style={{ background: "blue", color: "white" }}>
                                 Save Chart
                             </Button>
-                            <Button variant="destructive" className="flex-1 cursor-pointer">
+                            <Button onClick={updateDataSetReadyVisualization} variant="primary" className="flex-1 cursor-pointer" style={{ background: "green", color: "white" }}>
+                                Update Dataset Ready for Visualization
+                            </Button>
+                            <Button onClick={handleDeleteDataset} variant="destructive" className="flex-1 cursor-pointer">
                                 Delete Data Set
                             </Button>
                         </div>

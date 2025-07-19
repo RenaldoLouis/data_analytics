@@ -130,6 +130,7 @@ export default {
     chart: {
         getChart: () => getRequest(`/next-api/chart`),
         getChartData: (data) => postAPIRequest(`/next-api/chart`, data),
+        getChartRecords: (id) => getRequest(`/next-api/records/${id}`),
         postChartRecords: (data) => postAPIRequest(`/next-api/records`, data)
     }
 };
