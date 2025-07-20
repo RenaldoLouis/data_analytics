@@ -28,7 +28,10 @@ export default function DashboardLayout3({ listOfChart = [], setListOfChart, cha
                 return (
                     <div key={index} className={cell.className}>
                         {chartInfo && ChartComponent ? (
-                            <ChartComponent chartData={chartInfo.data} className={cell.cardClassName} />
+                            <ChartComponent chartData={chartInfo.data} className={cell.cardClassName}
+                                stacked={chartInfo.chartType === 'stackedbar'}
+
+                            />
                         ) : (
                             <DashboardCard
                                 className={cell.cardClassName}

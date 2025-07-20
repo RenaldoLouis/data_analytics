@@ -25,7 +25,9 @@ export default function DashboardLayout1({ listOfChart, setListOfChart, chartCom
                 return (
                     <div key={index} className={cell.className}>
                         {chartInfo && ChartComponent ? (
-                            <ChartComponent chartData={chartInfo.data} className={cell.cardClassName} />
+                            <ChartComponent chartData={chartInfo.data} className={cell.cardClassName}
+                                stacked={chartInfo.chartType === 'stackedbar'}
+                            />
                         ) : (
                             <DashboardCard className={cell.cardClassName} cardIndex={index} setListOfChart={setListOfChart} listOfChart={listOfChart} />
                         )}

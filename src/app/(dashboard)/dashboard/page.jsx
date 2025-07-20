@@ -15,14 +15,14 @@ import { useDashboardContext } from "@/context/dashboard-context";
 import { useEffect, useRef, useState } from "react";
 
 export default function Page() {
-  const { setIsDialogOpenAddNewDataSet, dataSetsList } = useDashboardContext();
+  const { setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
   const layoutRef = useRef(null);
 
-  const [selectedLayout, setSelectedLayout] = useState("layout1")
   const [listOfChart, setListOfChart] = useState(Array(8).fill({}));
 
   const chartComponents = {
     bar: DashboardCardBarChart,
+    stackedbar: DashboardCardBarChart,
     area: DashboardCardAreaChart,
     pie: DashboardCardPieChart,
     // lineChart: DashboardCardLineChart,

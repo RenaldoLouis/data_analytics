@@ -13,9 +13,13 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useDashboardContext } from "@/context/dashboard-context";
+import services from "@/services";
 import _ from 'lodash';
-import { Plus } from "lucide-react";
+import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon, Plus } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 const ChartSelectItem = ({ value, label, chartImageUrl }) => {
     return (
@@ -57,16 +61,94 @@ const AddedChartItem = ({ label, chartImageUrl }) => {
 
 // Main Component
 export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listOfChart }) => {
+    const { chartListType, setChartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
+
     const form = useForm({
         defaultValues: {
             selectedChartId: "chart-1",
         },
     });
 
-    const onSubmit = (data) => {
+    useEffect(() => {
+        const fetchChartType = async () => {
+            try {
+                const res = await services.chart.getChart()
+                if (res?.success) {
+                    const modifiedList = res.data.map((eachData) => {
+                        const updatedData = { ...eachData };
+
+                        updatedData.name = updatedData.name.replace(/\s+/g, '');
+
+                        switch (updatedData.name) {
+                            case "Bar":
+                                updatedData.icon = <BarChart2 />;
+                                break;
+                            case "StackedBar":
+                                updatedData.icon = <BarChart />;
+                                break;
+                            case "Groupbar":
+                                updatedData.icon = <ChartColumnBig />;
+                                break;
+                            case "Line":
+                                updatedData.icon = <LineChartIcon />;
+                                break;
+                            case "Area":
+                                updatedData.icon = <AreaChartIcon />;
+                                break;
+                            case "Pie":
+                                updatedData.icon = <PieChartIcon />;
+                                break;
+                            default:
+                                updatedData.icon = null;
+                                break;
+                        }
+                        return updatedData;
+                    });
+
+                    setChartListType(modifiedList)
+                }
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        fetchChartType();
+    }, [])
+
+    const availableChartsData = useMemo(() => {
+        // 1. Filter the datasets to only include those that have been saved as a chart.
+        //    We can check if `chart_content` is not null.
+        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content !== null);
+
+        // 2. Map over the filtered list to create the new structure.
+        const availableCharts = createdCharts.map(chart => {
+            // Find the corresponding chart type information (e.g., "Bar", "Pie")
+            // using the chart_id from the dataset.
+            const chartTypeInfo = chartListType.find(type => type.id === chart.chart_id);
+            const chartTypeName = chartTypeInfo ? chartTypeInfo.name : 'Chart';
+
+            // Create a descriptive name for the chart.
+            const displayName = `${chart.sheet_name}`;
+
+            // Create a placeholder image URL.
+            const imageUrl = `https://placehold.co/96x56/a0c4ff/ffffff?text=${chartTypeName}`;
+
+            // Return the new object in the desired format.
+            return {
+                id: chart.chart_record_id, // Use the unique ID for the chart instance
+                dataset_id: chart.id, // Use the unique ID for the chart instance
+                name: displayName,
+                imageUrl: imageUrl,
+            };
+        });
+
+        return availableCharts;
+    }, [dataSetsList])
+
+    const onSubmit = async (data) => {
         let clonedData = _.cloneDeep(listOfChart);
         const tempObj = {
-            chartType: "areaChart",
+            chartType: "area",
             data: [
                 [
                     { month: "January", desktop: 186, mobile: 80 },
@@ -137,6 +219,30 @@ export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listO
         clonedData[cardIndex] = tempObj;
         setListOfChart(clonedData)
 
+        const selectedDatasetID = availableChartsData.filter((eachData) => eachData.id === data.selectedChartId)
+
+        // real Flow
+        try {
+            const numberString = selectedLayout.replace(/\D/g, '');
+            const layoutNumber = parseInt(numberString, 10);
+            const tempObj = {
+                "dashboard_layout": layoutNumber,
+                "order": cardIndex,
+                "dataset_id": selectedDatasetID[0].dataset_id
+            }
+            const res = await services.dashboard.postSaveDashboardRecord(tempObj)
+            if (res.success) {
+                toast("Save Success")
+            } else {
+                throw new Error("Save chart to dashboard failed");
+            }
+        } catch (e) {
+            console.error("An error occurred:", e.message);
+            toast.error("Failed to save chart", {
+                description: e.message
+            });
+        }
+
     };
 
     const availableCharts = [
@@ -181,7 +287,7 @@ export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listO
                                                     value={field.value}
                                                     className="grid gap-3"
                                                 >
-                                                    {availableCharts.map((chart) => (
+                                                    {availableChartsData.map((chart) => (
                                                         <ChartSelectItem
                                                             key={chart.id}
                                                             value={chart.id}
