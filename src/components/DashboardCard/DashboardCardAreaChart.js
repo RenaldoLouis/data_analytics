@@ -14,39 +14,45 @@ import {
     ChartTooltip,
     ChartTooltipContent
 } from "@/components/ui/chart";
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { TrendingUp } from "lucide-react";
 import { CartesianGrid, XAxis } from "recharts";
 
 import downloadIcon from "@/assets/logo/downloadIcon.svg";
 import editIcon from "@/assets/logo/editIcon.svg";
-import { cn } from "@/lib/utils"; // 1. Import the cn utility
+import { cn } from "@/lib/utils";
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas-pro';
 import Image from "next/image";
-import { Area, AreaChart } from "recharts";
+import NextImage from "next/image";
 
-export default function DashboardCardAreaChart({ className }) {
-    const chartData = [
-        { month: "January", desktop: 186, mobile: 80 },
-        { month: "February", desktop: 305, mobile: 200 },
-        { month: "March", desktop: 237, mobile: 120 },
-        { month: "April", desktop: 73, mobile: 190 },
-        { month: "May", desktop: 209, mobile: 130 },
-        { month: "June", desktop: 214, mobile: 140 },
-    ]
+import { Area, AreaChart, ResponsiveContainer } from "recharts";
 
-    const chartConfig = {
-        desktop: {
-            label: "Desktop",
-            color: "var(--chart-1)",
-        },
-        mobile: {
-            label: "Mobile",
-            color: "var(--chart-2)",
-        },
-    }
+// This component is now fully dynamic
+export default function DashboardCardAreaChart({ className, chartData }) {
+
+    // Dynamically calculate keys and chart config from the chartData prop
+    const { xAxisKey, seriesKeys, chartConfig } = useMemo(() => {
+        if (!chartData || chartData.length === 0) {
+            return { xAxisKey: null, seriesKeys: [], chartConfig: {} };
+        }
+
+        const allKeys = Object.keys(chartData[0]);
+        const axisKey = allKeys[0]; // Assume first key is for the X-axis
+        const sKeys = allKeys.slice(1); // The rest are the data series
+
+        // Dynamically create a chartConfig for the legend and tooltips
+        const config = sKeys.reduce((acc, key, index) => {
+            acc[key] = {
+                label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                color: `var(--chart-${index + 1})`,
+            };
+            return acc;
+        }, {});
+
+        return { xAxisKey: axisKey, seriesKeys: sKeys, chartConfig: config };
+    }, [chartData]);
 
     const cardRef = useRef(null);
 
@@ -64,7 +70,7 @@ export default function DashboardCardAreaChart({ className }) {
 
             canvas.toBlob((blob) => {
                 if (blob) {
-                    saveAs(blob, 'chart-card.png');
+                    saveAs(blob, 'area-chart-card.png');
                 }
             });
         } catch (error) {
@@ -73,53 +79,50 @@ export default function DashboardCardAreaChart({ className }) {
     };
 
     return (
-        <Card ref={cardRef} className={cn("h-full", className)}>
+        <Card ref={cardRef} className={cn("h-full flex flex-col", className)}>
             <CardHeader>
-                <CardTitle>Area Chart - Legend</CardTitle>
+                <CardTitle>Area Chart</CardTitle>
                 <CardDescription>
-                    Showing total visitors for the last 6 months
+                    Dynamically Generated Chart
                 </CardDescription>
             </CardHeader>
-            <CardContent>
-                <ChartContainer config={chartConfig}>
-                    <AreaChart
-                        accessibilityLayer
-                        data={chartData}
-                        margin={{
-                            left: 12,
-                            right: 12,
-                        }}
-                    >
-                        <CartesianGrid vertical={false} />
-                        <XAxis
-                            dataKey="month"
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={8}
-                            tickFormatter={(value) => value.slice(0, 3)}
-                        />
-                        <ChartTooltip
-                            cursor={false}
-                            content={<ChartTooltipContent indicator="line" />}
-                        />
-                        <Area
-                            dataKey="mobile"
-                            type="natural"
-                            fill="var(--color-mobile)"
-                            fillOpacity={0.4}
-                            stroke="var(--color-mobile)"
-                            stackId="a"
-                        />
-                        <Area
-                            dataKey="desktop"
-                            type="natural"
-                            fill="var(--color-desktop)"
-                            fillOpacity={0.4}
-                            stroke="var(--color-desktop)"
-                            stackId="a"
-                        />
-                        <ChartLegend content={<ChartLegendContent />} />
-                    </AreaChart>
+            <CardContent className="flex-1">
+                <ChartContainer config={chartConfig} className="h-full w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                            accessibilityLayer
+                            data={chartData}
+                            margin={{
+                                left: 12,
+                                right: 12,
+                                top: 10,
+                            }}
+                        >
+                            <CartesianGrid vertical={false} />
+                            <XAxis
+                                dataKey={xAxisKey}
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={8}
+                            />
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent indicator="line" />}
+                            />
+                            {seriesKeys.map(key => (
+                                <Area
+                                    key={key}
+                                    dataKey={key}
+                                    type="natural"
+                                    fill={`var(--color-${key})`}
+                                    fillOpacity={0.4}
+                                    stroke={`var(--color-${key})`}
+                                    stackId="a"
+                                />
+                            ))}
+                            <ChartLegend content={<ChartLegendContent />} />
+                        </AreaChart>
+                    </ResponsiveContainer>
                 </ChartContainer>
             </CardContent>
             <CardFooter>
@@ -133,11 +136,10 @@ export default function DashboardCardAreaChart({ className }) {
                         </div>
                     </div>
                     <div className="flex">
-                        <Image src={downloadIcon} alt="Measure icon" className="w-5 h-5 mr-3 cursor-pointer"
+                        <NextImage src={downloadIcon} alt="Download icon" className="w-5 h-5 mr-3 cursor-pointer"
                             onClick={handleDownloadImage}
-
                         />
-                        <Image src={editIcon} alt="Measure icon" className="w-5 h-5" />
+                        <NextImage src={editIcon} alt="Edit icon" className="w-5 h-5 cursor-pointer" />
                     </div>
                 </div>
             </CardFooter>

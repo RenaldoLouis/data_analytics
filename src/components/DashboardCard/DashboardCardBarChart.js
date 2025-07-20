@@ -9,19 +9,47 @@ import {
 } from "@/components/ui/card";
 import {
     ChartContainer,
+    ChartLegend,
+    ChartLegendContent,
     ChartTooltip,
     ChartTooltipContent
 } from "@/components/ui/chart";
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 
+import downloadIcon from "@/assets/logo/downloadIcon.svg";
+import editIcon from "@/assets/logo/editIcon.svg";
 import { TrendingUp } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis } from "recharts";
+
+import { cn } from "@/lib/utils";
+import NextImage from "next/image";
 
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas-pro';
 
 
-export default function DashboardCardBarChart() {
+export default function DashboardCardBarChart({ chartData, className, stacked = false }) {
+    const { xAxisKey, seriesKeys, chartConfig } = useMemo(() => {
+        if (!chartData || chartData.length === 0) {
+            return { xAxisKey: null, seriesKeys: [], chartConfig: {} };
+        }
+
+        const allKeys = Object.keys(chartData[0]);
+        const axisKey = allKeys[0]; // Assume the first key is the X-axis (dimension)
+        const sKeys = allKeys.slice(1); // The rest are the series (measures)
+
+        // Dynamically create a chartConfig for the legend and tooltips
+        const config = sKeys.reduce((acc, key, index) => {
+            acc[key] = {
+                label: key.replace(/_Sum|_Count/g, ''), // Clean up the label
+                color: `var(--chart-${index + 1})`, // Use theme colors
+            };
+            return acc;
+        }, {});
+
+        return { xAxisKey: axisKey, seriesKeys: sKeys, chartConfig: config };
+    }, [chartData]);
+
     const barChartData = [
         { month: "January", desktop: 186, mobile: 80 },
         { month: "February", desktop: 305, mobile: 200 },
@@ -74,58 +102,42 @@ export default function DashboardCardBarChart() {
     };
 
     return (
-        <Card>
+        <Card ref={cardRef} className={cn("h-full flex flex-col", className)}>
             <CardHeader>
-                <CardTitle>Bar Chart - Custom Label</CardTitle>
-                <CardDescription>January - June 2024</CardDescription>
+                <CardTitle>{stacked ? "Stacked Bar Chart" : "Bar Chart"}</CardTitle>
+                <CardDescription>Dynamically Generated Chart</CardDescription>
             </CardHeader>
-            <CardContent>
-                <ChartContainer config={chartBarConfig}>
-                    <BarChart
-                        accessibilityLayer
-                        data={barChartData}
-                        layout="vertical"
-                        margin={{
-                            right: 16,
-                        }}
-                    >
-                        <CartesianGrid horizontal={false} />
-                        <YAxis
-                            dataKey="month"
-                            type="category"
-                            tickLine={false}
-                            tickMargin={10}
-                            axisLine={false}
-                            tickFormatter={(value) => value.slice(0, 3)}
-                            hide
-                        />
-                        <XAxis dataKey="desktop" type="number" hide />
-                        <ChartTooltip
-                            cursor={false}
-                            content={<ChartTooltipContent indicator="line" />}
-                        />
-                        <Bar
-                            dataKey="desktop"
-                            layout="vertical"
-                            fill="var(--color-desktop)"
-                            radius={4}
+            <CardContent className="flex-1">
+                <ChartContainer config={chartConfig} className="h-full w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                            accessibilityLayer
+                            data={chartData}
+                            margin={{ top: 20 }}
                         >
-                            <LabelList
-                                dataKey="month"
-                                position="insideLeft"
-                                offset={8}
-                                className="fill-(--color-label)"
-                                fontSize={12}
+                            <CartesianGrid vertical={false} />
+                            <XAxis
+                                dataKey={xAxisKey}
+                                tickLine={false}
+                                tickMargin={10}
+                                axisLine={false}
                             />
-                            <LabelList
-                                dataKey="desktop"
-                                position="right"
-                                offset={8}
-                                className="fill-foreground"
-                                fontSize={12}
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent indicator="line" />}
                             />
-                        </Bar>
-                    </BarChart>
+                            {seriesKeys.map((key) => (
+                                <Bar
+                                    key={key}
+                                    dataKey={key}
+                                    fill={`var(--color-${key})`}
+                                    radius={4}
+                                    stackId={stacked ? "a" : undefined}
+                                />
+                            ))}
+                            <ChartLegend content={<ChartLegendContent />} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </ChartContainer>
             </CardContent>
             <CardFooter className="flex-col items-start gap-2 text-sm">
@@ -134,6 +146,12 @@ export default function DashboardCardBarChart() {
                 </div>
                 <div className="text-muted-foreground leading-none">
                     Showing total visitors for the last 6 months
+                </div>
+                <div className="flex">
+                    <NextImage src={downloadIcon} alt="Download icon" className="w-5 h-5 mr-3 cursor-pointer"
+                        onClick={handleDownloadImage}
+                    />
+                    <NextImage src={editIcon} alt="Edit icon" className="w-5 h-5 cursor-pointer" />
                 </div>
             </CardFooter>
         </Card>

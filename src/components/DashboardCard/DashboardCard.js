@@ -146,6 +146,7 @@ export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listO
     }, [dataSetsList])
 
     const onSubmit = async (data) => {
+        //STARTREGION need to remove this and add real flow
         let clonedData = _.cloneDeep(listOfChart);
         const tempObj = {
             chartType: "area",
@@ -220,6 +221,7 @@ export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listO
         setListOfChart(clonedData)
 
         const selectedDatasetID = availableChartsData.filter((eachData) => eachData.id === data.selectedChartId)
+        //ENDREGION need to remove this and add real flow
 
         // real Flow
         try {

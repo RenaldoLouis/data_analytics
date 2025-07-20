@@ -134,6 +134,7 @@ export default {
         postChartRecords: (data) => postAPIRequest(`/next-api/records`, data)
     },
     dashboard: {
+        getDashboard: (layoutNumber) => getRequest(`/next-api/dashboard/${layoutNumber}`),
         postSaveDashboardRecord: (data) => postAPIRequest(`/next-api/dashboard`, data)
     }
 };
