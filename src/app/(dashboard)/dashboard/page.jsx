@@ -177,8 +177,6 @@ export default function Page() {
     ])
   }, [])
 
-  console.log("dataSetsList", dataSetsList)
-
   const renderlayout = () => {
     switch (selectedLayout) {
       case "layout1":

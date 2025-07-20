@@ -6,7 +6,6 @@ import {
 import { H3 } from "@/components/ui/typography";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
-import { transformChartData, transformForPieChart, transformForStackedChart } from "@/lib/transformChartData";
 import { cn } from "@/lib/utils";
 import services from "@/services";
 import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon } from "lucide-react";
@@ -151,34 +150,34 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     });
 
     //TO DO: might be remove one day This is the working frontend Logic Before for testing only
-    const processedData = useMemo(() => {
-        const dimensions = selectedColumn;
-        const measuresOrSecondDimension = selectedRow;
+    // const processedData = useMemo(() => {
+    //     const dimensions = selectedColumn;
+    //     const measuresOrSecondDimension = selectedRow;
 
-        if (measuresOrSecondDimension.length === 0 || dimensions.length === 0) return [];
+    //     if (measuresOrSecondDimension.length === 0 || dimensions.length === 0) return [];
 
-        const primaryDimension = dimensions[0];
-        const secondItem = measuresOrSecondDimension[0];
+    //     const primaryDimension = dimensions[0];
+    //     const secondItem = measuresOrSecondDimension[0];
 
-        // SCENARIO 1: Dimension vs. Dimension (e.g., product_category vs. customer_region)
-        // We will create a stacked chart by COUNTING records.
-        if (primaryDimension.type === ItemTypes.DIMENSION && secondItem.type === ItemTypes.DIMENSION) {
-            return transformForStackedChart(
-                chartData,
-                primaryDimension.name,
-                secondItem
-            );
-        }
+    //     // SCENARIO 1: Dimension vs. Dimension (e.g., product_category vs. customer_region)
+    //     // We will create a stacked chart by COUNTING records.
+    //     if (primaryDimension.type === ItemTypes.DIMENSION && secondItem.type === ItemTypes.DIMENSION) {
+    //         return transformForStackedChart(
+    //             chartData,
+    //             primaryDimension.name,
+    //             secondItem
+    //         );
+    //     }
 
-        // SCENARIO 2: Pie Chart (works as before)
-        if (selectedChartType?.name === 'Pie') {
-            return transformForPieChart(chartData, secondItem, primaryDimension);
-        }
+    //     // SCENARIO 2: Pie Chart (works as before)
+    //     if (selectedChartType?.name === 'Pie') {
+    //         return transformForPieChart(chartData, secondItem, primaryDimension);
+    //     }
 
-        // SCENARIO 3: Default Dimension vs. Measure (works as before)
-        return transformChartData(chartData, selectedColumn, selectedRow);
+    //     // SCENARIO 3: Default Dimension vs. Measure (works as before)
+    //     return transformChartData(chartData, selectedColumn, selectedRow);
 
-    }, [chartData, selectedRow, selectedColumn, selectedChartType]);
+    // }, [chartData, selectedRow, selectedColumn, selectedChartType]);
 
     // --- DYNAMIC KEYS FOR CHARTS ---
     const xAxisKey = selectedColumn[0]?.name;
@@ -219,7 +218,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 {/* Columns */}
                 <div className="flex items-start bg-gray-50 px-4 py-3 gap-3">
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
-                        ✏️ <span className="text-blue-600">Columns</span>
+                        <span className="text-blue-600">Columns</span>
                     </div>
                     <div
                         ref={dropColumn}
@@ -248,7 +247,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 {/* Rows (with horizontal scroll) */}
                 <div className="flex items-start px-4 py-3 gap-3">
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
-                        ✏️ <span className="text-blue-600">Rows</span>
+                        <span className="text-blue-600">Rows</span>
                     </div>
                     <div
                         ref={dropRow}

@@ -66,7 +66,7 @@ export default function DatasetRightContent() {
             const tempArray = dataSetsList.filter((eachData) => eachData.id === datasetId)
             return tempArray[0]
         }
-    }, [dataSetsList, datasetId])
+    }, [dataSetsList, datasetId, chartListType, chartDrawData])
 
     // To draw the chart if the user has ever saved the chart
     useEffect(() => {
@@ -75,6 +75,14 @@ export default function DatasetRightContent() {
                 try {
                     const res = await services.chart.getChartRecords(currentDataFromDataSetList?.chart_record_id)
 
+                    // TODO return of error from BE when no chart exist must be fixed
+                    if (res.message[0].code === "invalid_string") {
+                        setChartDrawData([])
+                        setSelectedChartType(null)
+                        setSelectedColumn([])
+                        setSelectedRow([])
+                        throw new Error("No Chart Exist yet");
+                    }
                     if (chartDrawData?.length <= 0) {
                         const selectedChart = chartListType.filter((eachData) => eachData.id === res?.data?.chart_id)
                         setChartDrawData(res?.data?.chart_content)
@@ -88,7 +96,7 @@ export default function DatasetRightContent() {
             }
             getChartRecords()
         }
-    }, [currentDataFromDataSetList, chartListType, chartDrawData])
+    }, [currentDataFromDataSetList])
 
     const {
         availableDimensions,
