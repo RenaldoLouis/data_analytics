@@ -60,7 +60,7 @@ export default function Page() {
           <ModalExportDashboard layoutRef={layoutRef} />
         </div>
       </div>
-      {dataSetsList.lengt <= 0 && (
+      {dataSetsList.length <= 0 && (
         <div className="px-4 lg:px-6" >
           <Alert variant="default" className="flex justify-between items-center" style={{ height: 42 }}>
             <P>
