@@ -193,7 +193,6 @@ export default function DatasetRightContent() {
         // TODO: we should normalize all API call with try catch
         try {
             const res = await services.chart.postChartRecords(tempObj)
-            console.log("res", res)
             if (res.success) {
                 toast("Chart Saved successfully");
             } else {

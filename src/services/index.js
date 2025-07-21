@@ -135,6 +135,7 @@ export default {
     },
     dashboard: {
         getDashboard: (layoutNumber) => getRequest(`/next-api/dashboard/${layoutNumber}`),
-        postSaveDashboardRecord: (data) => postAPIRequest(`/next-api/dashboard`, data)
+        postSaveDashboardRecord: (data) => postAPIRequest(`/next-api/dashboard`, data),
+        deleteDashboardChart: (id) => deleteRequestMiddleware(`/next-api/dashboard/chart/${id}`),
     }
 };

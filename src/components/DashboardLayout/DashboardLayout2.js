@@ -6,7 +6,7 @@
 
 import { DashboardCard } from "@/components/DashboardCard/DashboardCard";
 
-export default function DashboardLayout2({ listOfChart = [], setListOfChart, chartComponents }) {
+export default function DashboardLayout2({ refetch, listOfChart = [], setListOfChart, chartComponents }) {
     // Defines the unique grid structure for Layout 2
     const layoutConfig = [
         { className: "md:col-span-2" },
@@ -28,12 +28,16 @@ export default function DashboardLayout2({ listOfChart = [], setListOfChart, cha
                 return (
                     <div key={index} className={cell.className}>
                         {chartInfo && ChartComponent ? (
-                            <ChartComponent chartData={chartInfo.data} className={cell.cardClassName}
+                            <ChartComponent
+                                refetch={refetch}
+                                chartInfo={chartInfo}
+                                chartData={chartInfo.data} className={cell.cardClassName}
                                 stacked={chartInfo.chartType === 'stackedbar'}
 
                             />
                         ) : (
                             <DashboardCard
+                                refetch={refetch}
                                 className={cell.cardClassName}
                                 cardIndex={index}
                                 setListOfChart={setListOfChart}

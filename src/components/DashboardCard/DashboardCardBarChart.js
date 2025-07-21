@@ -18,17 +18,18 @@ import { useMemo, useRef } from 'react';
 
 import downloadIcon from "@/assets/logo/downloadIcon.svg";
 import editIcon from "@/assets/logo/editIcon.svg";
-import { TrendingUp } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Trash2, TrendingUp } from "lucide-react";
+import NextImage from "next/image";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis } from "recharts";
 
-import { cn } from "@/lib/utils";
-import NextImage from "next/image";
-
+import services from "@/services";
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas-pro';
+import { toast } from "sonner";
 
 
-export default function DashboardCardBarChart({ chartData, className, stacked = false }) {
+export default function DashboardCardBarChart({ refetch, chartInfo, chartData, className, stacked = false }) {
     const { xAxisKey, seriesKeys, chartConfig } = useMemo(() => {
         if (!chartData || chartData.length === 0) {
             return { xAxisKey: null, seriesKeys: [], chartConfig: {} };
@@ -101,11 +102,25 @@ export default function DashboardCardBarChart({ chartData, className, stacked = 
         }
     };
 
+    const handleDeleteChartFromDashboard = async () => {
+        try {
+            const res = await services.dashboard.deleteDashboardChart(chartInfo.id)
+            if (res.success) {
+                refetch()
+                toast("delete success")
+            } else {
+                throw new Error("No Chart Exist yet");
+            }
+        } catch (e) {
+            toast(e.message)
+        }
+    };
+
     return (
         <Card ref={cardRef} className={cn("h-full flex flex-col", className)}>
             <CardHeader>
                 <CardTitle>{stacked ? "Stacked Bar Chart" : "Bar Chart"}</CardTitle>
-                <CardDescription>Dynamically Generated Chart</CardDescription>
+                <CardDescription>{chartInfo.name}</CardDescription>
             </CardHeader>
             <CardContent className="flex-1">
                 <ChartContainer config={chartConfig} className="h-full w-full">
@@ -152,6 +167,7 @@ export default function DashboardCardBarChart({ chartData, className, stacked = 
                         onClick={handleDownloadImage}
                     />
                     <NextImage src={editIcon} alt="Edit icon" className="w-5 h-5 cursor-pointer" />
+                    <Trash2 onClick={handleDeleteChartFromDashboard} className="w-5 h-5 ml-3 cursor-pointer" style={{ color: "blue" }} />
                 </div>
             </CardFooter>
         </Card>

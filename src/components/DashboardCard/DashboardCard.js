@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
-import _ from 'lodash';
+import isEmpty from 'lodash/isEmpty';
 import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
@@ -60,7 +60,7 @@ const AddedChartItem = ({ label, chartImageUrl }) => {
 
 
 // Main Component
-export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listOfChart }) => {
+export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfChart, listOfChart }) => {
     const { chartListType, setChartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
 
     const form = useForm({
@@ -118,7 +118,7 @@ export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listO
     const availableChartsData = useMemo(() => {
         // 1. Filter the datasets to only include those that have been saved as a chart.
         //    We can check if `chart_content` is not null.
-        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content !== null);
+        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content !== null && !isEmpty(dataset.chart_content));
 
         // 2. Map over the filtered list to create the new structure.
         const availableCharts = createdCharts.map(chart => {
@@ -146,94 +146,19 @@ export const DashboardCard = ({ className = "", cardIndex, setListOfChart, listO
     }, [dataSetsList])
 
     const onSubmit = async (data) => {
-        //STARTREGION need to remove this and add real flow
-        let clonedData = _.cloneDeep(listOfChart);
-        const tempObj = {
-            chartType: "area",
-            data: [
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-                [
-                    { month: "January", desktop: 186, mobile: 80 },
-                    { month: "February", desktop: 305, mobile: 200 },
-                    { month: "March", desktop: 237, mobile: 120 },
-                    { month: "April", desktop: 73, mobile: 190 },
-                    { month: "May", desktop: 209, mobile: 130 },
-                    { month: "June", desktop: 214, mobile: 140 },
-                ],
-            ]
-        };
-        clonedData[cardIndex] = tempObj;
-        setListOfChart(clonedData)
 
         const selectedDatasetID = availableChartsData.filter((eachData) => eachData.id === data.selectedChartId)
-        //ENDREGION need to remove this and add real flow
-
-        // real Flow
         try {
             const numberString = selectedLayout.replace(/\D/g, '');
             const layoutNumber = parseInt(numberString, 10);
             const tempObj = {
                 "dashboard_layout": layoutNumber,
-                "order": cardIndex,
+                "order": cardIndex + 1,
                 "dataset_id": selectedDatasetID[0].dataset_id
             }
             const res = await services.dashboard.postSaveDashboardRecord(tempObj)
             if (res.success) {
+                refetch()
                 toast("Save Success")
             } else {
                 throw new Error("Save chart to dashboard failed");

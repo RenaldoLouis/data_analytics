@@ -4,7 +4,7 @@
 
 import { DashboardCard } from "@/components/DashboardCard/DashboardCard";
 
-export default function DashboardLayout1({ listOfChart, setListOfChart, chartComponents }) {
+export default function DashboardLayout1({ refetch, listOfChart, setListOfChart, chartComponents }) {
     const layoutConfig = [
         { className: "md:col-span-6 md:row-span-2", cardClassName: "min-h-82" }, // Large top card
         { className: "md:col-span-3" },
@@ -25,11 +25,14 @@ export default function DashboardLayout1({ listOfChart, setListOfChart, chartCom
                 return (
                     <div key={index} className={cell.className}>
                         {chartInfo && ChartComponent ? (
-                            <ChartComponent chartData={chartInfo.data} className={cell.cardClassName}
+                            <ChartComponent
+                                refetch={refetch}
+                                chartInfo={chartInfo}
+                                chartData={chartInfo.data} className={cell.cardClassName}
                                 stacked={chartInfo.chartType === 'stackedbar'}
                             />
                         ) : (
-                            <DashboardCard className={cell.cardClassName} cardIndex={index} setListOfChart={setListOfChart} listOfChart={listOfChart} />
+                            <DashboardCard refetch={refetch} className={cell.cardClassName} cardIndex={index} setListOfChart={setListOfChart} listOfChart={listOfChart} />
                         )}
                     </div>
                 );
