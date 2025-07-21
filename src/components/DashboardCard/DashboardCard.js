@@ -172,11 +172,6 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
     };
 
-    const availableCharts = [
-        { id: "chart-1", name: "Penjualan Maret 2024", imageUrl: "https://placehold.co/96x56/a0c4ff/ffffff?text=Chart1" },
-        { id: "chart-2", name: "User Engagement Q1", imageUrl: "https://placehold.co/96x56/bde0fe/ffffff?text=Chart2" },
-    ];
-
     const addedCharts = [
         { id: "chart-3", name: "Revenue Growth YTD", imageUrl: "https://placehold.co/96x56/ffafcc/ffffff?text=Chart3" },
     ];

@@ -3,9 +3,7 @@
 import DashboardCardAreaChart from "@/components/DashboardCard/DashboardCardAreaChart";
 import DashboardCardBarChart from "@/components/DashboardCard/DashboardCardBarChart";
 import DashboardCardPieChart from "@/components/DashboardCard/DashboardCardPieChart";
-import DashboardLayout1 from "@/components/DashboardLayout/DashboardLayout1";
-import DashboardLayout2 from "@/components/DashboardLayout/DashboardLayout2";
-import DashboardLayout3 from "@/components/DashboardLayout/DashboardLayout3";
+import DashboardLayoutPlaceholder from "@/components/DashboardLayoutPlaceholder";
 import { ModalExportDashboard } from "@/components/ModalExportDashboard";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -35,14 +33,14 @@ export default function Page() {
   const renderlayout = () => {
     switch (selectedLayout) {
       case "layout1":
-        return <DashboardLayout1 refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayoutPlaceholder layoutId={1} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
       case "layout2":
-        return <DashboardLayout2 refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayoutPlaceholder layoutId={2} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
       case "layout3":
-        return <DashboardLayout3 refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayoutPlaceholder layoutId={3} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
 
       default:
-        return <DashboardLayout1 />
+        return <DashboardLayoutPlaceholder />
     }
   }
 
