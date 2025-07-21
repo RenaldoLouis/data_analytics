@@ -24,6 +24,7 @@ const transformApiDataToListOfChart = (apiData, chartTypeMap, layoutSize = 8) =>
                 data: chart.chart_content,
                 name: chart.name,
                 id: chart.id,
+                dataset_id: chart.dataset_id
             };
         }
     });

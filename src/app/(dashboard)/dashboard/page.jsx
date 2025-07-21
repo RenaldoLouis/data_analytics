@@ -26,9 +26,7 @@ export default function Page() {
     // lineChart: DashboardCardLineChart,
   };
 
-
   const { listOfChart, setListOfChart, isLoading, error, refetch } = useDashboardRecords(selectedLayout, chartListType);
-
 
   const renderlayout = () => {
     switch (selectedLayout) {

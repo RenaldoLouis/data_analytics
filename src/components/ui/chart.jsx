@@ -109,8 +109,6 @@ function ChartTooltipContent({
       return null
     }
 
-    // console.log("payload", payload)
-
     const [item] = payload
     const key = `${labelKey || item?.dataKey || item?.name || "value"}`
     const itemConfig = getPayloadConfigFromPayload(config, item, key)

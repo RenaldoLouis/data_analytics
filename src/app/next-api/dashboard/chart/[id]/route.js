@@ -3,7 +3,6 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function DELETE(request, context) {
-    console.log("trigger")
     const { params } = context;
     const cookieStore = await cookies();
     const token = cookieStore.get('token')?.value;
