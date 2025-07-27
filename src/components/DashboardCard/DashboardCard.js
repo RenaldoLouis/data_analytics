@@ -118,7 +118,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
     const availableChartsData = useMemo(() => {
         // 1. Filter the datasets to only include those that have been saved as a chart.
         //    We can check if `chart_content` is not null.
-        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content !== null && !isEmpty(dataset.chart_content));
+        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content !== null && !isEmpty(dataset.chart_content) && dataset.dashboard_records.length <= 0);
 
         // 2. Map over the filtered list to create the new structure.
         const availableCharts = createdCharts.map(chart => {
@@ -172,9 +172,34 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
     };
 
-    const addedCharts = [
-        { id: "chart-3", name: "Revenue Growth YTD", imageUrl: "https://placehold.co/96x56/ffafcc/ffffff?text=Chart3" },
-    ];
+    const addedCharts = useMemo(() => {
+        // 1. Filter the datasets to find items that have been added to a dashboard.
+        const chartsOnDashboard = dataSetsList.filter(dataset =>
+            dataset.dashboard_records && dataset.dashboard_records.length > 0
+        );
+
+        // 2. Map over the filtered list to create the structure for the UI.
+        const formattedCharts = chartsOnDashboard.map(chart => {
+            // Find the corresponding chart type information
+            const chartTypeInfo = chartListType.find(type => type.id === chart.chart_id);
+            const chartTypeName = chartTypeInfo ? chartTypeInfo.name : 'Chart';
+
+            // Create a descriptive name for the chart.
+            const displayName = `${chart.sheet_name}`;
+
+            // Create a placeholder image URL.
+            const imageUrl = `https://placehold.co/96x56/e2e8f0/666?text=${chartTypeName}`;
+
+            // Return the new object in the desired format.
+            return {
+                id: chart.chart_record_id, // Use the unique ID for the chart instance
+                name: displayName,
+                imageUrl: imageUrl,
+            };
+        });
+
+        return formattedCharts;
+    }, [dataSetsList, chartListType]);
 
     return (
         <div className={`flex h-full min-h-48 items-center justify-center rounded-lg border border-dashed bg-card shadow-sm ${className}`}>
