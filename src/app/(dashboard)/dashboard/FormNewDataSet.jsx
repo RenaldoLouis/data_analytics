@@ -181,8 +181,19 @@ const FormNewDataSet = (props) => {
         }
     }, [isDialogOpenAddNewDataset])
 
+    const handleOpenChange = (isOpen) => {
+        // If an action is trying to close the dialog (isOpen would be false)
+        // AND the component is currently in a loading state, we prevent the close.
+        if (!isOpen && isLoading) {
+            return; // Do nothing, keeping the dialog open.
+        }
+
+        // Otherwise, allow the dialog's open state to be updated as usual.
+        setIsDialogOpenAddNewDataSet(isOpen);
+    };
+
     return (
-        <Dialog open={isDialogOpenAddNewDataset} onOpenChange={setIsDialogOpenAddNewDataSet} >
+        <Dialog open={isDialogOpenAddNewDataset} onOpenChange={handleOpenChange} >
             <FormProvider {...methods}>
                 <DialogTrigger style={{ display: !isShowText ? "none" : "" }} asChild>
                     <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>

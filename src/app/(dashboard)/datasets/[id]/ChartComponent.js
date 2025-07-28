@@ -22,19 +22,49 @@ import {
 } from "recharts";
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
 
+const CustomizedAxisTick = (props) => {
+    const { x, y, payload } = props;
+    const maxChars = 15; // Max characters to show before truncating
+
+    // Get the label text from the data
+    const label = payload.value;
+
+    // Truncate the label if it's too long
+    const truncatedLabel = label.length > maxChars
+        ? `${label.slice(0, maxChars)}…`
+        : label;
+
+    return (
+        <g transform={`translate(${x},${y})`}>
+            <text x={0} y={0} dy={16} textAnchor="end" fill="#666" >
+                {/* The visible, truncated label */}
+                {truncatedLabel}
+                {/* A tooltip that shows the full label on hover */}
+                <title>{label}</title>
+            </text>
+        </g>
+    );
+};
+
 export const BarChartComponent = ({ data, xAxisKey, seriesKeys, isGrouped = false }) => (
     <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
+        {/* Add a height to the chart to give the rotated labels enough space */}
+        <BarChart data={data} margin={{ bottom: 75 }}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey={xAxisKey} tickLine={false} axisLine={false} tickMargin={10} />
+            <XAxis
+                dataKey={xAxisKey}
+                // Tell the axis to use our custom component for the ticks
+                tick={<CustomizedAxisTick />}
+                // Adjust interval to prevent labels from overlapping
+                interval={0}
+            // We can remove other props as our component now handles styling
+            />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
             {seriesKeys.map((key, index) => (
                 <Bar
                     key={key}
                     dataKey={key}
-                    // This ID tells Recharts to stack the bars
-                    // stackId="a"
                     stackId={isGrouped ? undefined : "a"}
                     fill={COLORS[index % COLORS.length]}
                     radius={4}
