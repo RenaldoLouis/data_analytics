@@ -1,6 +1,7 @@
 "use-client";
 
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea
 import { useMemo } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import GenericDashboardCardChart from "./GenericDashboardCardChart";
@@ -46,33 +47,56 @@ export default function DashboardCardPieChart({ chartData, chartInfo, refetch, c
             refetch={refetch}
             className={className}
         >
+            {/* The ChartContainer now wraps the entire flex layout */}
             <ChartContainer
                 config={chartConfig}
-                className="mx-auto aspect-square max-h-[300px]"
+                className="h-full w-full"
             >
-                <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <ChartTooltip
-                            cursor={false}
-                            content={<ChartTooltipContent hideLabel />}
-                        />
-                        <Pie
-                            data={processedData}
-                            dataKey={dataKey}
-                            nameKey={nameKey}
-                            innerRadius={60}
-                            strokeWidth={5}
-                        >
-                            {processedData.map((entry) => (
-                                <Cell key={`cell-${entry[nameKey]}`} fill={entry.fill} />
-                            ))}
-                        </Pie>
-                        <ChartLegend
-                            content={<ChartLegendContent nameKey={nameKey} />}
-                            className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-                        />
-                    </PieChart>
-                </ResponsiveContainer>
+                {/* Use a flex container to position the chart and legend */}
+                <div className="flex h-full w-full items-center">
+                    {/* Column 1: The Pie Chart */}
+                    <div className="h-full w-2/3">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent hideLabel />}
+                                />
+                                <Pie
+                                    data={processedData}
+                                    dataKey={dataKey}
+                                    nameKey={nameKey}
+                                    innerRadius={60}
+                                    strokeWidth={5}
+                                >
+                                    {processedData.map((entry) => (
+                                        <Cell key={`cell-${entry[nameKey]}`} fill={entry.fill} />
+                                    ))}
+                                </Pie>
+                                {/* The default legend is removed */}
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Column 2: The Custom, Scrollable Legend */}
+                    <div className="h-full w-1/3 p-4">
+                        <ScrollArea className="h-full">
+                            <div className="flex flex-col gap-2">
+                                {processedData.map((entry, index) => (
+                                    <div key={`legend-${index}`} className="flex items-center gap-2">
+                                        <span
+                                            className="h-3 w-3 flex-shrink-0 rounded-full"
+                                            style={{ backgroundColor: entry.fill }}
+                                        />
+                                        <span className="text-sm text-muted-foreground truncate" title={entry[nameKey]}>
+                                            {entry[nameKey]}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                </div>
             </ChartContainer>
         </GenericDashboardCardChart>
     );

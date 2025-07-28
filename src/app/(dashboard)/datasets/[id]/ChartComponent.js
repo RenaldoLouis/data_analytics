@@ -6,6 +6,7 @@ import {
     ChartTooltip,
     ChartTooltipContent
 } from "@/components/ui/chart";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     Area,
     AreaChart,
@@ -20,6 +21,7 @@ import {
     ResponsiveContainer,
     XAxis
 } from "recharts";
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1919'];
 
 const CustomizedAxisTick = (props) => {
@@ -103,15 +105,42 @@ export const AreaChartComponent = ({ data, xAxisKey, seriesKeys }) => (
 );
 
 export const PieChartComponent = ({ data }) => (
-    <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-            <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={120}>
-                {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-            </Pie>
-        </PieChart>
-    </ResponsiveContainer>
+    <>
+        {/* Use a flex container to position the chart and legend */}
+        < div className="flex h-full w-full items-center" >
+            {/* Column 1: The Pie Chart */}
+            < div className="h-full w-2/3" >
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                        {/* FIX: The default ChartLegend component has been removed from here */}
+                        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={120}>
+                            {data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+            </div >
+
+            {/* Column 2: The Custom, Scrollable Legend */}
+            < div className="h-full w-1/3 p-4" >
+                <ScrollArea className="h-full">
+                    <div className="flex flex-col gap-2">
+                        {data.map((entry, index) => (
+                            <div key={`legend-${index}`} className="flex items-center gap-2">
+                                <span
+                                    className="h-3 w-3 rounded-full"
+                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                />
+                                <span className="text-sm text-muted-foreground truncate" title={entry.name}>
+                                    {entry.name}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+            </div >
+        </div >
+    </>
 );
