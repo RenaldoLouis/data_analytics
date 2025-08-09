@@ -87,7 +87,7 @@ export default function RegistrationForm() {
 
     return (
         <div className="w-full max-w-md">
-            <button onClick={() => router.back()} className="text-sm text-gray-500 mb-4 cursor-pointer">&larr; Back</button>
+            <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 cursor-pointer">&larr; Back</button>
             <h2 className="text-2xl font-bold">Try Free Trial</h2>
 
             <Form {...form}>

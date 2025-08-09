@@ -17,6 +17,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 
 // Schema
@@ -26,6 +27,8 @@ const loginSchema = z.object({
 });
 
 export default function LoginForm() {
+    const t = useTranslations("loginpage")
+
     const router = useRouter();
     const form = useForm({
         resolver: zodResolver(loginSchema),
@@ -48,7 +51,9 @@ export default function LoginForm() {
                 toast("Login success", {
                     description: moment().format("dddd, MMMM DD, YYYY [at] h:mm A"),
                 });
-                router.push("/dashboard");
+
+                console.log("move")
+                router.replace("/dashboard");
             } else {
                 form.setError("root", {
                     message: "Invalid credentials. Try again.",
@@ -63,19 +68,19 @@ export default function LoginForm() {
 
     const handleClickFreeTrial = (e) => {
         e.preventDefault();   // stop the form from submitting
-        router.push("/register");
+        router.replace("/register");
     }
 
     const handleClickDemoVideo = (e) => {
         e.preventDefault();   // stop the form from submitting
-        router.push("/requestdemo");
+        router.replace("/requestdemo");
     }
 
     return (
         <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-center">Login</h2>
             <p className="text-sm text-gray-500 text-center mt-1 mb-6">
-                Enter your credentials to access your account
+                {t("subtitle")}
             </p>
 
             <Form {...form}>

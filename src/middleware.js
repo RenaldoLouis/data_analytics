@@ -1,65 +1,68 @@
-// middleware.js
 import createIntlMiddleware from 'next-intl/middleware';
 import { NextResponse } from 'next/server';
 
-const protectedRoutes = ['/dashboard', '/', '/admin'];
+const protectedRoutes = ['/dashboard', '/admin'];
+const publicRoutes = ['/login', '/register'];
+
+const i18n = createIntlMiddleware({
+    locales: ['en', 'id'],
+    defaultLocale: 'en'
+});
 
 export async function middleware(req) {
-    const pathname = req.nextUrl.pathname;
+    const url = req.nextUrl;
+    const pathname = url.pathname; // /, /en, /en/login, /en/dashboard
+    const locale = pathname.match(/^\/(en|id)(?=\/|$)/)?.[1] ?? 'en';
+    const pathNoLocale = pathname.replace(/^\/(en|id)(?=\/|$)/, '') || '/';
+    const token = req.cookies.get('token')?.value;
 
-    // 1. Check if the path is a protected route
-    const isProtectedRoute = protectedRoutes.some((route) =>
-        // Handle root route ('/') separately and other routes with startsWith
-        pathname === route || (route !== '/' && pathname.startsWith(route))
-    );
+    const startsWith = (base) => pathNoLocale === base || pathNoLocale.startsWith(`${base}/`);
+    const isPublic = publicRoutes.some(startsWith);
+    const isProtected = protectedRoutes.some(startsWith);
+    const isLocaleRoot = pathNoLocale === '/';
 
-    if (isProtectedRoute) {
-        // 2. Run your authentication logic ONLY for protected routes
-        const token = req.cookies.get('token')?.value;
-
-        if (!token) {
-            return NextResponse.redirect(new URL('/login', req.url));
+    // 1) Public pages: never auth-check; if logged in, bounce to dashboard.
+    if (isPublic) {
+        if (token) {
+            // If the user is logged in and on a public page, send them to the dashboard.
+            return NextResponse.redirect(new URL(`/${locale}/dashboard`, req.url));
         }
+        // Otherwise, if they are not logged in on a public page, just let them be.
+        return i18n(req);
+    }
 
-        // Optional: Verify the token with your backend
+    // 2) Protected (or locale root) with no token -> go to login
+    if (!token && (isProtected || isLocaleRoot)) {
+        return NextResponse.redirect(new URL(`/${locale}/login`, req.url));
+    }
+
+    // 3) Verify token only on protected/root and only if we have one
+    if (token && (isProtected || isLocaleRoot)) {
         try {
             const res = await fetch(`${process.env.BACKEND_URL}/auth/authenticate`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
+                headers: { Authorization: `Bearer ${token}` }
             });
 
+            console.log("res", res)
             if (!res.ok) {
-                // If token is invalid, redirect to login
-                return NextResponse.redirect(new URL('/login', req.url));
+                // IMPORTANT: delete the token so /login doesn't bounce back to /dashboard
+                const resp = NextResponse.redirect(new URL(`/${locale}/login`, req.url));
+                resp.cookies.delete('token'); // same path/domain as you set it
+                return resp;
             }
-        } catch (error) {
-            console.error('Authentication fetch failed:', error);
-            // If the auth service is down, you might want to redirect to login or an error page
-            return NextResponse.redirect(new URL('/login', req.url));
+        } catch {
+            const resp = NextResponse.redirect(new URL(`/${locale}/login`, req.url));
+            resp.cookies.delete('token');
+            return resp;
         }
     }
 
-    const handleI18nRouting = createIntlMiddleware({
-        locales: ['en', 'id'],
-        defaultLocale: 'en'
-    });
-
-    const response = handleI18nRouting(req);
-
-    return response;
+    // 4) Default: locale handling
+    return i18n(req);
 }
 
-// Apply only to protected routes
 export const config = {
-    matcher: [
-        // Skip all paths that should not be internationalized. This includes
-        // files with extensions (e.g. .svg) and all paths starting with /next-api, /_next,
-        // or /_vercel.
-        '/((?!next-api|_next/static|_next/image|.*\\..*|_vercel).*)',
-        // Optional: Only run on root (/) URL
-        '/'
-    ]
+    // exclude real API routes
+    matcher: ['/((?!next-api|_next/static|_next/image|.*\\..*|_vercel).*)']
 };
