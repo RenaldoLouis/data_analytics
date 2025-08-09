@@ -1,6 +1,7 @@
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { FileText, FileX, Trash2, Upload } from "lucide-react"
+import { useState } from "react"
 import { Controller, useFormContext, useWatch } from "react-hook-form"
 import * as XLSX from "xlsx"
 import { Progress } from "./ui/progress"
@@ -33,6 +34,8 @@ const readSheetNames = (file, setUploadProgress) => {
 
 export function FileUpload(props) {
     const { setSheetList, setIsLoading, setUploadProgress, uploadProgress } = props
+
+    const [isDraggingOver, setIsDraggingOver] = useState(false);
 
     const fileWatch = useWatch({ name: "file" });
     const file = fileWatch?.[0];
@@ -106,6 +109,59 @@ export function FileUpload(props) {
                                         ? "border-red-500 bg-red-50 text-red-600"
                                         : "border-gray-300 text-muted-foreground hover:bg-muted/20"
                                 )}
+                                onDragEnter={(e) => {
+                                    e.preventDefault();
+                                    setIsDraggingOver(true);
+                                }}
+                                onDragOver={(e) => {
+                                    e.preventDefault(); // This is crucial to allow a drop
+                                    setIsDraggingOver(true);
+                                }}
+                                onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    setIsDraggingOver(false);
+                                }}
+                                onDrop={async (e) => {
+                                    e.preventDefault();
+                                    setIsDraggingOver(false);
+                                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                        setIsLoading(true);
+
+                                        setUploadProgress(10)
+                                        const fileList = e.dataTransfer.files;
+                                        const file = fileList?.[0];
+                                        const validationResult = validateFile(file);
+                                        setUploadProgress(20)
+
+                                        if (validationResult === true) {
+                                            clearErrors("file");
+                                            onChange(fileList);
+
+                                            try {
+                                                setUploadProgress(30)
+                                                const sheetNames = await readSheetNames(file, setUploadProgress);
+                                                setUploadProgress(100)
+                                                setSheetList(sheetNames);
+                                            } catch (err) {
+                                                console.error("Error reading file:", err);
+                                                setError("file", {
+                                                    type: "manual",
+                                                    message: "Failed to read the Excel file.",
+                                                });
+                                            }
+
+                                            setIsLoading(false);
+                                        } else {
+                                            onChange(null);
+                                            setError("file", {
+                                                type: "manual",
+                                                message: validationResult,
+                                            });
+
+                                            setIsLoading(false);
+                                        }
+                                    }
+                                }}
                             >
                                 {errors.file ? (
                                     <FileX className="h-6 w-6 mb-2 text-red-500" />
@@ -115,9 +171,9 @@ export function FileUpload(props) {
 
                                 <p>
                                     <span className={errors.file ? "text-red-600" : "text-blue-600 underline"}>
-                                        Link
+                                        Upload
                                     </span>{" "}
-                                    or drag and drop
+                                    or Drag and Drop
                                 </p>
                                 <p className="text-xs">
                                     CSV or XLSX (max. 10 MB)

@@ -105,7 +105,7 @@ export default function DatasetRightContent() {
     } = useDatasetRightContent(datasetId);
 
     useEffect(() => {
-        setIsShowsideContent(pathname !== "/dashboard");
+        setIsShowsideContent(!pathname.includes("/dashboard"));
     }, [pathname]);
 
     const handleUpdateData = async () => {
