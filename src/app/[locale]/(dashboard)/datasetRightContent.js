@@ -171,6 +171,7 @@ export default function DatasetRightContent() {
 
             if (res?.success) {
                 toast("Dataset Updated successfully");
+                setIsFetchDataSetLists(!isFetchDataSetLists)
                 setIsFetchDataSetContents(!isFetchDataSetContents)
             }
         } catch (e) {
@@ -214,6 +215,7 @@ export default function DatasetRightContent() {
         try {
             if (res?.success) {
                 toast("Dataset Deleted");
+                setIsFetchDataSetContents(!isFetchDataSetContents)
                 setIsFetchDataSetLists(!isFetchDataSetLists)
             }
         } catch (e) {

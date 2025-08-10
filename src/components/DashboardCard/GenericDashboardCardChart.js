@@ -10,6 +10,7 @@ import {
     CardHeader,
     CardTitle
 } from "@/components/ui/card";
+import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
 import services from "@/services";
 import { saveAs } from 'file-saver';
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 
 export default function GenericDashboardCardChart({ title, description, chartInfo, refetch, className, children }) {
     const router = useRouter();
+    const { setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
 
     const cardRef = useRef(null);
 
@@ -46,6 +48,7 @@ export default function GenericDashboardCardChart({ title, description, chartInf
             const res = await services.dashboard.deleteDashboardChart(chartInfo.id);
             if (res.success) {
                 refetch();
+                setIsFetchDataSetLists(!isFetchDataSetLists);
                 toast("Chart removed successfully");
             } else {
                 throw new Error("Failed to remove chart");

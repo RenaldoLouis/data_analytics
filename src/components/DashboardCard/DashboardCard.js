@@ -61,7 +61,7 @@ const AddedChartItem = ({ label, chartImageUrl }) => {
 
 // Main Component
 export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfChart, listOfChart }) => {
-    const { chartListType, setChartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
+    const { setIsFetchDataSetLists, isFetchDataSetLists, chartListType, setChartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
 
     const form = useForm({
         defaultValues: {
@@ -143,7 +143,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
         });
 
         return availableCharts;
-    }, [dataSetsList])
+    }, [dataSetsList, listOfChart])
 
     const onSubmit = async (data) => {
 
@@ -159,6 +159,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
             const res = await services.dashboard.postSaveDashboardRecord(tempObj)
             if (res.success) {
                 refetch()
+                setIsFetchDataSetLists(!isFetchDataSetLists)
                 toast("Save Success")
             } else {
                 throw new Error("Save chart to dashboard failed");
@@ -199,7 +200,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
         });
 
         return formattedCharts;
-    }, [dataSetsList, chartListType]);
+    }, [dataSetsList, chartListType, listOfChart]);
 
     return (
         <div className={`flex h-full min-h-48 items-center justify-center rounded-lg border border-dashed bg-card shadow-sm ${className}`}>

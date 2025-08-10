@@ -13,7 +13,7 @@ import DatasetsChartView from "./datasetsChartView"
 export default function DataSetView(props) {
     const { datasetId } = props
 
-    const { setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+    const { setIsFetchDataSetLists, isFetchDataSetLists, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
     const [currentView, setCurrentView] = useState(DatasetViewConst.chart);
     // const [dataToUpdate, setDataToUpdate] = useState([]);
     const [pagination, setPagination] = useState({
@@ -32,6 +32,7 @@ export default function DataSetView(props) {
 
     useEffect(() => {
         refetch()
+        setIsFetchDataSetLists(!isFetchDataSetLists)
     }, [isFetchDataSetContents])
 
     const handleTabView = (view) => {
