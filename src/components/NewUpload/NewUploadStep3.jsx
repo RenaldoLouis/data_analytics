@@ -6,14 +6,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { useFormContext } from "react-hook-form"
 import LoadingScreen from "../ui/loadingScreen"
 
 const NewUploadStep3 = ({ sheetList, isLoading }) => {
-    const { setValue, watch } = useFormContext()
+    const { setValue, watch, register, formState: { errors } } = useFormContext();
 
     const sheetSelection = watch("sheetSelection") ?? ""
+
+    // Register fields with validation rules
+    useEffect(() => {
+        register("sheetSelection", { required: "Please select a sheet." });
+    }, [register]);
+
 
     // Use useMemo to safely compute selected sheet name
     const selectedSheetLabel = useMemo(() => {
@@ -46,6 +52,9 @@ const NewUploadStep3 = ({ sheetList, isLoading }) => {
                         ))}
                     </SelectContent>
                 </Select>
+                {errors.sheetSelection && (
+                    <p className="text-sm text-red-500">{errors.sheetSelection.message}</p>
+                )}
             </div>
         </div>
     )

@@ -1,19 +1,25 @@
-import { Label } from "@/components/ui/label"
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"
-import { useFormContext } from "react-hook-form"
+} from "@/components/ui/select";
+import { useEffect } from "react";
+import { useFormContext } from "react-hook-form";
 
 const NewUploadStep2 = () => {
-    const { setValue, watch } = useFormContext()
+    const { setValue, watch, register, formState: { errors } } = useFormContext();
 
-    const dateFormat = watch("dateFormat")
-    const timeFormat = watch("timeFormat")
-    // const numberFormat = watch("numberFormat")
+    const dateFormat = watch("dateFormat");
+    const timeFormat = watch("timeFormat");
+
+    // Register fields with validation rules
+    useEffect(() => {
+        register("dateFormat", { required: "Please select a date format." });
+        register("timeFormat", { required: "Please select a time format." });
+    }, [register]);
 
     return (
         <div className="grid gap-6 w-full">
@@ -35,6 +41,9 @@ const NewUploadStep2 = () => {
                         <SelectItem value="MM-DD-YYYY">MM-DD-YYYY</SelectItem>
                     </SelectContent>
                 </Select>
+                {errors.dateFormat && (
+                    <p className="text-sm text-red-500">{errors.dateFormat.message}</p>
+                )}
             </div>
 
             {/* Time Format */}
@@ -52,25 +61,10 @@ const NewUploadStep2 = () => {
                         <SelectItem value="hh:mm A">02:30 PM (12-hour)</SelectItem>
                     </SelectContent>
                 </Select>
+                {errors.timeFormat && (
+                    <p className="text-sm text-red-500">{errors.timeFormat.message}</p>
+                )}
             </div>
-
-            {/* Number Format */}
-            {/* <div className="grid gap-3 w-full">
-                <Label>Number Format</Label>
-                <Select
-                    onValueChange={(v) => setValue("numberFormat", v)}
-                    value={numberFormat}
-                >
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a format" />
-                    </SelectTrigger>
-                    <SelectContent className="w-full">
-                        <SelectItem value="1,234.56">1,234.56</SelectItem>
-                        <SelectItem value="1.234,56">1.234,56</SelectItem>
-                        <SelectItem value="1234.56">1234.56</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div> */}
         </div>
     )
 }

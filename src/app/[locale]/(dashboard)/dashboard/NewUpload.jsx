@@ -20,6 +20,12 @@ const NewUpload = (props) => {
     const { handleSubmit, onSubmit, register, errors, isLoading, setIsLoading } = props
     const file = watch("file")
     const name = watch("name")
+    // Watch fields from Step 2
+    const dateFormat = watch("dateFormat")
+    const timeFormat = watch("timeFormat")
+
+    // Watch fields from Step 3
+    const sheetSelection = watch("sheetSelection")
 
     const [currentStep, setCurrentStep] = useState(1); // Starting from step 1
     const [sheetList, setSheetList] = useState([])
@@ -27,25 +33,42 @@ const NewUpload = (props) => {
 
     const goToNextStep = (e) => {
         e.preventDefault();   // stop the form from submitting
-        if (currentStep === 1 && !file) {
-            setError("file", {
-                type: "manual",
-                message: "Please upload a file before proceeding.",
-            });
-            return;
-        }
-        else if (currentStep === 1 && _.isEmpty(name)) {
-            setError("name", {
-                type: "manual",
-                message: "Please input name for the dataset.",
-            });
-            return;
-        }
-        else {
-            clearErrors();
-            if (currentStep < totalSteps) {
-                setCurrentStep(prev => prev + 1);
+        clearErrors(); // Clear previous errors before validating again
+
+        // --- Step 1 Validation ---
+        if (currentStep === 1) {
+            if (!file) {
+                setError("file", { type: "manual", message: "Please upload a file before proceeding." });
+                return;
             }
+            if (_.isEmpty(name)) {
+                setError("name", { type: "manual", message: "Please input a name for the dataset." });
+                return;
+            }
+        }
+
+        // --- Step 2 Validation (NEW) ---
+        else if (currentStep === 2) {
+            if (!dateFormat) {
+                setError("dateFormat", { type: "manual", message: "Please select a date format." });
+                return;
+            }
+            if (!timeFormat) {
+                setError("timeFormat", { type: "manual", message: "Please select a time format." });
+                return;
+            }
+        }
+
+        else if (currentStep === 3) {
+            if (!sheetSelection) {
+                setError("sheetSelection", { type: "manual", message: "Please select a sheet." });
+                return;
+            }
+        }
+
+        clearErrors();
+        if (currentStep < totalSteps) {
+            setCurrentStep(prev => prev + 1);
         }
     };
 

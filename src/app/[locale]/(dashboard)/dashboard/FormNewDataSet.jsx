@@ -36,6 +36,7 @@ const FormNewDataSet = (props) => {
 
     const [uploadDone, setUploadDone] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState(null);
 
     const createSingleSheetFile = async (file, selectedSheetIndex) => {
         // Read the file as ArrayBuffer
@@ -117,16 +118,13 @@ const FormNewDataSet = (props) => {
                 setUploadDone(UploadStatus.dataClear);
             } else {
                 setUploadDone(UploadStatus.uploadFailed);
-                throw new Error("Upload failed with status " + res.status);
+                throw new Error("Upload failed because" + res.message);
             }
 
             setIsFetchDataSetLists(!isFetchDataSetLists)
             setIsLoading(false)
         } catch (error) {
-            toast("Upload failed", {
-                description: error.message,
-            });
-
+            setErrorMessage(error.message)
             setUploadDone(UploadStatus.uploadFailed);
             setIsLoading(false)
         }
@@ -159,6 +157,7 @@ const FormNewDataSet = (props) => {
                     register={register}
                     errors={errors}
                     setUploadDone={setUploadDone}
+                    errorMessage={errorMessage}
                 />;
 
             default:

@@ -7,7 +7,7 @@ import { H3 } from "@/components/ui/typography"
 import Image from "next/image"
 
 const FailedUpload = (props) => {
-    const { setUploadDone } = props
+    const { setUploadDone, errorMessage } = props
 
     return (
         <div className="py-8 content-center">
@@ -21,7 +21,7 @@ const FailedUpload = (props) => {
                     </div>
                 </DialogTitle>
                 <DialogDescription>
-                    Something went wrong when uploading, please try again.
+                    {errorMessage}
                 </DialogDescription>
             </DialogHeader>
             <DialogFooter className="px-6 py-3">
