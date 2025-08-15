@@ -50,7 +50,8 @@
         "fileFormat": "File Format",
         "marginSettings": "Margin Settings",
         "preview": "Preview",
-        "downloadSuccess": "Visualization download success"
+        "downloadSuccess": "Visualization download success",
+        "noAvailableChart": "No Available Chart"
     },
     "datasetpage": {
         "newDataset": "New Data Set",

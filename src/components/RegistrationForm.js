@@ -88,17 +88,17 @@ export default function RegistrationForm() {
 
     return (
         <div className="w-full max-w-md">
-            <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 cursor-pointer">&larr; {t("back")}</button>
+            <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 pt-6 lg:pt-0">&larr; {t("back")}</button>
             <h2 className="text-2xl font-bold">{t("tryFree")}</h2>
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
-                    <div className="flex gap-4 mb-6">
+                    <div className="lg:flex gap-4 mb-3 lg:mb-6">
                         <FormField
                             control={form.control}
                             name="firstName"
                             render={({ field }) => (
-                                <FormItem className="w-1/2">
+                                <FormItem className="w-full lg:w-1/2 mb-3 lg:mb-0">
                                     <FormLabel>{t("firstName")}</FormLabel>
                                     <FormControl>
                                         <Input placeholder={t("firstNamePlaceholder")} {...field} />
@@ -111,7 +111,7 @@ export default function RegistrationForm() {
                             control={form.control}
                             name="lastName"
                             render={({ field }) => (
-                                <FormItem className="w-1/2">
+                                <FormItem className="w-full lg:w-1/2 ">
                                     <FormLabel>{t("lastName")}</FormLabel>
                                     <FormControl>
                                         <Input placeholder={t("lastNamePlaceholder")} {...field} />
@@ -127,7 +127,7 @@ export default function RegistrationForm() {
                         name="phone"
                         render={({ field }) => (
                             <FormItem
-                                className="mb-6">
+                                className="mb-3 lg:mb-6">
                                 <FormLabel>{t("mobilePhone")}</FormLabel>
                                 <FormControl>
                                     <div className="flex">
@@ -150,7 +150,7 @@ export default function RegistrationForm() {
                         control={form.control}
                         name="email"
                         render={({ field }) => (
-                            <FormItem className="mb-6">
+                            <FormItem className="mb-3 lg:mb-6">
                                 <FormLabel>{t("email")}</FormLabel>
                                 <FormControl>
                                     <Input placeholder={t("emailPlaceholder")} {...field} />
@@ -165,7 +165,7 @@ export default function RegistrationForm() {
                         name="username"
                         render={({ field }) => (
                             <FormItem
-                                className="mb-6">
+                                className="mb-3 lg:mb-6">
                                 <FormLabel>{t("createUsername")}</FormLabel>
                                 <FormControl>
                                     <Input placeholder={t("usernamePlaceholder")} {...field} />
@@ -198,7 +198,7 @@ export default function RegistrationForm() {
                         {t("submitForm")}
                     </Button>
 
-                    <div className="pt-8 flex justify-center">
+                    <div className="pt-3 lg:pt-8 flex justify-center pb-6 lg:pb-0">
                         <Image src="/logo.svg" alt="Daya Cipta Tech" width={180} height={28} />
                     </div>
                 </form>

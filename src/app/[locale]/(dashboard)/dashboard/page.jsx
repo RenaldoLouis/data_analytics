@@ -46,20 +46,20 @@ export default function Page() {
 
   return (
     <>
-      <div className="flex justify-between px-4 lg:px-6">
+      <div className="sm:flex sm:justify-between px-4 lg:px-6">
         <H3>Dashboard</H3>
-        <div className="flex">
+        <div className="flex flex-col sm:flex-row items-start pt-2 sm:pt-0">
           <Tabs
             value={selectedLayout}
             onValueChange={setSelectedLayout}
-            className="w-[400px] items-end mr-3">
+            className="w-[400px] items-start sm:items-end mr-3 pr-2">
             <TabsList>
               <TabsTrigger className="cursor-pointer" value="layout1">{`${t("layout")} 1`}</TabsTrigger>
               <TabsTrigger className="cursor-pointer" value="layout2">{`${t("layout")} 2`}</TabsTrigger>
               <TabsTrigger className="cursor-pointer" value="layout3">{`${t("layout")} 3`}</TabsTrigger>
             </TabsList>
           </Tabs>
-          <div className="ml-2">
+          <div className="pt-3 sm:pt-0">
             <ModalExportDashboard layoutRef={layoutRef} />
           </div>
         </div>
@@ -67,7 +67,7 @@ export default function Page() {
       {dataSetsList.length <= 0 && (
         <div className="px-4 lg:px-6" >
           <Alert variant="default" className="flex justify-between items-center bg-blue-100" style={{ height: 42 }}>
-            <P>
+            <P className="truncate">
               {t("noDatasetDetected")}
             </P>
             <Button

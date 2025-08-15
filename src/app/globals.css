@@ -137,3 +137,7 @@
 .animate-slide-in {
   animation: slideInRight 0.3s ease-out;
 }
+
+html, body {
+  overflow-x: hidden;
+}

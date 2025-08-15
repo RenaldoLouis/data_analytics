@@ -189,7 +189,7 @@ export default function LoginForm() {
                             height={28}
                             className="w-[20px] h-[20px] sm:w-[24px] sm:h-[24px] md:w-[28px] md:h-[28px] rounded-full border border-gray-200"
                         />
-                        <span className="text-[10px] sm:text-[12px] md:text-[16px] font-tiktok font-medium leading-[14px] sm:leading-[16px] md:leading-[18px] text-center text-global-6">
+                        <span className="text-sm font-tiktok font-medium leading-[14px] sm:leading-[16px] md:leading-[18px] text-center text-global-6">
                             {selectedLanguage.name}
                         </span>
                     </div>

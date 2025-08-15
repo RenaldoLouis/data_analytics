@@ -143,7 +143,7 @@ export const ModalExportDashboard = (props) => {
                 </Button>
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-4xl p-0 min-h-[730px] md:min-h-[500px]">
+            <DialogContent className="sm:max-w-4xl p-0 md:min-h-[500px]">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleDownload)}>
                         <DialogHeader className="p-6 pb-4">

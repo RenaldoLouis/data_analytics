@@ -50,7 +50,8 @@
         "fileFormat": "File Format",
         "marginSettings": "Pengaturan Margin",
         "preview": "Hasil",
-        "downloadSuccess": "Visualisasi berhasil diunduh"
+        "downloadSuccess": "Visualisasi berhasil diunduh",
+        "noAvailableChart": "Tidak ada Chart tersedia"
     },
     "datasetpage": {
         "newDataset": "Dataset Baru",

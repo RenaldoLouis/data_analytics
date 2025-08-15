@@ -43,18 +43,19 @@ const ChartSelectItem = ({ value, label, chartImageUrl }) => {
 };
 
 // A reusable component for the item in the "Added" list
-const AddedChartItem = ({ label, chartImageUrl }) => {
+const ChartItemDisabled = ({ label, chartImageUrl }) => {
+    const t = useTranslations("dashboardpage");
     return (
         <div className="flex items-center gap-4 rounded-lg border bg-slate-50 p-4">
             <div className="flex h-14 w-24 flex-shrink-0 items-center justify-center rounded-md bg-white p-1 ring-1 ring-inset ring-slate-200">
                 <img
-                    src={chartImageUrl}
-                    alt={label}
+                    src={chartImageUrl || 'https://placehold.co/96x56/e2e8f0/e2e8f0?text=Img'}
+                    alt={label || 'https://placehold.co/96x56/e2e8f0/e2e8f0?text=Img'}
                     className="h-full w-full object-contain"
                     onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/96x56/e2e8f0/e2e8f0?text=Img'; }}
                 />
             </div>
-            <span className="font-medium">{label}</span>
+            <span className="font-medium text-gray-400">{label || t("noAvailableChart")}</span>
         </div>
     );
 };
@@ -209,24 +210,24 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
             <Dialog>
                 <DialogTrigger asChild>
                     <div className={`cursor-pointer flex h-full min-h-48 items-center justify-center rounded-lg border border-dashed bg-card shadow-sm ${className}`}>
-                        <button className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+                        <button className="cursor-pointer flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
                             <Plus size={16} />
                             {t("addChart")}
                         </button>
                     </div>
                 </DialogTrigger>
 
-                <DialogContent className="sm:max-w-2xl p-0">
+                <DialogContent className="p-0 min-h-[600px] md:min-h-[500px]">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)}>
-                            <DialogHeader className="p-6 pb-4">
+                            <DialogHeader className="p-6">
                                 <DialogTitle className="text-xl font-bold text-left">
                                     {t("chooseChart")}
                                 </DialogTitle>
                             </DialogHeader>
                             <div className="border-t"></div>
 
-                            <div className="grid gap-8 p-6">
+                            <div className="grid gap-4 p-5">
                                 <FormField
                                     control={form.control}
                                     name="selectedChartId"
@@ -239,37 +240,42 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                                                     value={field.value}
                                                     className="grid gap-3"
                                                 >
-                                                    {availableChartsData.map((chart) => (
-                                                        <ChartSelectItem
-                                                            key={chart.id}
-                                                            value={chart.id}
-                                                            label={chart.name}
-                                                            chartImageUrl={chart.imageUrl}
-                                                        />
-                                                    ))}
+                                                    {availableChartsData.length > 1
+                                                        ? availableChartsData.map((chart) => (
+                                                            <ChartSelectItem
+                                                                key={chart.id}
+                                                                value={chart.id}
+                                                                label={chart.name}
+                                                                chartImageUrl={chart.imageUrl}
+                                                            />
+                                                        ))
+                                                        : <ChartItemDisabled />}
                                                 </RadioGroup>
                                             </FormControl>
                                         </FormItem>
                                     )}
                                 />
 
-                                <div className="grid gap-3">
+                                <div className="grid gap-3 pb-13">
                                     <h3 className="font-semibold">{t("added")}</h3>
-                                    {addedCharts.map((chart) => (
-                                        <AddedChartItem
-                                            key={chart.id}
-                                            label={chart.name}
-                                            chartImageUrl={chart.imageUrl}
-                                        />
-                                    ))}
+                                    {addedCharts.length > 1
+                                        ? addedCharts.map((chart) => (
+                                            <ChartItemDisabled
+                                                key={chart.id}
+                                                label={chart.name}
+                                                chartImageUrl={chart.imageUrl}
+                                            />
+                                        ))
+                                        : <ChartItemDisabled />
+                                    }
                                 </div>
                             </div>
 
-                            <DialogFooter className="bg-slate-50 p-6 sm:justify-end">
+                            <DialogFooter>
                                 <DialogClose asChild>
-                                    <Button variant="outline" className="w-full sm:w-auto cursor-pointer">{t("cancel")}</Button>
+                                    <Button variant="outline" className="w-full sm:flex-1">{t("cancel")}</Button>
                                 </DialogClose>
-                                <Button type="submit" className="w-full sm:w-auto cursor-pointer">{t("add")}</Button>
+                                <Button type="submit" className="w-full sm:flex-1">{t("add")}</Button>
                             </DialogFooter>
                         </form>
                     </Form>

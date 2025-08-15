@@ -1,5 +1,5 @@
 import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import services from "@/services";
 import { IconBell, IconSettings } from '@tabler/icons-react';
 import { useEffect, useState } from "react";
@@ -9,6 +9,8 @@ import { SearchBar } from "./searchBar";
 
 export function SiteHeader() {
   const t = useTranslations()
+
+  const { isMobile } = useSidebar()
 
   const [userInfo, setUserInfo] = useState(null);
 
@@ -38,7 +40,7 @@ export function SiteHeader() {
         <div className="flex w-full items-center justify-end">
           <IconSettings className="size-6 mr-6" />
           <IconBell className="size-6" />
-          <Separator orientation="vertical" className="mx-5 data-[orientation=vertical]:h-8" />
+          {!isMobile && (<Separator orientation="vertical" className="mx-5 data-[orientation=vertical]:h-8" />)}
           <NavUser user={userInfo} />
         </div>
       </div>

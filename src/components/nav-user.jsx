@@ -61,18 +61,23 @@ export function NavUser({
             <SidebarMenuButton
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-              <div className="flex flex-col items-end text-left text-sm leading-tight mr-2">
-                <span className="truncate font-medium w-fit">{user?.first_name} {user?.last_name}</span>
-                <span className="text-muted-foreground truncate text-xs w-fit">
-                  {/* {user?.role} */}
-                  {user?.email}
-                </span>
-              </div>
-              <Avatar className="h-8 w-8 rounded-lg grayscale">
+              {!isMobile && (
+                <div className="flex flex-col items-end text-left text-sm leading-tight mr-2">
+                  <span className="truncate font-medium w-fit">{user?.first_name} {user?.last_name}</span>
+                  <span className="text-muted-foreground truncate text-xs w-fit">
+                    {/* {user?.role} */}
+                    {user?.email}
+                  </span>
+                </div>
+              )
+              }
+              <Avatar className="ml-3 lg:ml-0 h-8 w-8 rounded-lg grayscale">
                 <AvatarImage src={user?.image} alt={user?.first_name} />
                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
-              <IconDotsVertical className="size-4" />
+              {!isMobile && (
+                <IconDotsVertical className="size-4" />
+              )}
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
