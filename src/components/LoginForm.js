@@ -145,7 +145,7 @@ export default function LoginForm() {
                 router.replace("/dashboard");
             } else {
                 form.setError("root", {
-                    message: "Invalid credentials. Try again.",
+                    message: t("invalidCredentials"),
                 });
             }
         } catch (err) {
@@ -239,7 +239,7 @@ export default function LoginForm() {
                             <FormItem>
                                 <FormLabel>Email</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Enter username or registered email" {...field} />
+                                    <Input placeholder={t("emailPlaceholder")} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -253,7 +253,7 @@ export default function LoginForm() {
                             <FormItem>
                                 <FormLabel>Password</FormLabel>
                                 <FormControl>
-                                    <Input type="password" placeholder="Enter password" {...field} />
+                                    <Input type="password" placeholder={t("passwordPlaceholder")} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -262,7 +262,7 @@ export default function LoginForm() {
 
                     <div className="text-right">
                         <a href="#" className="text-sm text-blue-600 hover:underline">
-                            Forgot Password
+                            {t("forgotPassword")}
                         </a>
                     </div>
 
@@ -278,16 +278,16 @@ export default function LoginForm() {
 
                     <div className="flex items-center gap-2 text-gray-400 text-sm my-4">
                         <div className="flex-grow border-t" />
-                        <span>or</span>
+                        <span>{t("or")}</span>
                         <div className="flex-grow border-t" />
                     </div>
 
                     <div className="flex gap-3">
                         <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
-                            Try Free Trial
+                            {t("tryFreeTrial")}
                         </Button>
                         <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickDemoVideo}>
-                            Request Free Demo Video
+                            {t("requestFreeDemo")}
                         </Button>
                     </div>
 

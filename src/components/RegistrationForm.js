@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react"; // 1. Import useState
 import { useForm } from "react-hook-form";
+import { useTranslations } from "next-intl";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import services from "@/services";
 import { Check } from "lucide-react"; // 2. Import a check icon
 
-const registrationSchema = z.object({
+const registrationSchema = (t) => z.object({
     // firstName: z.string().min(1, "Enter first name"),
     // lastName: z.string().min(1, "Enter last name"),
     // phone: z.string().min(8, "Enter valid phone number"),
@@ -35,18 +36,19 @@ const registrationSchema = z.object({
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     phone: z.string().optional(),
-    email: z.string().email("Invalid email address"),
+    email: z.string().email(t("invalidEmail")),
     username: z.string().optional(),
     // username: z.string().min(3, "Username too short"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    password: z.string().min(6, t("minimumPassword")),
 });
 
 export default function RegistrationForm() {
+    const t = useTranslations("registrationpage")
     const router = useRouter();
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
     const form = useForm({
-        resolver: zodResolver(registrationSchema),
+        resolver: zodResolver(registrationSchema(t)),
         defaultValues: {
             firstName: "",
             lastName: "",
@@ -70,7 +72,6 @@ export default function RegistrationForm() {
 
             if (res.status === 200) {
                 setIsSuccessModalOpen(true);
-                setTimeout(router.push("/login"), 500)
             }
             else {
                 const errData = await res.error.data;
@@ -87,8 +88,8 @@ export default function RegistrationForm() {
 
     return (
         <div className="w-full max-w-md">
-            <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 cursor-pointer">&larr; Back</button>
-            <h2 className="text-2xl font-bold">Try Free Trial</h2>
+            <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 cursor-pointer">&larr; {t("back")}</button>
+            <h2 className="text-2xl font-bold">{t("tryFree")}</h2>
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
@@ -98,9 +99,9 @@ export default function RegistrationForm() {
                             name="firstName"
                             render={({ field }) => (
                                 <FormItem className="w-1/2">
-                                    <FormLabel>First Name</FormLabel>
+                                    <FormLabel>{t("firstName")}</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Enter first name" {...field} />
+                                        <Input placeholder={t("firstNamePlaceholder")} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -111,9 +112,9 @@ export default function RegistrationForm() {
                             name="lastName"
                             render={({ field }) => (
                                 <FormItem className="w-1/2">
-                                    <FormLabel>Last Name</FormLabel>
+                                    <FormLabel>{t("lastName")}</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Enter last name" {...field} />
+                                        <Input placeholder={t("lastNamePlaceholder")} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -127,7 +128,7 @@ export default function RegistrationForm() {
                         render={({ field }) => (
                             <FormItem
                                 className="mb-6">
-                                <FormLabel>Mobile Phone</FormLabel>
+                                <FormLabel>{t("mobilePhone")}</FormLabel>
                                 <FormControl>
                                     <div className="flex">
                                         <span className="inline-flex items-center px-3 text-sm bg-gray-100 border border-r-0 border-gray-300 rounded-l-md">
@@ -135,7 +136,7 @@ export default function RegistrationForm() {
                                         </span>
                                         <Input
                                             {...field}
-                                            placeholder="Enter mobile phone"
+                                            placeholder={t("mobilePhonePlaceholder")}
                                             className="rounded-l-none"
                                         />
                                     </div>
@@ -150,9 +151,9 @@ export default function RegistrationForm() {
                         name="email"
                         render={({ field }) => (
                             <FormItem className="mb-6">
-                                <FormLabel>Email</FormLabel>
+                                <FormLabel>{t("email")}</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Enter email" {...field} />
+                                    <Input placeholder={t("emailPlaceholder")} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -165,9 +166,9 @@ export default function RegistrationForm() {
                         render={({ field }) => (
                             <FormItem
                                 className="mb-6">
-                                <FormLabel>Create username</FormLabel>
+                                <FormLabel>{t("createUsername")}</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Enter username" {...field} />
+                                    <Input placeholder={t("usernamePlaceholder")} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -180,9 +181,9 @@ export default function RegistrationForm() {
                         render={({ field }) => (
                             <FormItem
                                 className="mb-12">
-                                <FormLabel>Create Password</FormLabel>
+                                <FormLabel>{t("createPassword")}</FormLabel>
                                 <FormControl>
-                                    <Input type="password" placeholder="Enter password" {...field} />
+                                    <Input type="password" placeholder={t("passwordPlaceholder")} {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -194,7 +195,7 @@ export default function RegistrationForm() {
                     )}
 
                     <Button type="submit" className="w-full bg-gray-500 text-white">
-                        Submit Form
+                        {t("submitForm")}
                     </Button>
 
                     <div className="pt-8 flex justify-center">
@@ -204,24 +205,24 @@ export default function RegistrationForm() {
             </Form>
 
             <Dialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
-                <DialogContent className="sm:max-w-md p-8 text-center">
+                <DialogContent className="sm:max-w-md p-8 text-center" preventClose={true} showCloseButton={false}>
                     <DialogHeader className="space-y-4 items-center">
                         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
                             <Check className="h-10 w-10 text-green-600" />
                         </div>
-                        <DialogTitle className="text-2xl font-bold">
-                            Thank you for Signing Up!
+                        <DialogTitle className="text-2xl font-bold text-center">
+                            {t("confirmationTitle")}
                         </DialogTitle>
                         <DialogDescription>
-                            We&apos;ll contact through your registered email.
+                            {t("confirmationSubtitle")}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-6">
                         <Button
-                            onClick={() => router.push("/")} // Navigate to home or another page
+                            onClick={() => router.push("/login")} // Navigate to home or another page
                             className="w-full bg-slate-800 hover:bg-slate-700 cursor-pointer"
                         >
-                            Back to Home
+                            {t("backToHome")}
                         </Button>
                     </div>
                 </DialogContent>

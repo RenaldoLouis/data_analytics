@@ -1,6 +1,36 @@
 {
     "loginpage": {
-        "subtitle": "Sign in to access your dashboard"
+        "subtitle": "Sign in to access your dashboard",
+        "emailPlaceholder": "Enter email",
+        "passwordPlaceholder": "Enter password",
+        "forgotPassword": "Forgot your password? Recover here",
+        "noAccountYet": "New here? Create your account",
+        "tryFreeTrial": "Try for Free",
+        "requestFreeDemo": "Request Video Demo",
+        "or": "or",
+        "invalidCredentials": "Invalid credentials. Please try again."
+    },
+    "registrationpage": {
+        "back": "Back",
+        "tryFree": "Try Free Trial",
+        "firstName": "First Name",
+        "firstNamePlaceholder": "Enter first name",
+        "lastName": "Last Name",
+        "lastNamePlaceholder": "Enter last name",
+        "mobilePhone": "Mobile Phone",
+        "mobilePhonePlaceholder": "Enter mobile phone",
+        "email": "Email",
+        "emailPlaceholder": "Enter email",
+        "createUsername": "Create Username",
+        "usernamePlaceholder": "Enter username",
+        "createPassword": "Create Password",
+        "passwordPlaceholder": "Enter password",
+        "submitForm": "Submit Form",
+        "invalidEmail": "Invalid email address",
+        "minimumPassword": "Password must be at least 6 characters",
+        "confirmationTitle": "Thank you for Signing Up!",
+        "confirmationSubtitle": "We&apos;ll contact through your registered email.",
+        "backToHome": "Back to Home"
     },
     "flag": "GB",
     "language": "English"

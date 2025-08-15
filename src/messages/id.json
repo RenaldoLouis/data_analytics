@@ -1,6 +1,36 @@
 {
     "loginpage": {
-        "subtitle": "Masuk ke akun Anda untuk mengakses dashboard"
+        "subtitle": "Masuk ke akun Anda untuk mengakses dashboard",
+        "emailPlaceholder": "Masukan email",
+        "passwordPlaceholder": "Masukan password",
+        "forgotPassword": "Lupa password anda? Klik di sini",
+        "noAccountYet": "Belum memiliki akun? Buat sekarang",
+        "tryFreeTrial": "Coba Gratis",
+        "requestFreeDemo": "Request Video Demo",
+        "or": "atau",
+        "invalidCredentials": "Kredensial tidak valid. Silahkan coba kembali."
+    },
+    "registrationpage": {
+        "back": "Kembali",
+        "tryFree": "Coba Gratis",
+        "firstName": "Nama Depan",
+        "firstNamePlaceholder": "Masukan nama depan",
+        "lastName": "Nama Belakang",
+        "lastNamePlaceholder": "Masukan nama belakang",
+        "mobilePhone": "Nomor Telepon",
+        "mobilePhonePlaceholder": "Masukan nomor telepon",
+        "email": "Email",
+        "emailPlaceholder": "Masukan email",
+        "createUsername": "Buat Username",
+        "usernamePlaceholder": "Masukan username",
+        "createPassword": "Buat Password",
+        "passwordPlaceholder": "Masukan password",
+        "submitForm": "Kirim Formulir",
+        "invalidEmail": "Email tidak valid",
+        "minimumPassword": "Password harus terdiri dari minimal 6 karakter",
+        "confirmationTitle": "Terima Kasih telah Bergabung Bersama Kami!",
+        "confirmationSubtitle": "Kami akan menghubungi anda melalui email.",
+        "backToHome": "Kembali ke Beranda"
     },
     "flag": "ID",
     "language": "Bahasa"

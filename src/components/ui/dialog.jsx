@@ -49,9 +49,22 @@ function DialogContent({
   children,
   showCloseButton = true,
   description,
+  preventClose = false,
   ...props
 }) {
   const descriptionId = description ? "dialog-description" : undefined;
+
+   const handleInteractOutside = (event) => {
+    if (preventClose) {
+      event.preventDefault(); // prevent closing when clicking outside
+    }
+  };
+
+  const handleEscapeKeyDown = (event) => {
+    if (preventClose) {
+      event.preventDefault(); // prevent closing when pressing Escape
+    }
+  };
 
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -63,7 +76,11 @@ function DialogContent({
           className
         )}
         aria-describedby={descriptionId}
-        {...props}>
+        {...props}
+        // Radix handlers to prevent close
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
+      >
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
