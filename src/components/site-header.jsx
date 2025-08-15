@@ -3,10 +3,12 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import services from "@/services";
 import { IconBell, IconSettings } from '@tabler/icons-react';
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { NavUser } from "./nav-user";
 import { SearchBar } from "./searchBar";
 
 export function SiteHeader() {
+  const t = useTranslations()
 
   const [userInfo, setUserInfo] = useState(null);
 
@@ -30,7 +32,7 @@ export function SiteHeader() {
         <div className="flex w-full items-center ">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-          <SearchBar placeholder="Search for datasets..." />
+          <SearchBar placeholder={t("searchDatasets")} />
         </div>
 
         <div className="flex w-full items-center justify-end">

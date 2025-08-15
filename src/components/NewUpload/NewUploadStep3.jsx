@@ -8,16 +8,18 @@ import {
 } from "@/components/ui/select"
 import { useEffect, useMemo } from "react"
 import { useFormContext } from "react-hook-form"
+import { useTranslations } from "next-intl"
 import LoadingScreen from "../ui/loadingScreen"
 
 const NewUploadStep3 = ({ sheetList, isLoading }) => {
     const { setValue, watch, register, formState: { errors } } = useFormContext();
+    const t = useTranslations("datasetpage");
 
     const sheetSelection = watch("sheetSelection") ?? ""
 
     // Register fields with validation rules
     useEffect(() => {
-        register("sheetSelection", { required: "Please select a sheet." });
+        register("sheetSelection", { required: t("selectSheet") });
     }, [register]);
 
 
@@ -33,28 +35,30 @@ const NewUploadStep3 = ({ sheetList, isLoading }) => {
                 <LoadingScreen />
             )}
             <div className="grid gap-3 w-full">
-                <Label>Sheet Selection</Label>
-                <Select
-                    onValueChange={(v) => setValue("sheetSelection", v)}
-                    value={sheetSelection}
-                >
-                    <SelectTrigger className="w-full">
-                        {/* Customize the label displayed in the trigger */}
-                        <SelectValue placeholder="Select a sheet">
-                            {selectedSheetLabel}
-                        </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="w-full">
-                        {sheetList.map((sheet, index) => (
-                            <SelectItem key={index} value={String(index)}>
-                                {sheet}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                {errors.sheetSelection && (
-                    <p className="text-sm text-red-500">{errors.sheetSelection.message}</p>
-                )}
+                <Label>{t("sheetSelection")}</Label>
+                <div>
+                    <Select
+                        onValueChange={(v) => setValue("sheetSelection", v)}
+                        value={sheetSelection}
+                    >
+                        <SelectTrigger className="w-full">
+                            {/* Customize the label displayed in the trigger */}
+                            <SelectValue placeholder={t("selectSheet")}>
+                                {selectedSheetLabel}
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="w-full">
+                            {sheetList.map((sheet, index) => (
+                                <SelectItem key={index} value={String(index)}>
+                                    {sheet}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {errors.sheetSelection && (
+                        <p className="text-sm text-red-500 mt-1">{errors.sheetSelection.message}</p>
+                    )}
+                </div>
             </div>
         </div>
     )

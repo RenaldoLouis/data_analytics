@@ -11,11 +11,13 @@ import { H3 } from "@/components/ui/typography"
 import _ from 'lodash'
 import { useState } from "react"
 import { useFormContext } from "react-hook-form"
+import { useTranslations } from "next-intl"
 
 const totalSteps = 3
 
 const NewUpload = (props) => {
     const { watch, setError, clearErrors } = useFormContext()
+    const t = useTranslations("datasetpage");
 
     const { handleSubmit, onSubmit, register, errors, isLoading, setIsLoading } = props
     const file = watch("file")
@@ -38,11 +40,11 @@ const NewUpload = (props) => {
         // --- Step 1 Validation ---
         if (currentStep === 1) {
             if (!file) {
-                setError("file", { type: "manual", message: "Please upload a file before proceeding." });
+                setError("file", { type: "manual", message: t("uploadFileBeforeContinue") });
                 return;
             }
             if (_.isEmpty(name)) {
-                setError("name", { type: "manual", message: "Please input a name for the dataset." });
+                setError("name", { type: "manual", message: t("inputNameBeforeContinue") });
                 return;
             }
         }
@@ -50,18 +52,18 @@ const NewUpload = (props) => {
         // --- Step 2 Validation (NEW) ---
         else if (currentStep === 2) {
             if (!dateFormat) {
-                setError("dateFormat", { type: "manual", message: "Please select a date format." });
+                setError("dateFormat", { type: "manual", message: t("selectDateFormat") });
                 return;
             }
             if (!timeFormat) {
-                setError("timeFormat", { type: "manual", message: "Please select a time format." });
+                setError("timeFormat", { type: "manual", message: t("selectTimeFormat") });
                 return;
             }
         }
 
         else if (currentStep === 3) {
             if (!sheetSelection) {
-                setError("sheetSelection", { type: "manual", message: "Please select a sheet." });
+                setError("sheetSelection", { type: "manual", message: t("selectSheet") });
                 return;
             }
         }
@@ -108,7 +110,7 @@ const NewUpload = (props) => {
                 <DialogTitle className="py-3">
                     <div className="px-6 p-3">
                         <H3>
-                            New Data Set
+                            {t("newDataset")}
                         </H3>
                     </div>
                     <Separator />
@@ -123,16 +125,16 @@ const NewUpload = (props) => {
             <DialogFooter className="px-6 py-3">
                 {currentStep === 1 ? (
                     <DialogClose asChild>
-                        <Button disabled={isLoading ? true : false} id="buttonDiscard" variant="outline" type="button" className="cursor-pointer">Discard</Button>
+                        <Button className="w-full sm:flex-1" disabled={isLoading ? true : false} id="buttonDiscard" variant="outline" type="button">{t("discard")}</Button>
                     </DialogClose>
                 ) : (
-                    <Button disabled={isLoading ? true : false} id="buttonBack" type="button" className="cursor-pointer" onClick={goToPreviousStep}>Back</Button>
+                    <Button className="w-full sm:flex-1" disabled={isLoading ? true : false} id="buttonBack" variant="outline" type="button" onClick={goToPreviousStep}>{t("back")}</Button>
 
                 )}
                 {currentStep !== 3 ? (
-                    <Button disabled={isLoading ? true : false} id="buttonNext" type="button" className="cursor-pointer" onClick={goToNextStep}>Next</Button>
+                    <Button className="w-full sm:flex-1" disabled={isLoading ? true : false} id="buttonNext" type="button" onClick={goToNextStep}>{t("next")}</Button>
                 ) : (
-                    <Button disabled={isLoading ? true : false} id="buttonSubmit" type="submit" className="cursor-pointer">Add</Button>
+                    <Button className="w-full sm:flex-1" disabled={isLoading ? true : false} id="buttonSubmit" type="submit">{t("add")}</Button>
                 )}
             </DialogFooter>
         </form>

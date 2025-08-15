@@ -1,4 +1,7 @@
 {
+    "flag": "ID",
+    "language": "Bahasa",
+    "searchDatasets": "Cari Datasets",
     "loginpage": {
         "subtitle": "Masuk ke akun Anda untuk mengakses dashboard",
         "emailPlaceholder": "Masukan email",
@@ -32,6 +35,45 @@
         "confirmationSubtitle": "Kami akan menghubungi anda melalui email.",
         "backToHome": "Kembali ke Beranda"
     },
-    "flag": "ID",
-    "language": "Bahasa"
+    "dashboardpage": {
+        "addDataset": "Tambahkan Dataset",
+        "noDatasetDetected": "Anda belum memiliki Datasets. Tambahkan Datasets terlebih dahulu untuk membuat chart",
+        "layout": "Tampilan",
+        "download": "Unduh",
+        "addChart": "Tambah Chart",
+        "chooseChart": "Pilih Chart",
+        "available": "Tersedia",
+        "added": "Telah Ditambahkan",
+        "add": "Tambah",
+        "cancel": "Batal",
+        "downloadVisual": "Unduh Visualisasi",
+        "fileFormat": "File Format",
+        "marginSettings": "Pengaturan Margin",
+        "preview": "Hasil",
+        "downloadSuccess": "Visualisasi berhasil diunduh"
+    },
+    "datasetpage": {
+        "newDataset": "Dataset Baru",
+        "datasetName": "Nama Dataset",
+        "datasetNamePlaceholder": "Contoh: Penjualan Maret 2024",
+        "upload": "Unggah",
+        "file": "File",
+        "or": "atau",
+        "complete": "Selesai",
+        "uploadFileBeforeContinue": "Unggah file sebelum melanjutkan",
+        "inputNameBeforeContinue": "Masukkan nama dataset sebelum melanjutkan",
+        "dateFormat": "Format Tanggal",
+        "timeFormat": "Format Waktu",
+        "selectDateFormat": "Pilih format tanggal",
+        "selectTimeFormat": "Pilih format waktu",
+        "sheetSelection": "Pemilihan Sheet",
+        "selectSheet": "Pilih sheet",
+        "add": "Tambah",
+        "discard": "Batal",
+        "next": "Selanjutnya",
+        "back": "Kembali",
+        "close": "Tutup",
+        "datasetUploadedTitle": "Unggah Berhasil",
+        "dataUploadedSubtitle": "Selesai! Data berhasil diunggah."
+    }
 }

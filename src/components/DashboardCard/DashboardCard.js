@@ -20,6 +20,7 @@ import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieC
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 const ChartSelectItem = ({ value, label, chartImageUrl }) => {
     return (
@@ -62,6 +63,7 @@ const AddedChartItem = ({ label, chartImageUrl }) => {
 // Main Component
 export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfChart, listOfChart }) => {
     const { setIsFetchDataSetLists, isFetchDataSetLists, chartListType, setChartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
+    const t = useTranslations("dashboardpage");
 
     const form = useForm({
         defaultValues: {
@@ -203,13 +205,15 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
     }, [dataSetsList, chartListType, listOfChart]);
 
     return (
-        <div className={`flex h-full min-h-48 items-center justify-center rounded-lg border border-dashed bg-card shadow-sm ${className}`}>
+        <>
             <Dialog>
                 <DialogTrigger asChild>
-                    <button className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
-                        <Plus size={16} />
-                        Add Chart
-                    </button>
+                    <div className={`cursor-pointer flex h-full min-h-48 items-center justify-center rounded-lg border border-dashed bg-card shadow-sm ${className}`}>
+                        <button className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+                            <Plus size={16} />
+                            {t("addChart")}
+                        </button>
+                    </div>
                 </DialogTrigger>
 
                 <DialogContent className="sm:max-w-2xl p-0">
@@ -217,7 +221,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                         <form onSubmit={form.handleSubmit(onSubmit)}>
                             <DialogHeader className="p-6 pb-4">
                                 <DialogTitle className="text-xl font-bold text-left">
-                                    Choose Chart
+                                    {t("chooseChart")}
                                 </DialogTitle>
                             </DialogHeader>
                             <div className="border-t"></div>
@@ -228,7 +232,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                                     name="selectedChartId"
                                     render={({ field }) => (
                                         <FormItem className="grid gap-3">
-                                            <FormLabel className="font-semibold text-muted-foreground">Available</FormLabel>
+                                            <h3 className="font-semibold">{t("available")}</h3>
                                             <FormControl>
                                                 <RadioGroup
                                                     onValueChange={field.onChange}
@@ -250,7 +254,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                                 />
 
                                 <div className="grid gap-3">
-                                    <h3 className="font-semibold text-muted-foreground">Added</h3>
+                                    <h3 className="font-semibold">{t("added")}</h3>
                                     {addedCharts.map((chart) => (
                                         <AddedChartItem
                                             key={chart.id}
@@ -263,14 +267,14 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
                             <DialogFooter className="bg-slate-50 p-6 sm:justify-end">
                                 <DialogClose asChild>
-                                    <Button variant="outline" className="w-full sm:w-auto cursor-pointer">Cancel</Button>
+                                    <Button variant="outline" className="w-full sm:w-auto cursor-pointer">{t("cancel")}</Button>
                                 </DialogClose>
-                                <Button type="submit" className="w-full sm:w-auto cursor-pointer">Add to Dashboard</Button>
+                                <Button type="submit" className="w-full sm:w-auto cursor-pointer">{t("add")}</Button>
                             </DialogFooter>
                         </form>
                     </Form>
                 </DialogContent>
             </Dialog>
-        </div>
+        </>
     );
 };

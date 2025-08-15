@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils"
 import { FileText, FileX, Trash2, Upload } from "lucide-react"
 import { useState } from "react"
 import { Controller, useFormContext, useWatch } from "react-hook-form"
+import { useTranslations } from "next-intl"
 import * as XLSX from "xlsx"
 import { Progress } from "./ui/progress"
 
@@ -34,6 +35,7 @@ const readSheetNames = (file, setUploadProgress) => {
 
 export function FileUpload(props) {
     const { setSheetList, setIsLoading, setUploadProgress, uploadProgress } = props
+    const t = useTranslations("datasetpage");
 
     const [isDraggingOver, setIsDraggingOver] = useState(false);
 
@@ -64,8 +66,8 @@ export function FileUpload(props) {
     }
 
     return (
-        <div className="grid w-full max-w-md gap-1.5">
-            <Label htmlFor="file-upload">Upload File</Label>
+        <div className="grid w-full gap-1.5">
+            <Label htmlFor="file-upload" className="mb-1">{t("upload")} {t("file")}</Label>
 
             <Controller
                 name="file"
@@ -85,7 +87,7 @@ export function FileUpload(props) {
                                     <div className="w-full">
                                         <p className="text-sm font-medium">{fileName}</p>
                                         <p className="text-xs text-muted-foreground">
-                                            {fileSize} • {uploadProgress !== 100 ? "Loading" : "Complete"}
+                                            {fileSize} • {uploadProgress !== 100 ? "Loading" : t("complete")}
                                         </p>
                                         <Progress value={uploadProgress} className="mt-1" />
                                     </div>
@@ -171,12 +173,12 @@ export function FileUpload(props) {
 
                                 <p>
                                     <span className={errors.file ? "text-red-600" : "text-blue-600 underline"}>
-                                        Upload
+                                        {t("upload")}
                                     </span>{" "}
-                                    or Drag and Drop
+                                    {t("or")} Drag and Drop
                                 </p>
                                 <p className="text-xs">
-                                    CSV or XLSX (max. 10 MB)
+                                    CSV {t("or")} XLSX (max. 10 MB)
                                 </p>
 
                                 <input
@@ -228,7 +230,7 @@ export function FileUpload(props) {
             />
 
             {errors.file && (
-                <p className="text-sm text-red-600 mt-1">{errors.file.message}</p>
+                <p className="text-sm text-red-600">{errors.file.message}</p>
             )}
         </div>
     )

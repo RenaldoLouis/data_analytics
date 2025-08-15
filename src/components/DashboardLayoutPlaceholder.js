@@ -53,7 +53,7 @@ export default function DashboardLayoutPlaceholder({ layoutId, refetch, listOfCh
     }, [layoutId])
 
     return (
-        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-6 md:gap-6 lg:p-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-6 md:gap-6 lg:px-6">
             {layoutConfig?.map((cell, index) => {
                 const chartInfo = listOfChart[index];
                 const ChartComponent = chartInfo ? chartComponents[chartInfo.chartType] : null;

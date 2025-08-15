@@ -12,10 +12,12 @@ import { H3, P } from "@/components/ui/typography";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { useDashboardRecords } from "@/hooks/useDashboardRecords";
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 
 export default function Page() {
   const { chartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
   const layoutRef = useRef(null);
+  const t = useTranslations("dashboardpage");
 
 
   const chartComponents = {
@@ -52,26 +54,28 @@ export default function Page() {
             onValueChange={setSelectedLayout}
             className="w-[400px] items-end mr-3">
             <TabsList>
-              <TabsTrigger className="cursor-pointer" value="layout1">Layout 1</TabsTrigger>
-              <TabsTrigger className="cursor-pointer" value="layout2">Layout 2</TabsTrigger>
-              <TabsTrigger className="cursor-pointer" value="layout3">Layout 3</TabsTrigger>
+              <TabsTrigger className="cursor-pointer" value="layout1">{`${t("layout")} 1`}</TabsTrigger>
+              <TabsTrigger className="cursor-pointer" value="layout2">{`${t("layout")} 2`}</TabsTrigger>
+              <TabsTrigger className="cursor-pointer" value="layout3">{`${t("layout")} 3`}</TabsTrigger>
             </TabsList>
           </Tabs>
-          <ModalExportDashboard layoutRef={layoutRef} />
+          <div className="ml-2">
+            <ModalExportDashboard layoutRef={layoutRef} />
+          </div>
         </div>
       </div>
       {dataSetsList.length <= 0 && (
         <div className="px-4 lg:px-6" >
-          <Alert variant="default" className="flex justify-between items-center" style={{ height: 42 }}>
+          <Alert variant="default" className="flex justify-between items-center bg-blue-100" style={{ height: 42 }}>
             <P>
-              You don’t have any data sets. Add data sets first in order to make dashboard
+              {t("noDatasetDetected")}
             </P>
             <Button
               onClick={() => setIsDialogOpenAddNewDataSet(true)}
               variant="link"
-              className="cursor-pointer"
+              className="cursor-pointer text-blue-600"
             >
-              Add data sets
+              {t("addDataset")}
             </Button>
           </Alert>
         </div>

@@ -22,9 +22,9 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 // Schema
-const loginSchema = z.object({
-    email: z.string().min(1, "Enter username or registered email"),
-    password: z.string().min(1, "Enter password"),
+const loginSchema = (t) => z.object({
+    email: z.string().min(1, t("emailPlaceholder")),
+    password: z.string().min(1, t("passwordPlaceholder")),
 });
 
 
@@ -41,7 +41,7 @@ export default function LoginForm() {
     const t = useTranslations("loginpage")
     const router = useRouter();
     const form = useForm({
-        resolver: zodResolver(loginSchema),
+        resolver: zodResolver(loginSchema(t)),
         defaultValues: {
             email: "",
             password: "",

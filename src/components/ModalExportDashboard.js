@@ -32,11 +32,13 @@ import { CheckCircle2, Download } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 
 export const ModalExportDashboard = (props) => {
     const { layoutRef } = props
 
+    const t = useTranslations("dashboardpage");
     const [previewUrl, setPreviewUrl] = useState("");
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
     const [canvasElement, setCanvasElement] = useState(null);
@@ -115,7 +117,7 @@ export const ModalExportDashboard = (props) => {
             }, `image/${data.format}`);
         }
 
-        toast("Export has been downloaded.", {
+        toast(t("downloadSuccess"), {
             unstyled: true,
             icon: <CheckCircle2 className="text-blue-600" />,
             classNames: {
@@ -135,33 +137,30 @@ export const ModalExportDashboard = (props) => {
             }
         }}>
             <DialogTrigger asChild>
-                <Button
-                    variant="outline"
-                    className="border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 cursor-pointer"
-                >
+                <Button variant="outline">
                     <Download className="mr-2 h-4 w-4" />
-                    Download
+                    {t("download")}
                 </Button>
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-4xl p-0">
+            <DialogContent className="sm:max-w-4xl p-0 min-h-[730px] md:min-h-[500px]">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleDownload)}>
                         <DialogHeader className="p-6 pb-4">
                             <DialogTitle className="text-2xl font-bold text-left">
-                                Export Visualization
+                                {t("downloadVisual")}
                             </DialogTitle>
                         </DialogHeader>
                         <div className="border-t" />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6">
-                            <div className="flex flex-col gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-5">
+                            <div className="flex flex-col gap-4">
                                 <FormField
                                     control={form.control}
                                     name="format"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>File Format</FormLabel>
+                                            <FormLabel>{t("fileFormat")}</FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger id="format" className="w-full">
@@ -183,7 +182,7 @@ export const ModalExportDashboard = (props) => {
                                     name="margin"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Margin Settings</FormLabel>
+                                            <FormLabel>{t("marginSettings")}</FormLabel>
                                             <Select onValuechange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger id="margin" className="w-full">
@@ -203,7 +202,7 @@ export const ModalExportDashboard = (props) => {
                             </div>
 
                             <div className="grid gap-3">
-                                <FormLabel>Preview</FormLabel>
+                                <FormLabel>{t("preview")}</FormLabel>
                                 <div className="flex items-center justify-center rounded-lg border bg-slate-100 p-4 min-h-[300px] w-full">
                                     {isPreviewLoading ? (
                                         <div className="text-sm text-muted-foreground">Generating Preview...</div>
@@ -222,17 +221,17 @@ export const ModalExportDashboard = (props) => {
                             </div>
                         </div>
 
-                        <DialogFooter className="bg-slate-50 border-t p-6 sm:justify-end">
+                        <DialogFooter>
                             <DialogClose asChild>
-                                <Button type="button" variant="outline" className="w-full sm:w-auto">
-                                    Cancel
+                                <Button type="button" variant="outline" className="w-full sm:flex-1">
+                                    {t("cancel")}
                                 </Button>
                             </DialogClose>
                             <Button
                                 type="submit"
-                                className="w-full sm:w-auto bg-slate-800 text-white hover:bg-slate-700"
+                                className="w-full sm:flex-1"
                             >
-                                Download Layout
+                                {t("download")}
                             </Button>
                         </DialogFooter>
                     </form>

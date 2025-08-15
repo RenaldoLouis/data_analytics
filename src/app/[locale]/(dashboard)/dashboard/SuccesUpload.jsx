@@ -7,8 +7,10 @@ import { H3 } from "@/components/ui/typography"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useRef } from "react"
+import { useTranslations } from "next-intl"
 
 const SuccessUpload = (props) => {
+    const t = useTranslations("datasetpage");
     const closeRef = useRef(null)
 
     const router = useRouter();
@@ -27,17 +29,17 @@ const SuccessUpload = (props) => {
                 <DialogTitle className="">
                     <div className="px-6">
                         <H3>
-                            Successfully Uploaded
+                            {t("datasetUploadedTitle")}
                         </H3>
                     </div>
                 </DialogTitle>
                 <DialogDescription>
-                    All done! Your data is safely uploaded.
+                    {t("dataUploadedSubtitle")}
                 </DialogDescription>
             </DialogHeader>
             <DialogFooter className="px-6 py-3">
                 <DialogClose asChild>
-                    <Button ref={closeRef} variant="outline" type="button" className="cursor-pointer">Close</Button>
+                    <Button className="w-full sm:flex-1" ref={closeRef} variant="outline" type="button">Close</Button>
                 </DialogClose>
                 {/* <Button onClick={handleClickNext} type="submit" className="cursor-pointer">Next</Button> */}
             </DialogFooter>
