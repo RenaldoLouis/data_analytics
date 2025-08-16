@@ -59,6 +59,7 @@
         "datasetNamePlaceholder": "Ex: March Sales 2024",
         "upload": "Upload",
         "file": "File",
+        "or": "or",
         "complete": "Complete",
         "uploadFileBeforeContinue": "Upload a file before proceeding",
         "inputNameBeforeContinue": "Fill dataset name before proceeding",

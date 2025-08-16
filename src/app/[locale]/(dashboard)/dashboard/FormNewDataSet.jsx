@@ -37,6 +37,7 @@ const FormNewDataSet = (props) => {
     const [uploadDone, setUploadDone] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [emptyData, setEmptyData] = useState(0);
 
     const createSingleSheetFile = async (file, selectedSheetIndex) => {
         // Read the file as ArrayBuffer
@@ -111,6 +112,7 @@ const FormNewDataSet = (props) => {
         try {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
 
+            setEmptyData(res?.data.empty_data ?? null);
             if (res?.success) {
                 toast("Dataset uploaded successfully", {
                     description: "File has been uploaded."
@@ -139,6 +141,7 @@ const FormNewDataSet = (props) => {
                     register={register}
                     errors={errors}
                     setUploadDone={setUploadDone}
+                    emptyData={emptyData}
                 />;
 
             case UploadStatus.dataNotClear:

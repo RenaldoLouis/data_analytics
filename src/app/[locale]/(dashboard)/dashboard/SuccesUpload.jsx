@@ -4,10 +4,10 @@ import checkMark from "@/assets/logo/checkmark.svg"
 import { Button } from "@/components/ui/button"
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { H3 } from "@/components/ui/typography"
+import { useTranslations } from "next-intl"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useRef } from "react"
-import { useTranslations } from "next-intl"
 
 const SuccessUpload = (props) => {
     const t = useTranslations("datasetpage");
@@ -15,7 +15,7 @@ const SuccessUpload = (props) => {
 
     const router = useRouter();
 
-    const { setUploadDone } = props
+    const { setUploadDone, emptyData } = props
 
     const handleClickNext = () => {
         closeRef.current?.click()
@@ -34,7 +34,7 @@ const SuccessUpload = (props) => {
                     </div>
                 </DialogTitle>
                 <DialogDescription>
-                    {t("dataUploadedSubtitle")}
+                    {t("dataUploadedSubtitle")} With total of {emptyData} empty data.
                 </DialogDescription>
             </DialogHeader>
             <DialogFooter className="px-6 py-3">
