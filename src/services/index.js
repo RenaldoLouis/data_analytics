@@ -126,6 +126,7 @@ export default {
         updateDatasetContents: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDatasetContents/${id}`, datasetContents),
         updateDataset: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDataset/${id}`, datasetContents),
         deleteDataset: (id) => deleteRequestMiddleware(`/next-api/dataset/${id}`),
+        searchDataset: (name) => getRequest(`/next-api/dataset/searchDataset/?name=${name}`),
     },
     chart: {
         getChart: () => getRequest(`/next-api/chart`),
