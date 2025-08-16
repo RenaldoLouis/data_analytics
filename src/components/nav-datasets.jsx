@@ -10,10 +10,11 @@ import {
 } from "@/components/ui/sidebar";
 import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { EditableSidebarItem } from "./editableTextSidebar";
 import { Skeleton } from "./ui/skeleton";
 
 const predefinedColors = [
@@ -32,9 +33,14 @@ const predefinedColors = [
 export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
-  const { setIsDialogOpenAddNewDataSet, isFetchDataSetLists, setIsFetchDataSetLists, setDataSetsList, setChartDrawData, setSelectedChartType, setSelectedColumn, setSelectedRow } = useDashboardContext();
+  const { setIsFetchDataSetContents, isFetchDataSetContents, setIsDialogOpenAddNewDataSet, isFetchDataSetLists, setIsFetchDataSetLists, setDataSetsList, setChartDrawData, setSelectedChartType, setSelectedColumn, setSelectedRow } = useDashboardContext();
 
   const [isLoadingListDataset, setIsLoadingListDataSet] = useState();
+  const [editingItemId, setEditingItemId] = useState(null);
+
+  const currentDataset = useMemo(() => {
+    return dataSetsList.find(item => item.id === selectedNav) || {};
+  }, [dataSetsList, selectedNav]);
 
   useEffect(() => {
     setIsLoadingListDataSet(true)
@@ -96,6 +102,49 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
     }
   };
 
+  const handleEditClick = (e, itemId) => {
+    e.stopPropagation(); // Prevent navigation
+    setEditingItemId(itemId);
+  };
+
+  const handleSaveName = async (itemId, newName) => {
+    if (newName.trim() === currentDataset.sheet_name.trim()) {
+      toast("No change detected after trimming whitespace. Not saving.");
+      return; // Exit the function if the names are the same after trimming
+    }
+    if (newName.trim() === "") {
+      toast("Name cannot be empty.");
+      return;
+    }
+
+    const tempData = {
+      "name": newName,
+      "sheet_name": currentDataset.sheet_name,
+      "status": currentDataset.status
+    }
+    // TODO: Add your API call to update the name here
+    const res = await services.dataset.updateDataset(itemId, tempData);
+    if (!res?.success) {
+      toast("Failed to update dataset name");
+      return;
+    }
+
+    // After saving, update the list in the state and exit edit mode
+    setDataSetsList(prevList =>
+      prevList.map(item =>
+        item.id === itemId ? { ...item, name: newName } : item
+      )
+    );
+    setEditingItemId(null);
+
+    setIsFetchDataSetLists(!isFetchDataSetLists)
+    setIsFetchDataSetContents(!isFetchDataSetContents)
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+  };
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>
@@ -120,27 +169,39 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
               className="group/item rounded-md"
             >
               <SidebarMenuButton asChild>
-                <div className="flex justify-between"
-                  style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
-                  <div style={{ width: "100%" }}>
-                    <div
-                      key={`${item.name} ${index}`}
-                      onClick={() => handleClickNavigateDataSets(item)}
-                      className="group flex items-center space-x-3 cursor-pointer">
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
+                {editingItemId === item.id ? (
+                  <EditableSidebarItem
+                    initialName={item.name}
+                    onSave={(newName) => handleSaveName(item.id, newName)}
+                    onCancel={handleCancelEdit}
+                  />
+                ) : (
+                  <div className="flex justify-between"
+                    style={{ background: selectedNav === item.id ? "#EAF3FB" : "" }}>
+                    <div style={{ width: "100%" }}>
+                      <div
+                        key={`${item.name} ${index}`}
+                        onClick={() => handleClickNavigateDataSets(item)}
+                        className="group flex items-center space-x-3 cursor-pointer">
+                        <span
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span>{item.name}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 invisible group-hover/item:visible">
+                      <IconPencil
+                        onClick={(e) => handleEditClick(e, item.id)}
+                        className="w-4 h-4 invisible group-hover/item:visible hover:text-black cursor-pointer"
                       />
-                      <span>{item.name}</span>
+                      <IconTrash
+                        onClick={(e) => handleDeleteDataset(e, item.id)}
+                        className="w-4 h-4 text-muted-foreground invisible group-hover/item:visible hover:text-red-800 cursor-pointer"
+                      />
                     </div>
                   </div>
-                  <div>
-                    <IconTrash
-                      onClick={(e) => handleDeleteDataset(e, item.id)}
-                      className="w-4 h-4 text-muted-foreground invisible group-hover/item:visible hover:text-red-800 cursor-pointer"
-                    />
-                  </div>
-                </div>
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))
