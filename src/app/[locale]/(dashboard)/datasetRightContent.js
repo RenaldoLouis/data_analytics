@@ -274,7 +274,7 @@ export default function DatasetRightContent() {
                             onSave={handleNameSave}
                         />
                         <div className="flex items-center gap-2 my-3">
-                            <Switch disabled={currentDataset?.status === 0 ? true : false} id="show-dashboard" defaultChecked />
+                            <Switch disabled={true} id="show-dashboard" checked={currentDataset?.status === 0 ? false : true} />
                             <Label
                                 htmlFor="show-dashboard"
                                 className="text-sm font-medium text-gray-800"
@@ -367,18 +367,19 @@ export default function DatasetRightContent() {
 
                         <div className="flex flex-col gap-2 w-full">
 
-                            <Button onClick={handleUpdateData} variant="secondary" className="flex-1 cursor-pointer" style={{ background: "#0B2238", color: "white" }}>
-                                <Image src={syncIcon} alt="Measure icon" className="w-5 h-5" />   Sync Changes
+                            <Button onClick={handleUpdateData} variant="default" className="flex-1 cursor-pointer">
+                                {/* <Image src={syncIcon} alt="Measure icon" className="w-5 h-5 color-blue-100" />    */}
+                                Save Dataset Changes
                             </Button>
-                            <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="primary" className="flex-1 cursor-pointer" style={{ background: "blue", color: "white" }}>
-                                Save Chart
+                            <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="outline" className="flex-1 cursor-pointer">
+                                Save Chart Changes
                             </Button>
-                            <Button onClick={updateDataSetReadyVisualization} variant="primary" className="flex-1 cursor-pointer" style={{ background: "green", color: "white" }}>
-                                Update Dataset Ready for Visualization
+                            <Button onClick={updateDataSetReadyVisualization} variant="secondary" className="flex-1 cursor-pointer">
+                                Proceed to Visualization
                             </Button>
-                            <Button onClick={handleDeleteDataset} variant="destructive" className="flex-1 cursor-pointer">
+                            {/* <Button onClick={handleDeleteDataset} variant="destructive" className="flex-1 cursor-pointer">
                                 Delete Data Set
-                            </Button>
+                            </Button> */}
                         </div>
                     </CardFooter>
                 </motion.div>

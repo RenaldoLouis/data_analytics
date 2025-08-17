@@ -216,7 +216,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
             {/* Column & Row Settings */}
             <div className="border rounded-md overflow-hidden mb-6 divide-y divide-gray-200">
                 {/* Columns */}
-                <div className="flex items-start bg-gray-50 px-4 py-3 gap-3">
+                <div className="flex items-center bg-gray-50 px-4 py-3 gap-3">
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
                         <span className="text-blue-600">Columns</span>
                     </div>
@@ -235,7 +235,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                                 📅 {item.name}
                                 <button
                                     onClick={() => handleRemoveItem(item, 'column')}
-                                    className="text-blue-500 hover:text-blue-800"
+                                    className="text-blue-500 hover:text-blue-800 cursor-pointer"
                                 >
                                     &times;
                                 </button>
@@ -245,7 +245,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 </div>
 
                 {/* Rows (with horizontal scroll) */}
-                <div className="flex items-start px-4 py-3 gap-3">
+                <div className="flex items-center px-4 py-3 gap-3">
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
                         <span className="text-blue-600">Rows</span>
                     </div>
