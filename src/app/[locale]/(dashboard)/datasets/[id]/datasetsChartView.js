@@ -132,7 +132,18 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
         drop: (item) => {
-            setSelectedColumn((prev) => [...new Set([...prev, { name: item.name, type: item.type }])]);
+            setSelectedColumn((prev) => {
+                // Check if an item with the same name already exists
+                const alreadyExists = prev.some(existingItem => existingItem.name === item.name);
+
+                // If it doesn't exist, add the new item
+                if (!alreadyExists) {
+                    return [...prev, { name: item.name, type: item.type }];
+                }
+
+                // Otherwise, return the array unchanged
+                return prev;
+            });
         },
         collect: (monitor) => ({
             isOver: monitor.isOver(),
@@ -142,7 +153,18 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     const [{ isOver: isOverRow }, dropRow] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
         drop: (item) => {
-            setSelectedRow((prev) => [...new Set([...prev, { name: item.name, type: item.type }])]);
+            setSelectedRow((prev) => {
+                // Check if an item with the same name already exists
+                const alreadyExists = prev.some(existingItem => existingItem.name === item.name);
+
+                // If it doesn't exist, add the new item
+                if (!alreadyExists) {
+                    return [...prev, { name: item.name, type: item.type }];
+                }
+
+                // Otherwise, return the array unchanged
+                return prev;
+            });
         },
         collect: (monitor) => ({
             isOver: monitor.isOver(),
