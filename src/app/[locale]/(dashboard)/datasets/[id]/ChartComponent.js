@@ -38,7 +38,7 @@ const CustomizedAxisTick = (props) => {
 
     return (
         <g transform={`translate(${x},${y})`}>
-            <text x={0} y={0} dy={16} textAnchor="end" fill="#666" >
+            <text x={0} y={0} dy={16} textAnchor="middle" fill="#666" >
                 {/* The visible, truncated label */}
                 {truncatedLabel}
                 {/* A tooltip that shows the full label on hover */}
