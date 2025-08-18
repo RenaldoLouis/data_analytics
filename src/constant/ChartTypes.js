@@ -17,3 +17,11 @@ export const ChartTypes = [
     { icon: <AreaChartIcon />, name: "Area" },
     { icon: <PieChartIcon />, name: "Pie" },
 ];
+
+export const ChartAggregator = {
+    sum: 'Sum',
+    count: 'Count',
+    average: 'Average',
+    median: 'Median',
+    modus: 'Modus'
+}

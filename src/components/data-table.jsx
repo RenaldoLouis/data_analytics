@@ -218,7 +218,7 @@ export function DataTable({
     <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
       <TabsContent
         value="outline"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6 pb-4">
         <div className="overflow-hidden rounded-lg border">
           <DndContext
             collisionDetection={closestCenter}

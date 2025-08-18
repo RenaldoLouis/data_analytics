@@ -8,6 +8,7 @@ import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
 import services from "@/services";
+import { ChartAggregator } from "@/constant/ChartTypes";
 import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
@@ -113,7 +114,8 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                         "chart_id": selectedChartType?.id,
                         "dataset_id": datasetId,
                         "selected_row": selectedRow,
-                        "selected_column": selectedColumn
+                        "selected_column": selectedColumn,
+                        "chart_aggregator": ChartAggregator.count
                     }
 
                     const res = await services.chart.getChartData(tempObj)
@@ -234,7 +236,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     };
 
     return (
-        <div className="w-full p-6">
+        <div className="w-full px-6 pb-4 overflow-x-auto">
             {/* Column & Row Settings */}
             <div className="border rounded-md overflow-hidden mb-6 divide-y divide-gray-200">
                 {/* Columns */}
@@ -286,7 +288,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                                 # {item.name} {/* Display item.name */}
                                 <button
                                     onClick={() => handleRemoveItem(item, 'row')}
-                                    className="text-blue-500 hover:text-blue-800"
+                                    className="cursor-pointer text-blue-500 hover:text-blue-800"
                                 >
                                     &times;
                                 </button>
@@ -344,7 +346,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
 
             {/* Chart View */}
             <div className="bg-white rounded-md p-4 shadow-sm">
-                <ChartContainer config={dynamicChartConfig} className="min-h-[400px] w-full flex items-center justify-center">
+                <ChartContainer config={dynamicChartConfig} className="w-full flex items-center justify-center">
                     {renderSelectedChart()}
                 </ChartContainer>
             </div>

@@ -42,7 +42,9 @@ export default function DataSetView(props) {
     return (
         <>
             <div className="flex justify-between px-4 lg:px-6">
-                <H3>All chart</H3>
+                <div className="flex items-center">
+                    <H3 className="text-xl font-bold">Charts</H3>
+                </div>
                 {/* <Button onClick={handleUpdateData}>
                     Update Data
                 </Button> */}
@@ -66,7 +68,7 @@ export default function DataSetView(props) {
             <div className="px-4 lg:px-6">
                 <ChartAreaInteractive />
             </div> */}
-            <div className="flex">
+            <div className="flex overflow-x-auto">
                 <div className="flex-auto">
                     {currentView === DatasetViewConst.chart ? (
                         <DatasetsChartView

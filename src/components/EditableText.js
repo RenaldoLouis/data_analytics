@@ -41,17 +41,17 @@ export function EditableText({ initialName, onSave }) {
     };
 
     return (
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start w-full">
             {isEditing ? (
                 // --- Edit Mode ---
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-2">
                     <Input
                         ref={inputRef}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onBlur={handleSave} // Save when the user clicks away
-                        className="text-lg font-bold h-9"
+                        className="text-xl font-bold h-9 w-55"
                     />
                     <Button onClick={handleSave} size="icon" className="h-9 w-9 flex-shrink-0">
                         <Check className="w-4 h-4" />
@@ -60,7 +60,7 @@ export function EditableText({ initialName, onSave }) {
             ) : (
                 // --- View Mode ---
                 <>
-                    <H3 className="text-lg font-bold leading-snug break-all">
+                    <H3 className="text-xl font-bold leading-snug break-all w-55">
                         {name}
                     </H3>
                     <Button

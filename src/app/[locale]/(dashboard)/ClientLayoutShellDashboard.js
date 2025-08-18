@@ -25,11 +25,11 @@ export default function ClientLayoutShellDashboard({ children }) {
                     <SidebarInset>
                         <SiteHeader />
                         <div
-                            className="flex flex-1"
+                            className="flex min-h-screen"
                             style={{ background: "#f2f2f2" }}
                         >
                             <div
-                                className="@container/main flex flex-1 flex-col gap-2"
+                                className="@container/main flex-1 overflow-auto"
                                 style={{
                                     background: "white",
                                     // margin: 50,
@@ -37,11 +37,10 @@ export default function ClientLayoutShellDashboard({ children }) {
                                     // border: "1px solid black",
                                 }}
                             >
-                                <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                                <div className="flex flex-col gap-4 pt-4 md:gap-6 md:pt-6">
                                     {children}
                                 </div>
                             </div>
-                            <Separator orientation="vertical" />
                             <DatasetRightContent />
                         </div>
                     </SidebarInset>
