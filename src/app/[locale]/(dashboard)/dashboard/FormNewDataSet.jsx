@@ -112,15 +112,15 @@ const FormNewDataSet = (props) => {
         try {
             const res = await services.dataset.addNewDataSet(formData); // assumes this sends as multipart/form-data
 
-            setEmptyData(res?.data.empty_data ?? null);
             if (res?.success) {
                 toast("Dataset uploaded successfully", {
                     description: "File has been uploaded."
                 });
                 setUploadDone(UploadStatus.dataClear);
+                setEmptyData(res?.data.empty_data ?? null);
             } else {
                 setUploadDone(UploadStatus.uploadFailed);
-                throw new Error("Upload failed because" + res.message);
+                throw new Error("Upload failed because: " + res.message);
             }
 
             setIsFetchDataSetLists(!isFetchDataSetLists)
