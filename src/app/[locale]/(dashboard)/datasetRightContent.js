@@ -12,6 +12,7 @@ import { useDashboardContext } from "@/context/dashboard-context";
 import { useDatasetRightContent } from "@/hooks/useDatasetRightContent";
 import services from "@/services";
 import { AnimatePresence, motion } from "framer-motion";
+import moment from "moment";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -339,34 +340,34 @@ export default function DatasetRightContent() {
                         <div className="space-y-1 w-full">
                             <p className="mb-4" style={{ fontWeight: 700, fontSize: 12 }}>DATA SET DETAILS</p>
                             <p className="mb-3">
-                                <span className="font-medium">Data Source:</span>{" "}
-                                <a href="#" className="text-blue-600 underline">
-                                    Data_Penjualan_P...
-                                </a>
+                                <span className="font-medium">Data Source: </span>
+                                {currentDataset?.sheet_name}
                             </p>
                             <p className="mb-3">
-                                <span className="font-medium">Created on:</span> 04/05/2025
+                                <span className="font-medium">Created on: </span>
+                                {moment(currentDataset?.created_at).format("DD/MM/YYYY")}
                             </p>
                             <p className="mb-3">
-                                <span className="font-medium">Last edited on:</span> -
+                                <span className="font-medium">Last edited on: </span>
+                                {moment(currentDataset?.updated_at).format("DD/MM/YYYY")}
                             </p>
                             <p className="mb-3">
-                                <span className="font-medium">Last edited by:</span> Renaldo
+                                <span className="font-medium">Last edited by: </span>
+                                {currentDataset?.updated_by}
                             </p>
                             <p className="mb-3">
                                 <span className="font-medium">Data status:</span>{" "}
                                 <span className="text-green-600">{dataStatus}</span>
                             </p>
-                            <p className="mb-3">
+                            {/* <p className="mb-3">
                                 <span className="font-medium">Quality Score:</span>{" "}
                                 <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                                     100%
                                 </span>
-                            </p>
+                            </p> */}
                         </div>
 
                         <div className="flex flex-col gap-2 w-full">
-
                             <Button onClick={handleUpdateData} variant="default" className="flex-1 cursor-pointer">
                                 {/* <Image src={syncIcon} alt="Measure icon" className="w-5 h-5 color-blue-100" />    */}
                                 Save Dataset Changes
