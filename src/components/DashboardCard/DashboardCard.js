@@ -126,7 +126,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
     const availableChartsData = useMemo(() => {
         // 1. Filter the datasets to only include those that have been saved as a chart.
         //    We can check if `chart_content` is not null.
-        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content !== null && !isEmpty(dataset.chart_content) && dataset.dashboard_records.length <= 0);
+        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content != null && !isEmpty(dataset.chart_content) && dataset.dashboard_records.length <= 0);
 
         // 2. Map over the filtered list to create the new structure.
         const availableCharts = createdCharts.map(chart => {
@@ -136,7 +136,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
             const chartTypeName = chartTypeInfo ? chartTypeInfo.name : 'Chart';
 
             // Create a descriptive name for the chart.
-            const displayName = `${chart.sheet_name}`;
+            const displayName = `${chart.name}`;
 
             // Create a placeholder image URL.
             const imageUrl = `https://placehold.co/96x56/a0c4ff/ffffff?text=${chartTypeName}`;
@@ -194,7 +194,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
             const chartTypeName = chartTypeInfo ? chartTypeInfo.name : 'Chart';
 
             // Create a descriptive name for the chart.
-            const displayName = `${chart.sheet_name}`;
+            const displayName = `${chart.name}`;
 
             // Create a placeholder image URL.
             const imageUrl = `https://placehold.co/96x56/e2e8f0/666?text=${chartTypeName}`;
@@ -248,7 +248,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                                                     value={field.value}
                                                     className="grid gap-3"
                                                 >
-                                                    {availableChartsData.length > 1
+                                                    {availableChartsData.length > 0
                                                         ? availableChartsData.map((chart) => (
                                                             <ChartSelectItem
                                                                 key={chart.id}
@@ -266,7 +266,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
                                 <div className="grid gap-3 pb-13">
                                     <h3 className="font-semibold">{t("added")}</h3>
-                                    {addedCharts.length > 1
+                                    {addedCharts.length > 0
                                         ? addedCharts.map((chart) => (
                                             <ChartItemDisabled
                                                 key={chart.id}
