@@ -93,6 +93,13 @@
         "saveDatasetChanges": "Save Dataset Changes",
         "saveChartChanges": "Save Chart Changes",
         "proceedToVisualization": "Proceed to Visualization",
-        "showToDashboard": "Show to Dashboard"
+        "showToDashboard": "Show to Dashboard",
+        "emptyDatasetNameValidation": "Dataset Name cannot be empty",
+        "datasetUpdated": "Dataset updated successfully",
+        "uploadFailed": "Upload Failed",
+        "chartUpdated": "Chart updated successfully",
+        "datasetReadyToVisualize": "Dataset ready to visualize",
+        "draft": "Draft",
+        "readyForVisualization": "Ready for Visualization"
     }
 }

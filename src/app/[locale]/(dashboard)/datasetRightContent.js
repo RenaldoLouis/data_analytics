@@ -126,11 +126,11 @@ export default function DatasetRightContent() {
             });
 
             if (res?.success) {
-                toast("Dataset Updated successfully");
+                toast(t("datasetUpdated"));
                 setIsFetchDataSetContents(!isFetchDataSetContents)
             }
         } catch (e) {
-            toast("Upload failed", {
+            toast(t("uploadFailed"), {
                 description: error.message,
             });
             throw new Error("Upload failed with status " + res.status);
@@ -148,9 +148,9 @@ export default function DatasetRightContent() {
         if (currentDataset) {
             switch (currentDataset.status) {
                 case 0:
-                    return "Draft"
+                    return t("draft")
                 case 1:
-                    return "Ready for Visualization"
+                    return t("readyForVisualization")
             }
 
         }
@@ -158,11 +158,11 @@ export default function DatasetRightContent() {
 
     const handleNameSave = async (newName) => {
         if (newName.trim() === currentDataset.name.trim()) {
-            toast("No change detected after trimming whitespace. Not saving.");
+            // toast("No change detected after trimming whitespace. Not saving.");
             return; // Exit the function if the names are the same after trimming
         }
         if (newName.trim() === "") {
-            toast("Name cannot be empty.");
+            toast(t("emptyDatasetNameValidation"));
             return;
         }
 
@@ -175,12 +175,12 @@ export default function DatasetRightContent() {
             const res = await services.dataset.updateDataset(datasetId, tempData);
 
             if (res?.success) {
-                toast("Dataset Updated successfully");
+                toast(t("datasetUpdated"));
                 setIsFetchDataSetLists(!isFetchDataSetLists)
                 setIsFetchDataSetContents(!isFetchDataSetContents)
             }
         } catch (e) {
-            toast("Upload failed", {
+            toast(t("uploadFailed"), {
                 description: e.message,
             });
             throw new Error("Upload failed with status " + res.status);
@@ -200,14 +200,14 @@ export default function DatasetRightContent() {
         try {
             const res = await services.chart.postChartRecords(tempObj)
             if (res.success) {
-                toast("Chart Saved successfully");
+                toast(t("chartUpdated"));
             } else {
                 // const errorData = await res.json(); // Try to get more details from the response body
                 throw new Error(res.message || `Request failed with status ${res.status}`);
             }
         } catch (e) {
             console.error("An error occurred:", e.message);
-            toast.error("Failed to save chart", {
+            toast.error(t("uploadFailed"), {
                 description: e.message
             });
         }
@@ -242,12 +242,12 @@ export default function DatasetRightContent() {
             const res = await services.dataset.updateDataset(datasetId, tempData);
 
             if (res?.success) {
-                toast("Dataset ready to visualize");
+                toast(t("datasetReadyToVisualize"));
                 setIsFetchDataSetContents(!isFetchDataSetContents)
                 setIsFetchDataSetLists(!isFetchDataSetLists)
             }
         } catch (e) {
-            toast("Upload failed", {
+            toast(t("uploadFailed"), {
                 description: e.message,
             });
             throw new Error("Upload failed with status " + res.status);

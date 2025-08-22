@@ -21,13 +21,21 @@ export function EditableText({ initialName, onSave }) {
 
     // This effect ensures the local state updates if the initialName prop changes from the parent
     useEffect(() => {
-        setName(initialName);
+        if (initialName !== null && initialName !== "") setName(initialName);
     }, [initialName]);
 
     const handleSave = () => {
+        const trimmed = name?.trim() || "";
+
         setIsEditing(false);
-        // Call the onSave function passed from the parent with the new name
-        onSave(name);
+        if (trimmed === "") {
+            // Revert name to initial value
+            setName(initialName);
+            onSave(trimmed)
+            return;
+        }
+
+        onSave(trimmed);
     };
 
     const handleKeyDown = (event) => {

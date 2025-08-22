@@ -93,6 +93,13 @@
         "saveDatasetChanges": "Simpan Perubahan Dataset",
         "saveChartChanges": "Simpan Perubahan Chart",
         "proceedToVisualization": "Mulai Visualisasi Data",
-        "showToDashboard": "Tampilkan ke Dashboard"
+        "showToDashboard": "Tampilkan ke Dashboard",
+        "emptyDatasetNameValidation": "Nama Dataset tidak boleh kosong",
+        "datasetUpdated": "Dataset berhasil di perbarui",
+        "uploadFailed": "Gagal mengunggah",
+        "chartUpdated": "Chart berhasil di perbarui",
+        "datasetReadyToVisualize": "Dataset siap untuk divisualisasikan",
+        "draft": "Draft",
+        "readyForVisualization": "Siap untuk Visualisasi"
     }
 }
