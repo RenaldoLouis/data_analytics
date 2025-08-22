@@ -90,16 +90,19 @@
         "lastEditedOn": "Edited on",
         "lastEditedBy": "Edited by",
         "dataStatus": "Data status",
-        "saveDatasetChanges": "Save Dataset Changes",
+        "saveDatasetChanges": "Save Data set Changes",
         "saveChartChanges": "Save Chart Changes",
         "proceedToVisualization": "Proceed to Visualization",
         "showToDashboard": "Show to Dashboard",
-        "emptyDatasetNameValidation": "Dataset Name cannot be empty",
-        "datasetUpdated": "Dataset updated successfully",
+        "emptyDatasetNameValidation": "Data set Name cannot be empty",
+        "datasetUpdated": "Data set updated successfully",
+        "datasetUpdatedFailed": "Fail to update data set",
         "uploadFailed": "Upload Failed",
         "chartUpdated": "Chart updated successfully",
-        "datasetReadyToVisualize": "Dataset ready to visualize",
+        "datasetReadyToVisualize": "Data set ready to visualize",
         "draft": "Draft",
-        "readyForVisualization": "Ready for Visualization"
+        "readyForVisualization": "Ready for Visualization",
+        "datasetDeleted": "Data set deleted successfully",
+        "datasetDeletedFailed": "Fail to delete data set"
     }
 }

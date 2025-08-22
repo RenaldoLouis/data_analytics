@@ -96,10 +96,13 @@
         "showToDashboard": "Tampilkan ke Dashboard",
         "emptyDatasetNameValidation": "Nama Dataset tidak boleh kosong",
         "datasetUpdated": "Dataset berhasil di perbarui",
+        "datasetUpdatedFailed": "Dataset gagal di perbarui",
         "uploadFailed": "Gagal mengunggah",
         "chartUpdated": "Chart berhasil di perbarui",
         "datasetReadyToVisualize": "Dataset siap untuk divisualisasikan",
         "draft": "Draft",
-        "readyForVisualization": "Siap untuk Visualisasi"
+        "readyForVisualization": "Siap untuk Visualisasi",
+        "datasetDeleted": "Dataset berhasil dihapus",
+        "datasetDeletedFailed": "Dataset gagal dihapus"
     }
 }

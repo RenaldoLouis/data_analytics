@@ -180,7 +180,7 @@ export default function DatasetRightContent() {
                 setIsFetchDataSetContents(!isFetchDataSetContents)
             }
         } catch (e) {
-            toast(t("uploadFailed"), {
+            toast(t("datasetUpdatedFailed"), {
                 description: e.message,
             });
             throw new Error("Upload failed with status " + res.status);

@@ -43,7 +43,7 @@ export const EditableSidebarItem = ({ initialName, onSave, onCancel }) => {
                 onBlur={handleSave} // Save when the user clicks away
                 className="h-7 text-sm"
             />
-            <button onClick={handleSave} className="p-1">
+            <button onClick={handleSave} className="p-1 cursor-pointer">
                 <Check className="w-4 h-4" />
             </button>
         </div>

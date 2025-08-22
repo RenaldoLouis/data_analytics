@@ -93,11 +93,11 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
 
     try {
       if (res?.success) {
-        toast("Dataset Deleted");
+        toast(t("datasetDeleted"));
         setIsFetchDataSetLists(!isFetchDataSetLists)
       }
     } catch (e) {
-      toast("Delete failed", {
+      toast(t("datasetDeletedFailed"), {
         description: e.message,
       });
       throw new Error("Delete failed with status " + res.status);
@@ -110,12 +110,12 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
   };
 
   const handleSaveName = async (itemId, newName) => {
-    if (newName.trim() === currentDataset.sheet_name.trim()) {
-      toast("No change detected after trimming whitespace. Not saving.");
+    if (newName.trim() === currentDataset.name.trim()) {
+      // toast("No change detected after trimming whitespace. Not saving.");
       return; // Exit the function if the names are the same after trimming
     }
     if (newName.trim() === "") {
-      toast("Name cannot be empty.");
+      toast(t("emptyDatasetNameValidation"));
       return;
     }
 
@@ -126,8 +126,10 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
     }
     // TODO: Add your API call to update the name here
     const res = await services.dataset.updateDataset(itemId, tempData);
-    if (!res?.success) {
-      toast("Failed to update dataset name");
+    if (res?.success) {
+      toast(t("datasetUpdated"));
+    } else {
+      toast(t("datasetUpdatedFailed"));
       return;
     }
 
