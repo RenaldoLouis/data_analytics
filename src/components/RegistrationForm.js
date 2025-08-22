@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import services from "@/services";
 import { Check } from "lucide-react"; // 2. Import a check icon
+import LoadingScreen from "./ui/loadingScreen";
 
 const registrationSchema = (t) => z.object({
     // firstName: z.string().min(1, "Enter first name"),
@@ -46,6 +47,7 @@ export default function RegistrationForm() {
     const t = useTranslations("registrationpage")
     const router = useRouter();
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm({
         resolver: zodResolver(registrationSchema(t)),
@@ -60,6 +62,7 @@ export default function RegistrationForm() {
     });
 
     const onSubmit = async (data) => {
+        setIsLoading(true);
         const tempData = {
             email: data.email,
             password: data.password,
@@ -80,14 +83,19 @@ export default function RegistrationForm() {
                 });
             }
         } catch (err) {
+            setIsLoading(false);
             form.setError("root", {
                 message: err.message || "An unexpected error occurred.",
             });
         }
+        setIsLoading(false);
     };
 
     return (
         <div className="w-full max-w-md">
+            {isLoading && (
+                <LoadingScreen />
+            )}
             <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 pt-6 lg:pt-0">&larr; {t("back")}</button>
             <h2 className="text-2xl font-bold">{t("tryFree")}</h2>
 

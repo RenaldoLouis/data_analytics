@@ -20,6 +20,7 @@ import { useDrag } from "react-dnd";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
+import LoadingScreen from "@/components/ui/loadingScreen";
 
 const testGetterObj = {
     firstName: "bob",
@@ -54,6 +55,7 @@ export default function DatasetRightContent() {
     const [isShowsideContent, setIsShowsideContent] = useState(false);
     const [isOpenSideContent, setIsOpenSideContent] = useState(false);
     const [datasetId, setDatasetId] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (pathname !== "/dashboard") {
@@ -115,6 +117,7 @@ export default function DatasetRightContent() {
     }, [pathname]);
 
     const handleUpdateData = async () => {
+        setIsLoading(true);
         const datasetContents = dataToUpdate.map((eachData) => ({
             id: eachData.id,
             data: eachData,
@@ -130,11 +133,13 @@ export default function DatasetRightContent() {
                 setIsFetchDataSetContents(!isFetchDataSetContents)
             }
         } catch (e) {
+            setIsLoading(false);
             toast(t("uploadFailed"), {
                 description: error.message,
             });
             throw new Error("Upload failed with status " + res.status);
         }
+        setIsLoading(false);
     };
 
     const currentDataset = useMemo(() => {
@@ -157,11 +162,14 @@ export default function DatasetRightContent() {
     }, [currentDataset])
 
     const handleNameSave = async (newName) => {
+        setIsLoading(true);
         if (newName.trim() === currentDataset.name.trim()) {
+            setIsLoading(false);
             // toast("No change detected after trimming whitespace. Not saving.");
             return; // Exit the function if the names are the same after trimming
         }
         if (newName.trim() === "") {
+            setIsLoading(false);
             toast(t("emptyDatasetNameValidation"));
             return;
         }
@@ -180,14 +188,17 @@ export default function DatasetRightContent() {
                 setIsFetchDataSetContents(!isFetchDataSetContents)
             }
         } catch (e) {
+            setIsLoading(false);
             toast(t("datasetUpdatedFailed"), {
                 description: e.message,
             });
             throw new Error("Upload failed with status " + res.status);
         }
+        setIsLoading(false);
     };
 
     const handleSaveChart = async () => {
+        setIsLoading(true);
         const tempObj = {
             "dataset_id": datasetId,
             "chart_id": selectedChartType.id,
@@ -202,15 +213,18 @@ export default function DatasetRightContent() {
             if (res.success) {
                 toast(t("chartUpdated"));
             } else {
+                setIsLoading(false);
                 // const errorData = await res.json(); // Try to get more details from the response body
                 throw new Error(res.message || `Request failed with status ${res.status}`);
             }
         } catch (e) {
+            setIsLoading(false);
             console.error("An error occurred:", e.message);
             toast.error(t("uploadFailed"), {
                 description: e.message
             });
         }
+        setIsLoading(false);
     }
 
 
@@ -232,6 +246,7 @@ export default function DatasetRightContent() {
     };
 
     const updateDataSetReadyVisualization = async () => {
+        setIsLoading(true);
         const tempData = {
             "name": currentDataset?.name,
             "sheet_name": currentDataset?.sheet_name,
@@ -247,11 +262,13 @@ export default function DatasetRightContent() {
                 setIsFetchDataSetLists(!isFetchDataSetLists)
             }
         } catch (e) {
+            setIsLoading(false);
             toast(t("uploadFailed"), {
                 description: e.message,
             });
             throw new Error("Upload failed with status " + res.status);
         }
+        setIsLoading(false);
     }
 
     const toggleSidebar = () => {
@@ -260,6 +277,9 @@ export default function DatasetRightContent() {
 
     return (
         <AnimatePresence>
+            {isLoading && (
+                <LoadingScreen />
+            )}
             {isShowsideContent && (
                 <Button variant="ghost" onClick={toggleSidebar} className={`${isOpenSideContent ? "right-76" : "right-0"} z-50 absolute top-29 bg-white rounded rounded-full size-8 shadow border-none`}>
                     {isOpenSideContent

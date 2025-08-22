@@ -17,10 +17,11 @@ import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
 import isEmpty from 'lodash/isEmpty';
 import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon, Plus } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import LoadingScreen from "../ui/loadingScreen";
 
 const ChartSelectItem = ({ value, label, chartImageUrl }) => {
     return (
@@ -65,6 +66,7 @@ const ChartItemDisabled = ({ label, chartImageUrl }) => {
 export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfChart, listOfChart }) => {
     const { setIsFetchDataSetLists, isFetchDataSetLists, chartListType, setChartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
     const t = useTranslations("dashboardpage");
+    const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm({
         defaultValues: {
@@ -74,6 +76,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
     useEffect(() => {
         const fetchChartType = async () => {
+            setIsLoading(true);
             try {
                 const res = await services.chart.getChart()
                 if (res?.success) {
@@ -109,8 +112,10 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                     });
 
                     setChartListType(modifiedList)
+                    setIsLoading(false);
                 }
             } catch (e) {
+                setIsLoading(false);
                 console.error(e)
             }
         }
@@ -207,6 +212,9 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
     return (
         <>
+            {isLoading && (
+                <LoadingScreen />
+            )}
             <Dialog>
                 <DialogTrigger asChild>
                     <div className={`cursor-pointer flex h-full min-h-48 items-center justify-center rounded-lg border border-dashed bg-card shadow-sm ${className}`}>

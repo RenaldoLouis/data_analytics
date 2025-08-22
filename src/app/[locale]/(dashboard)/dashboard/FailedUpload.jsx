@@ -4,9 +4,11 @@ import warning from "@/assets/logo/warning.svg"
 import { Button } from "@/components/ui/button"
 import { DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { H3 } from "@/components/ui/typography"
+import { useTranslations } from "next-intl"
 import Image from "next/image"
 
 const FailedUpload = (props) => {
+    const t = useTranslations("datasetpage");
     const { setUploadDone, errorMessage } = props
 
     return (
@@ -16,7 +18,7 @@ const FailedUpload = (props) => {
                 <DialogTitle className="">
                     <div className="px-6">
                         <H3>
-                            Upload Failed!
+                            {t("uploadFailed")}
                         </H3>
                     </div>
                 </DialogTitle>

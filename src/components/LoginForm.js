@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import LoadingScreen from "./ui/loadingScreen";
 
 // Schema
 const loginSchema = (t) => z.object({
@@ -56,6 +57,7 @@ export default function LoginForm() {
         name: 'English',
         flag: '/images/img_gb.svg'
     });
+    const [isLoading, setIsLoading] = useState(false)
 
 
     // Function to get current language from URL
@@ -128,6 +130,7 @@ export default function LoginForm() {
     };
 
     const onSubmit = async (data) => {
+        setIsLoading(true)
         try {
             const res = await fetch("/next-api/login", {
                 method: "POST",
@@ -137,11 +140,9 @@ export default function LoginForm() {
             });
 
             if (res.status === 200) {
-                toast("Login success", {
-                    description: moment().format("dddd, MMMM DD, YYYY [at] h:mm A"),
-                });
-
-                console.log("move")
+                // toast("Login success", {
+                //     description: moment().format("dddd, MMMM DD, YYYY [at] h:mm A"),
+                // });
                 router.replace("/dashboard");
             } else {
                 form.setError("root", {
@@ -149,6 +150,7 @@ export default function LoginForm() {
                 });
             }
         } catch (err) {
+            setIsLoading(false)
             form.setError("root", {
                 message: err.message || "Unexpected error occurred.",
             });
@@ -171,6 +173,9 @@ export default function LoginForm() {
 
     return (
         <div className="w-full max-w-md">
+            {isLoading && (
+                <LoadingScreen />
+            )}
             <h2 className="text-2xl font-bold text-center">Login</h2>
             <p className="text-sm text-gray-500 text-center mt-1 mb-6">
                 {t("subtitle")}

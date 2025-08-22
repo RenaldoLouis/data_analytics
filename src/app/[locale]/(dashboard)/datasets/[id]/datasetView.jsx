@@ -10,6 +10,7 @@ import { useDatasetTable } from "@/hooks/useDatasetTable"
 import { useEffect, useState } from "react"
 import DatasetsChartView from "./datasetsChartView"
 import { useTranslations } from "next-intl"
+import LoadingScreen from "@/components/ui/loadingScreen"
 
 export default function DataSetView(props) {
     const { datasetId } = props
@@ -43,6 +44,9 @@ export default function DataSetView(props) {
 
     return (
         <>
+            {loading && (
+                <LoadingScreen />
+            )}
             <div className="flex justify-between px-4 lg:px-6">
                 <div className="flex items-center">
                     <H3 className="text-xl font-bold">{t("chart")}</H3>

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { EditableSidebarItem } from "./editableTextSidebar";
 import { Skeleton } from "./ui/skeleton";
 import { useTranslations } from "next-intl";
+import LoadingScreen from "./ui/loadingScreen";
 
 const predefinedColors = [
   "#FF6B6B",
@@ -39,6 +40,8 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
 
   const [isLoadingListDataset, setIsLoadingListDataSet] = useState();
   const [editingItemId, setEditingItemId] = useState(null);
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const currentDataset = useMemo(() => {
     return dataSetsList.find(item => item.id === selectedNav) || {};
@@ -89,6 +92,7 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
 
   const handleDeleteDataset = async (e, datasetId) => {
     e.stopPropagation();
+    setIsLoading(true);
     const res = await services.dataset.deleteDataset(datasetId);
 
     try {
@@ -97,11 +101,13 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
         setIsFetchDataSetLists(!isFetchDataSetLists)
       }
     } catch (e) {
+      setIsLoading(false);
       toast(t("datasetDeletedFailed"), {
         description: e.message,
       });
       throw new Error("Delete failed with status " + res.status);
     }
+    setIsLoading(false);
   };
 
   const handleEditClick = (e, itemId) => {
@@ -110,11 +116,14 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
   };
 
   const handleSaveName = async (itemId, newName) => {
+    setIsLoading(true);
     if (newName.trim() === currentDataset.name.trim()) {
+      setIsLoading(false);
       // toast("No change detected after trimming whitespace. Not saving.");
       return; // Exit the function if the names are the same after trimming
     }
     if (newName.trim() === "") {
+      setIsLoading(false);
       toast(t("emptyDatasetNameValidation"));
       return;
     }
@@ -130,6 +139,7 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
       toast(t("datasetUpdated"));
     } else {
       toast(t("datasetUpdatedFailed"));
+      setIsLoading(false);
       return;
     }
 
@@ -143,6 +153,7 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
 
     setIsFetchDataSetLists(!isFetchDataSetLists)
     setIsFetchDataSetContents(!isFetchDataSetContents)
+    setIsLoading(false);
   };
 
   const handleCancelEdit = () => {
@@ -151,6 +162,9 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+      {isLoading && (
+        <LoadingScreen />
+      )}
       <SidebarGroupLabel>
         <div className="flex justify-between w-100">
           {t("datasets").toUpperCase()}
