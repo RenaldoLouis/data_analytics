@@ -103,6 +103,8 @@
         "draft": "Draft",
         "readyForVisualization": "Ready for Visualization",
         "datasetDeleted": "Data set deleted successfully",
-        "datasetDeletedFailed": "Fail to delete data set"
+        "datasetDeletedFailed": "Fail to delete data set",
+        "columns": "Columns",
+        "rows": "Rows"
     }
 }

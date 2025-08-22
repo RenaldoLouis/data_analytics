@@ -13,9 +13,11 @@ import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieC
 import { useEffect, useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
 import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComponent } from "./ChartComponent";
+import { useTranslations } from "next-intl";
 
 
 const DatasetsChartView = ({ chartData, datasetId }) => {
+    const t = useTranslations("datasetpage");
     const { chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
 
     const [isLoadingChart, setIsLoadingChart] = useState(false);
@@ -242,7 +244,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 {/* Columns */}
                 <div className="flex items-center bg-gray-50 px-4 py-3 gap-3">
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
-                        <span className="text-blue-600">Columns</span>
+                        <span className="text-blue-600">{t("columns")}</span>
                     </div>
                     <div
                         ref={dropColumn}
@@ -271,7 +273,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 {/* Rows (with horizontal scroll) */}
                 <div className="flex items-center px-4 py-3 gap-3">
                     <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
-                        <span className="text-blue-600">Rows</span>
+                        <span className="text-blue-600">{t("rows")}</span>
                     </div>
                     <div
                         ref={dropRow}

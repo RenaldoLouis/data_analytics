@@ -103,6 +103,8 @@
         "draft": "Draft",
         "readyForVisualization": "Siap untuk Visualisasi",
         "datasetDeleted": "Dataset berhasil dihapus",
-        "datasetDeletedFailed": "Dataset gagal dihapus"
+        "datasetDeletedFailed": "Dataset gagal dihapus",
+        "columns": "Kolom",
+        "rows": "Baris"
     }
 }
