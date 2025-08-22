@@ -155,7 +155,7 @@ export default function DatasetRightContent() {
     }, [currentDataset])
 
     const handleNameSave = async (newName) => {
-        if (newName.trim() === currentDataset.sheet_name.trim()) {
+        if (newName.trim() === currentDataset.name.trim()) {
             toast("No change detected after trimming whitespace. Not saving.");
             return; // Exit the function if the names are the same after trimming
         }
@@ -165,8 +165,7 @@ export default function DatasetRightContent() {
         }
 
         const tempData = {
-            "name": currentDataset.name,
-            "sheet_name": newName,
+            "name": newName,
             "status": currentDataset.status
         }
 
@@ -288,7 +287,7 @@ export default function DatasetRightContent() {
                             </Button>
                         </div> */}
                             <EditableText
-                                initialName={currentDataset?.sheet_name}
+                                initialName={currentDataset?.name}
                                 onSave={handleNameSave}
                             />
                             <div className="flex items-center gap-2 my-3">
