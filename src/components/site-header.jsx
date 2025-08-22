@@ -38,9 +38,9 @@ export function SiteHeader() {
         </div>
 
         <div className="flex w-full items-center justify-end">
-          <IconSettings className="size-6 mr-6" />
-          <IconBell className="size-6" />
-          {!isMobile && (<Separator orientation="vertical" className="mx-5 data-[orientation=vertical]:h-8" />)}
+          {/* <IconSettings className="size-6 mr-6" />
+          <IconBell className="size-6" /> */}
+          {/* {!isMobile && (<Separator orientation="vertical" className="mx-5 data-[orientation=vertical]:h-8" />)} */}
           <NavUser user={userInfo} />
         </div>
       </div>
