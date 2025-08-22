@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useDrag } from "react-dnd";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 const testGetterObj = {
     firstName: "bob",
@@ -47,6 +48,7 @@ const DraggableItem = ({ item, type }) => {
 
 export default function DatasetRightContent() {
     const pathname = usePathname();
+    const t = useTranslations("datasetpage");
     const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, chartListType, isFetchDataSetLists, setIsFetchDataSetLists, setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
 
     const [isShowsideContent, setIsShowsideContent] = useState(false);
@@ -296,7 +298,7 @@ export default function DatasetRightContent() {
                                     htmlFor="show-dashboard"
                                     className="text-sm font-medium text-gray-800"
                                 >
-                                    Show to Dashboard
+                                    {t("showToDashboard")}
                                 </Label>
                             </div>
                         </CardHeader>
@@ -305,7 +307,7 @@ export default function DatasetRightContent() {
                         <CardContent className="pb-2">
                             <div className="mb-5">
                                 <p className="text-sm font-semibold text-gray-500 mb-3">
-                                    Dimensions
+                                    {t("category")}
                                 </p>
                                 {loading ? (
                                     <div className="flex flex-col space-y-3">
@@ -329,7 +331,7 @@ export default function DatasetRightContent() {
 
                             <div>
                                 <p className="text-sm font-semibold text-gray-500 mb-3">
-                                    Measures
+                                    {t("numeric")}
                                 </p>
                                 {loading ? (
                                     <div className="flex flex-col space-y-3">
@@ -354,25 +356,25 @@ export default function DatasetRightContent() {
                         {/* Footer: Details & Actions */}
                         <CardFooter className="flex flex-col items-start gap-4 border-t pt-4 text-sm text-gray-600">
                             <div className="space-y-1 w-full">
-                                <p className="mb-4" style={{ fontWeight: 700, fontSize: 12 }}>DATA SET DETAILS</p>
+                                <p className="mb-4" style={{ fontWeight: 700, fontSize: 12 }}>{t("datasetDetail")}</p>
                                 <p className="mb-3">
-                                    <span className="font-medium">Data Source: </span>
+                                    <span className="font-medium">{t("dataSource")}: </span>
                                     {currentDataset?.sheet_name}
                                 </p>
                                 <p className="mb-3">
-                                    <span className="font-medium">Created on: </span>
+                                    <span className="font-medium">{t("createdOn")}: </span>
                                     {moment(currentDataset?.created_at).format("DD/MM/YYYY")}
                                 </p>
                                 <p className="mb-3">
-                                    <span className="font-medium">Last edited on: </span>
+                                    <span className="font-medium">{t("lastEditedOn")}: </span>
                                     {moment(currentDataset?.updated_at).format("DD/MM/YYYY")}
                                 </p>
                                 <p className="mb-3">
-                                    <span className="font-medium">Last edited by: </span>
+                                    <span className="font-medium">{t("lastEditedBy")}: </span>
                                     {currentDataset?.updated_by}
                                 </p>
                                 <p className="mb-3">
-                                    <span className="font-medium">Data status:</span>{" "}
+                                    <span className="font-medium">{t("dataStatus")}:</span>{" "}
                                     <span className="text-green-600">{dataStatus}</span>
                                 </p>
                                 {/* <p className="mb-3">
@@ -386,13 +388,13 @@ export default function DatasetRightContent() {
                             <div className="flex flex-col gap-2 w-full">
                                 <Button onClick={handleUpdateData} variant="default" className="flex-1 cursor-pointer">
                                     {/* <Image src={syncIcon} alt="Measure icon" className="w-5 h-5 color-blue-100" />    */}
-                                    Save Dataset Changes
+                                    {t("saveDatasetChanges")}
                                 </Button>
                                 <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="outline" className="flex-1 cursor-pointer">
-                                    Save Chart Changes
+                                    {t("saveChartChanges")}
                                 </Button>
                                 <Button onClick={updateDataSetReadyVisualization} variant="secondary" className="flex-1 cursor-pointer">
-                                    Proceed to Visualization
+                                    {t("proceedToVisualization")}
                                 </Button>
                                 {/* <Button onClick={handleDeleteDataset} variant="destructive" className="flex-1 cursor-pointer">
                                 Delete Data Set

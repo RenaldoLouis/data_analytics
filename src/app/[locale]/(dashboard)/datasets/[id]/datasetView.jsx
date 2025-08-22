@@ -9,10 +9,12 @@ import { useDashboardContext } from "@/context/dashboard-context"
 import { useDatasetTable } from "@/hooks/useDatasetTable"
 import { useEffect, useState } from "react"
 import DatasetsChartView from "./datasetsChartView"
+import { useTranslations } from "next-intl"
 
 export default function DataSetView(props) {
     const { datasetId } = props
 
+    const t = useTranslations("datasetpage");
     const { setIsFetchDataSetLists, isFetchDataSetLists, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
     const [currentView, setCurrentView] = useState(DatasetViewConst.chart);
     // const [dataToUpdate, setDataToUpdate] = useState([]);
@@ -43,7 +45,7 @@ export default function DataSetView(props) {
         <>
             <div className="flex justify-between px-4 lg:px-6">
                 <div className="flex items-center">
-                    <H3 className="text-xl font-bold">Charts</H3>
+                    <H3 className="text-xl font-bold">{t("chart")}</H3>
                 </div>
                 {/* <Button onClick={handleUpdateData}>
                     Update Data
@@ -56,8 +58,8 @@ export default function DataSetView(props) {
                     className="w-[400px] items-end"
                 >
                     <TabsList>
-                        <TabsTrigger className="cursor-pointer" value="chart">Chart</TabsTrigger>
-                        <TabsTrigger className="cursor-pointer" value="datasets">Datasets</TabsTrigger>
+                        <TabsTrigger className="cursor-pointer" value="chart">{t("chart")}</TabsTrigger>
+                        <TabsTrigger className="cursor-pointer" value="datasets">{t("datasets")}</TabsTrigger>
                     </TabsList>
                 </Tabs>
             </div>

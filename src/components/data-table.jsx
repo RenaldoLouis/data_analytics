@@ -57,6 +57,7 @@ import {
   Tabs,
   TabsContent
 } from "@/components/ui/tabs";
+import { useTranslations } from "next-intl";
 
 export const schema = z.object({
   id: z.number(),
@@ -102,6 +103,7 @@ export function DataTable({
   pagination,
   setPagination
 }) {
+  const t = useTranslations("datasetpage");
   const excludeKeys = ["transaction_id", "customer_id", "id"];
 
   const [data, setData] = React.useState(() => initialData)
@@ -262,13 +264,13 @@ export function DataTable({
         </div>
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
+            {table.getFilteredSelectedRowModel().rows.length} {t("of")} {" "}
+            {table.getFilteredRowModel().rows.length} {t("rowsSelected")}.
           </div>
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
               <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                Rows per page
+                {t("rowsPerPage")}
               </Label>
               <Select
                 value={`${table.getState().pagination.pageSize}`}
@@ -288,7 +290,7 @@ export function DataTable({
               </Select>
             </div>
             <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
+              {t("page")} {table.getState().pagination.pageIndex + 1} {t("of")} {" "}
               {table.getPageCount()}
             </div>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">

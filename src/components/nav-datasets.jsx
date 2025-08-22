@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EditableSidebarItem } from "./editableTextSidebar";
 import { Skeleton } from "./ui/skeleton";
+import { useTranslations } from "next-intl";
 
 const predefinedColors = [
   "#FF6B6B",
@@ -33,6 +34,7 @@ const predefinedColors = [
 export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
+  const t = useTranslations("datasetpage");
   const { setIsFetchDataSetContents, isFetchDataSetContents, setIsDialogOpenAddNewDataSet, isFetchDataSetLists, setIsFetchDataSetLists, setDataSetsList, setChartDrawData, setSelectedChartType, setSelectedColumn, setSelectedRow } = useDashboardContext();
 
   const [isLoadingListDataset, setIsLoadingListDataSet] = useState();
@@ -149,7 +151,7 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>
         <div className="flex justify-between w-100">
-          Data Sets
+          {t("datasets").toUpperCase()}
           <IconPlus className="w-4 h-4 cursor-pointer" onClick={handleOpenAddDataset} />
         </div>
       </SidebarGroupLabel>

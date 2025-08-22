@@ -54,7 +54,9 @@
         "noAvailableChart": "Tidak ada Chart tersedia"
     },
     "datasetpage": {
+        "datasets": "Datasets",
         "newDataset": "Dataset Baru",
+        "chart": "Chart",
         "datasetName": "Nama Dataset",
         "datasetNamePlaceholder": "Contoh: Penjualan Maret 2024",
         "upload": "Unggah",
@@ -75,6 +77,22 @@
         "back": "Kembali",
         "close": "Tutup",
         "datasetUploadedTitle": "Unggah Berhasil",
-        "dataUploadedSubtitle": "Selesai! Data berhasil diunggah."
+        "dataUploadedSubtitle": "Selesai! Data berhasil diunggah.",
+        "rowsSelected": "baris terpilih",
+        "of": "dari",
+        "rowsPerPage": "Baris per halaman",
+        "page": "Halaman",
+        "category": "Kategori",
+        "numeric": "Numerik",
+        "datasetDetail": "Detail Dataset",
+        "dataSource": "Data Source",
+        "createdOn": "Dibuat pada",
+        "lastEditedOn": "Diedit pada",
+        "lastEditedBy": "Diedit oleh",
+        "dataStatus": "Data status",
+        "saveDatasetChanges": "Simpan Perubahan Dataset",
+        "saveChartChanges": "Simpan Perubahan Chart",
+        "proceedToVisualization": "Mulai Visualisasi Data",
+        "showToDashboard": "Tampilkan ke Dashboard"
     }
 }

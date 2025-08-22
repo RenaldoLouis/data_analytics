@@ -54,8 +54,10 @@
         "noAvailableChart": "No Available Chart"
     },
     "datasetpage": {
+        "datasets": "Data Sets",
         "newDataset": "New Data Set",
-        "datasetName": "Nama Dataset",
+        "chart": "Chart",
+        "datasetName": "Dataset Name",
         "datasetNamePlaceholder": "Ex: March Sales 2024",
         "upload": "Upload",
         "file": "File",
@@ -75,6 +77,22 @@
         "back": "Back",
         "close": "Close",
         "datasetUploadedTitle": "Successfully Uploaded",
-        "dataUploadedSubtitle": "All done! Your data is uploaded."
+        "dataUploadedSubtitle": "All done! Your data is uploaded.",
+        "rowsSelected": "row(s) selected",
+        "of": "of",
+        "rowsPerPage": "Rows per page",
+        "page": "Page",
+        "category": "Category",
+        "numeric": "Numeric",
+        "datasetDetail": "Data Set Details",
+        "dataSource": "Data Source",
+        "createdOn": "Created on",
+        "lastEditedOn": "Edited on",
+        "lastEditedBy": "Edited by",
+        "dataStatus": "Data status",
+        "saveDatasetChanges": "Save Dataset Changes",
+        "saveChartChanges": "Save Chart Changes",
+        "proceedToVisualization": "Proceed to Visualization",
+        "showToDashboard": "Show to Dashboard"
     }
 }
