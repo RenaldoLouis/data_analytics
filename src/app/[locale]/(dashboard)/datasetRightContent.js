@@ -77,7 +77,7 @@ export default function DatasetRightContent() {
 
     // To draw the chart if the user has ever saved the chart
     useEffect(() => {
-        if (currentDataFromDataSetList && chartListType.length > 0) {
+        if (currentDataFromDataSetList && currentDataFromDataSetList.chart_record_id && chartListType.length > 0) {
             const getChartRecords = async () => {
                 try {
                     const res = await services.chart.getChartRecords(currentDataFromDataSetList?.chart_record_id)
