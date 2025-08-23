@@ -276,7 +276,7 @@ export default function DatasetRightContent() {
     }
 
     return (
-        <AnimatePresence>
+        <>
             {isLoading && (
                 <LoadingScreen />
             )}
@@ -288,19 +288,19 @@ export default function DatasetRightContent() {
                     }
                 </Button>
             )}
-            {isOpenSideContent && (
-                <div className={`${isOpenSideContent ? "w-80" : "w-0"} shrink-0 transition-all duration-300 relative`}>
-
-                    <motion.div
-                        initial={{ opacity: 0, x: 50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 50 }}
-                        transition={{ duration: 0.3 }}
-                        className="py-4 pt-5 w-full max-w-sm h-full bg-white border-l"
-                    >
-                        {/* Header */}
-                        <CardHeader className="pb-2">
-                            {/* <div className="flex justify-between items-start">
+            <AnimatePresence>
+                {isOpenSideContent && (
+                    <div className={`${isOpenSideContent ? "w-80" : "w-0"} shrink-0 transition-all duration-300 relative`}>
+                        <motion.div
+                            initial={{ opacity: 0, x: 50 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 50 }}
+                            transition={{ duration: 0.3 }}
+                            className="py-4 pt-5 w-full max-w-sm h-full bg-white border-l"
+                        >
+                            {/* Header */}
+                            <CardHeader className="pb-2">
+                                {/* <div className="flex justify-between items-start">
                             <H3 className="text-lg font-bold leading-snug">
                                 {currentDataset?.sheet_name}
                             </H3>
@@ -308,123 +308,124 @@ export default function DatasetRightContent() {
                                 <Pencil className="w-4 h-4 text-muted-foreground" />
                             </Button>
                         </div> */}
-                            <EditableText
-                                initialName={currentDataset?.name}
-                                onSave={handleNameSave}
-                            />
-                            <div className="flex items-center gap-2 my-3">
-                                <Switch disabled={true} id="show-dashboard" checked={currentDataset?.status === 0 ? false : true} />
-                                <Label
-                                    htmlFor="show-dashboard"
-                                    className="text-sm font-medium text-gray-800"
-                                >
-                                    {t("showToDashboard")}
-                                </Label>
-                            </div>
-                        </CardHeader>
+                                <EditableText
+                                    initialName={currentDataset?.name}
+                                    onSave={handleNameSave}
+                                />
+                                <div className="flex items-center gap-2 my-3">
+                                    <Switch disabled={true} id="show-dashboard" checked={currentDataset?.status === 0 ? false : true} />
+                                    <Label
+                                        htmlFor="show-dashboard"
+                                        className="text-sm font-medium text-gray-800"
+                                    >
+                                        {t("showToDashboard")}
+                                    </Label>
+                                </div>
+                            </CardHeader>
 
-                        {/* Dimensions and Measures */}
-                        <CardContent className="pb-2">
-                            <div className="mb-5">
-                                <p className="text-sm font-semibold text-gray-500 mb-3">
-                                    {t("category")}
-                                </p>
-                                {loading ? (
-                                    <div className="flex flex-col space-y-3">
-                                        <div className="space-y-2">
-                                            <Skeleton className="h-4 w-[120px]" />
-                                            <Skeleton className="h-4 w-[120px]" />
-                                            <Skeleton className="h-4 w-[120px]" />
+                            {/* Dimensions and Measures */}
+                            <CardContent className="pb-2">
+                                <div className="mb-5">
+                                    <p className="text-sm font-semibold text-gray-500 mb-3">
+                                        {t("category")}
+                                    </p>
+                                    {loading ? (
+                                        <div className="flex flex-col space-y-3">
+                                            <div className="space-y-2">
+                                                <Skeleton className="h-4 w-[120px]" />
+                                                <Skeleton className="h-4 w-[120px]" />
+                                                <Skeleton className="h-4 w-[120px]" />
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    //  <ScrollArea className="h-auto max-h-28 rounded-md p-2">
-                                    < ul id="dimensionList" className="space-y-2">
-                                        {availableDimensions.map((dim) => (
-                                            <DraggableItem key={dim.name} item={dim} type={ItemTypes.DIMENSION} />
-                                        ))}
-                                    </ul>
-                                    // </ScrollArea> 
-                                )}
+                                    ) : (
+                                        //  <ScrollArea className="h-auto max-h-28 rounded-md p-2">
+                                        < ul id="dimensionList" className="space-y-2">
+                                            {availableDimensions.map((dim, index) => (
+                                                <DraggableItem key={index} item={dim} type={ItemTypes.DIMENSION} />
+                                            ))}
+                                        </ul>
+                                        // </ScrollArea> 
+                                    )}
 
-                            </div>
+                                </div>
 
-                            <div>
-                                <p className="text-sm font-semibold text-gray-500 mb-3">
-                                    {t("numeric")}
-                                </p>
-                                {loading ? (
-                                    <div className="flex flex-col space-y-3">
-                                        <div className="space-y-2">
-                                            <Skeleton className="h-4 w-[120px]" />
-                                            <Skeleton className="h-4 w-[120px]" />
-                                            <Skeleton className="h-4 w-[120px]" />
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-500 mb-3">
+                                        {t("numeric")}
+                                    </p>
+                                    {loading ? (
+                                        <div className="flex flex-col space-y-3">
+                                            <div className="space-y-2">
+                                                <Skeleton className="h-4 w-[120px]" />
+                                                <Skeleton className="h-4 w-[120px]" />
+                                                <Skeleton className="h-4 w-[120px]" />
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    // <ScrollArea className="h-auto max-h-28 rounded-md p-2"> 
-                                    < ul id="measuresList" className="space-y-2">
-                                        {availableMeasures.map((m) => (
-                                            <DraggableItem key={m.name} item={m} type={ItemTypes.MEASURE} />
-                                        ))}
-                                    </ul>
-                                    // </ScrollArea> 
-                                )}
-                            </div>
-                        </CardContent>
+                                    ) : (
+                                        // <ScrollArea className="h-auto max-h-28 rounded-md p-2"> 
+                                        < ul id="measuresList" className="space-y-2">
+                                            {availableMeasures.map((m, index) => (
+                                                <DraggableItem key={index} item={m} type={ItemTypes.MEASURE} />
+                                            ))}
+                                        </ul>
+                                        // </ScrollArea> 
+                                    )}
+                                </div>
+                            </CardContent>
 
-                        {/* Footer: Details & Actions */}
-                        <CardFooter className="flex flex-col items-start gap-4 border-t pt-4 text-sm text-gray-600">
-                            <div className="space-y-1 w-full">
-                                <p className="mb-4" style={{ fontWeight: 700, fontSize: 12 }}>{t("datasetDetail")}</p>
-                                <p className="mb-3">
-                                    <span className="font-medium">{t("dataSource")}: </span>
-                                    {currentDataset?.sheet_name}
-                                </p>
-                                <p className="mb-3">
-                                    <span className="font-medium">{t("createdOn")}: </span>
-                                    {moment(currentDataset?.created_at).format("DD/MM/YYYY")}
-                                </p>
-                                <p className="mb-3">
-                                    <span className="font-medium">{t("lastEditedOn")}: </span>
-                                    {moment(currentDataset?.updated_at).format("DD/MM/YYYY")}
-                                </p>
-                                <p className="mb-3">
-                                    <span className="font-medium">{t("lastEditedBy")}: </span>
-                                    {currentDataset?.updated_by}
-                                </p>
-                                <p className="mb-3">
-                                    <span className="font-medium">{t("dataStatus")}:</span>{" "}
-                                    <span className="text-green-600">{dataStatus}</span>
-                                </p>
-                                {/* <p className="mb-3">
+                            {/* Footer: Details & Actions */}
+                            <CardFooter className="flex flex-col items-start gap-4 border-t pt-4 text-sm text-gray-600">
+                                <div className="space-y-1 w-full">
+                                    <p className="mb-4" style={{ fontWeight: 700, fontSize: 12 }}>{t("datasetDetail")}</p>
+                                    <p className="mb-3">
+                                        <span className="font-medium">{t("dataSource")}: </span>
+                                        {currentDataset?.sheet_name}
+                                    </p>
+                                    <p className="mb-3">
+                                        <span className="font-medium">{t("createdOn")}: </span>
+                                        {moment(currentDataset?.created_at).format("DD/MM/YYYY")}
+                                    </p>
+                                    <p className="mb-3">
+                                        <span className="font-medium">{t("lastEditedOn")}: </span>
+                                        {moment(currentDataset?.updated_at).format("DD/MM/YYYY")}
+                                    </p>
+                                    <p className="mb-3">
+                                        <span className="font-medium">{t("lastEditedBy")}: </span>
+                                        {currentDataset?.updated_by}
+                                    </p>
+                                    <p className="mb-3">
+                                        <span className="font-medium">{t("dataStatus")}:</span>{" "}
+                                        <span className="text-green-600">{dataStatus}</span>
+                                    </p>
+                                    {/* <p className="mb-3">
                                 <span className="font-medium">Quality Score:</span>{" "}
                                 <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                                     100%
                                 </span>
                             </p> */}
-                            </div>
+                                </div>
 
-                            <div className="flex flex-col gap-2 w-full">
-                                <Button onClick={handleUpdateData} variant="default" className="flex-1 cursor-pointer">
-                                    {/* <Image src={syncIcon} alt="Measure icon" className="w-5 h-5 color-blue-100" />    */}
-                                    {t("saveDatasetChanges")}
-                                </Button>
-                                <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="outline" className="flex-1 cursor-pointer">
-                                    {t("saveChartChanges")}
-                                </Button>
-                                <Button onClick={updateDataSetReadyVisualization} variant="secondary" className="flex-1 cursor-pointer">
-                                    {t("proceedToVisualization")}
-                                </Button>
-                                {/* <Button onClick={handleDeleteDataset} variant="destructive" className="flex-1 cursor-pointer">
+                                <div className="flex flex-col gap-2 w-full">
+                                    <Button onClick={handleUpdateData} variant="default" className="flex-1 cursor-pointer">
+                                        {/* <Image src={syncIcon} alt="Measure icon" className="w-5 h-5 color-blue-100" />    */}
+                                        {t("saveDatasetChanges")}
+                                    </Button>
+                                    <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="outline" className="flex-1 cursor-pointer">
+                                        {t("saveChartChanges")}
+                                    </Button>
+                                    <Button onClick={updateDataSetReadyVisualization} variant="secondary" className="flex-1 cursor-pointer">
+                                        {t("proceedToVisualization")}
+                                    </Button>
+                                    {/* <Button onClick={handleDeleteDataset} variant="destructive" className="flex-1 cursor-pointer">
                                 Delete Data Set
                             </Button> */}
-                            </div>
-                        </CardFooter>
-                    </motion.div>
-                </div>
-            )
-            }
-        </AnimatePresence >
+                                </div>
+                            </CardFooter>
+                        </motion.div>
+                    </div>
+                )
+                }
+            </AnimatePresence >
+        </>
     );
 }
