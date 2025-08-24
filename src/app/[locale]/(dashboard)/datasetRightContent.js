@@ -1,10 +1,10 @@
 "use client";
 
-import syncIcon from "@/assets/logo/syncIcon.svg";
 import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import LoadingScreen from "@/components/ui/loadingScreen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { ItemTypes } from "@/constant/DragTypes";
@@ -12,15 +12,13 @@ import { useDashboardContext } from "@/context/dashboard-context";
 import { useDatasetRightContent } from "@/hooks/useDatasetRightContent";
 import services from "@/services";
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import moment from "moment";
-import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useDrag } from "react-dnd";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useTranslations } from "next-intl";
-import LoadingScreen from "@/components/ui/loadingScreen";
 
 const testGetterObj = {
     firstName: "bob",
@@ -83,7 +81,7 @@ export default function DatasetRightContent() {
                     const res = await services.chart.getChartRecords(currentDataFromDataSetList?.chart_record_id)
 
                     // TODO return of error from BE when no chart exist must be fixed
-                    if (res.message[0].code === "invalid_string") {
+                    if (res?.message[0]?.code === "invalid_string") {
                         setChartDrawData([])
                         setSelectedChartType(null)
                         setSelectedColumn([])
@@ -341,7 +339,7 @@ export default function DatasetRightContent() {
                                         //  <ScrollArea className="h-auto max-h-28 rounded-md p-2">
                                         < ul id="dimensionList" className="space-y-2">
                                             {availableDimensions.map((dim, index) => (
-                                                <DraggableItem key={index} item={dim} type={ItemTypes.DIMENSION} />
+                                                <DraggableItem key={`dimension ${dim.name} ${index}`} item={dim} type={ItemTypes.DIMENSION} />
                                             ))}
                                         </ul>
                                         // </ScrollArea> 
@@ -365,7 +363,7 @@ export default function DatasetRightContent() {
                                         // <ScrollArea className="h-auto max-h-28 rounded-md p-2"> 
                                         < ul id="measuresList" className="space-y-2">
                                             {availableMeasures.map((m, index) => (
-                                                <DraggableItem key={index} item={m} type={ItemTypes.MEASURE} />
+                                                <DraggableItem key={`measure ${m.name} ${index}`} item={m} type={ItemTypes.MEASURE} />
                                             ))}
                                         </ul>
                                         // </ScrollArea> 
