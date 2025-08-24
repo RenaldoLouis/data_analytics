@@ -10,17 +10,17 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
 import isEmpty from 'lodash/isEmpty';
 import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { useTranslations } from "next-intl";
 import LoadingScreen from "../ui/loadingScreen";
 
 const ChartSelectItem = ({ value, label, chartImageUrl }) => {
@@ -124,9 +124,23 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
     }, [])
 
     const availableChartsData = useMemo(() => {
-        // 1. Filter the datasets to only include those that have been saved as a chart.
-        //    We can check if `chart_content` is not null.
-        const createdCharts = dataSetsList.filter(dataset => dataset.chart_content != null && !isEmpty(dataset.chart_content) && dataset.dashboard_records.length <= 0);
+        // 1. Get the IDs of all charts that are currently displayed in the layout.
+        // We filter out the null/empty slots to get a clean list of active chart IDs.
+        const idsOnCurrentDashboard = listOfChart
+            .filter(chart => chart !== null)
+            .map(chart => chart.id); // Assumes chart.id is the unique chart_record_id
+
+        // 2. Filter the master dataset list to find charts that are "available".
+        const createdCharts = dataSetsList.filter(dataset => {
+            // Condition 1: The dataset must have been configured as a chart.
+            const hasChartContent = dataset.chart_content != null && !isEmpty(dataset.chart_content);
+
+            // Condition 2: The chart must NOT already be on the current dashboard.
+            // This is the "reverse" logic you were looking for.
+            const isNotOnThisDashboard = !idsOnCurrentDashboard.includes(dataset.dashboard_records?.[0]?.id);
+
+            return hasChartContent && isNotOnThisDashboard;
+        });
 
         // 2. Map over the filtered list to create the new structure.
         const availableCharts = createdCharts.map(chart => {
@@ -183,9 +197,26 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
     const addedCharts = useMemo(() => {
         // 1. Filter the datasets to find items that have been added to a dashboard.
-        const chartsOnDashboard = dataSetsList.filter(dataset =>
-            dataset.dashboard_records && dataset.dashboard_records.length > 0
-        );
+        const targetId = listOfChart?.[0]?.id;
+
+        const chartsOnDashboard = dataSetsList.filter(dataset => {
+            // Condition 1: The dataset must have dashboard records.
+            const hasRecords = dataset.dashboard_records && dataset.dashboard_records.length > 0;
+
+            // If it doesn't have records, it can't be an "added" chart.
+            if (!hasRecords) {
+                return false;
+            }
+
+            // Condition 2: Check if any record in `dashboard_records` has an ID
+            // that matches the target ID from the first chart slot.
+            const hasMatchingRecord = dataset.dashboard_records.some(
+                record => record.id === targetId
+            );
+
+            // The dataset will only be included if both conditions are met.
+            return hasMatchingRecord;
+        });
 
         // 2. Map over the filtered list to create the structure for the UI.
         const formattedCharts = chartsOnDashboard.map(chart => {
