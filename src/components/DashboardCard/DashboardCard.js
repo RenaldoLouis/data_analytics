@@ -123,21 +123,44 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
         fetchChartType();
     }, [])
 
+    const onSubmit = async (data) => {
+
+        const selectedDatasetID = availableChartsData.filter((eachData) => eachData.id === data.selectedChartId)
+        try {
+            const numberString = selectedLayout.replace(/\D/g, '');
+            const layoutNumber = parseInt(numberString, 10);
+            const tempObj = {
+                "dashboard_layout": layoutNumber,
+                "order": cardIndex + 1,
+                "dataset_id": selectedDatasetID[0].dataset_id
+            }
+            const res = await services.dashboard.postSaveDashboardRecord(tempObj)
+            if (res.success) {
+                refetch()
+                setIsFetchDataSetLists(!isFetchDataSetLists)
+                toast("Save Success")
+            } else {
+                throw new Error("Save chart to dashboard failed");
+            }
+        } catch (e) {
+            console.error("An error occurred:", e.message);
+            toast.error("Failed to save chart", {
+                description: e.message
+            });
+        }
+
+    };
+
     const availableChartsData = useMemo(() => {
-        // 1. Get the IDs of all charts that are currently displayed in the layout.
-        // We filter out the null/empty slots to get a clean list of active chart IDs.
         const idsOnCurrentDashboard = listOfChart
             .filter(chart => chart !== null)
-            .map(chart => chart.id); // Assumes chart.id is the unique chart_record_id
+            .map(chart => chart.dataset_id);
 
-        // 2. Filter the master dataset list to find charts that are "available".
         const createdCharts = dataSetsList.filter(dataset => {
             // Condition 1: The dataset must have been configured as a chart.
             const hasChartContent = dataset.chart_content != null && !isEmpty(dataset.chart_content);
 
-            // Condition 2: The chart must NOT already be on the current dashboard.
-            // This is the "reverse" logic you were looking for.
-            const isNotOnThisDashboard = !idsOnCurrentDashboard.includes(dataset.dashboard_records?.[0]?.id);
+            const isNotOnThisDashboard = !idsOnCurrentDashboard.includes(dataset.id);
 
             return hasChartContent && isNotOnThisDashboard;
         });
@@ -167,40 +190,12 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
         return availableCharts;
     }, [dataSetsList, listOfChart])
 
-    const onSubmit = async (data) => {
-
-        const selectedDatasetID = availableChartsData.filter((eachData) => eachData.id === data.selectedChartId)
-        try {
-            const numberString = selectedLayout.replace(/\D/g, '');
-            const layoutNumber = parseInt(numberString, 10);
-            const tempObj = {
-                "dashboard_layout": layoutNumber,
-                "order": cardIndex + 1,
-                "dataset_id": selectedDatasetID[0].dataset_id
-            }
-            const res = await services.dashboard.postSaveDashboardRecord(tempObj)
-            if (res.success) {
-                refetch()
-                setIsFetchDataSetLists(!isFetchDataSetLists)
-                toast("Save Success")
-            } else {
-                throw new Error("Save chart to dashboard failed");
-            }
-        } catch (e) {
-            console.error("An error occurred:", e.message);
-            toast.error("Failed to save chart", {
-                description: e.message
-            });
-        }
-
-    };
-
     const addedCharts = useMemo(() => {
-        // 1. Filter the datasets to find items that have been added to a dashboard.
-        const targetId = listOfChart?.[0]?.id;
+        const idsOnCurrentDashboard = listOfChart
+            .filter(chart => chart !== null)
+            .map(chart => chart.dataset_id);
 
         const chartsOnDashboard = dataSetsList.filter(dataset => {
-            // Condition 1: The dataset must have dashboard records.
             const hasRecords = dataset.dashboard_records && dataset.dashboard_records.length > 0;
 
             // If it doesn't have records, it can't be an "added" chart.
@@ -208,14 +203,10 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                 return false;
             }
 
-            // Condition 2: Check if any record in `dashboard_records` has an ID
-            // that matches the target ID from the first chart slot.
-            const hasMatchingRecord = dataset.dashboard_records.some(
-                record => record.id === targetId
-            );
+            const isOnThisDashboard = idsOnCurrentDashboard.includes(dataset.id);
 
             // The dataset will only be included if both conditions are met.
-            return hasMatchingRecord;
+            return isOnThisDashboard;
         });
 
         // 2. Map over the filtered list to create the structure for the UI.
