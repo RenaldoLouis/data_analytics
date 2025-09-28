@@ -3,7 +3,7 @@ import DimensionStringIcon from "@/assets/logo/dimensionStringIcon.svg";
 import MeasureIcon from "@/assets/logo/measureIcon.svg";
 import { ItemTypes } from '@/constant/DragTypes';
 import services from '@/services';
-import Image from 'next/image'; // 1. Impor komponen Image
+import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 
 export function useDatasetRightContent(datasetId) {

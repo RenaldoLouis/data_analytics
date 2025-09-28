@@ -1,5 +1,6 @@
 "use client";
 
+import Checklist from "@/assets/logo/checklist.svg";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -28,12 +29,12 @@ import {
 import { saveAs } from 'file-saver';
 import html2canvas from "html2canvas-pro";
 import jsPDF from 'jspdf';
-import { CheckCircle2, Download } from "lucide-react";
+import { Download } from "lucide-react";
+import { useTranslations } from "next-intl";
+import Image from 'next/image';
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-
 
 export const ModalExportDashboard = (props) => {
     const { layoutRef } = props
@@ -119,9 +120,9 @@ export const ModalExportDashboard = (props) => {
 
         toast(t("downloadSuccess"), {
             unstyled: true,
-            icon: <CheckCircle2 className="text-blue-600" />,
+            icon: <Image src={Checklist} alt="Measure icon" />,
             classNames: {
-                toast: "flex items-center w-full p-3 pl-4 bg-emerald-50 border border-emerald-200 rounded-full gap-2",
+                toast: "flex items-center w-fit max-w-md p-3 pl-4 bg-emerald-50 border border-emerald-200 rounded-lg gap-2",
                 title: "text-emerald-900 font-medium",
             },
         });

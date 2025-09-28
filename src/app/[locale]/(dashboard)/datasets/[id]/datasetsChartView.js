@@ -4,23 +4,30 @@ import {
     ChartContainer
 } from "@/components/ui/chart";
 import { H3 } from "@/components/ui/typography";
+import { ChartAggregator } from "@/constant/ChartTypes";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
 import services from "@/services";
-import { ChartAggregator } from "@/constant/ChartTypes";
 import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
 import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComponent } from "./ChartComponent";
-import { useTranslations } from "next-intl";
 
+import ColumnIcon from "@/assets/logo/ColumnIcon.svg";
+import FormulaIcon from "@/assets/logo/FormulaIcon.svg";
+import RowIcon from "@/assets/logo/RowIcon.svg";
 
 const DatasetsChartView = ({ chartData, datasetId }) => {
+
+
     const t = useTranslations("datasetpage");
     const { chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
 
     const [isLoadingChart, setIsLoadingChart] = useState(false);
+    const [selectedFormula, setSelectedFormula] = useState(ChartAggregator.sum)
 
     const renderSelectedChart = () => {
         const hasData = chartDrawData && chartDrawData.length > 0;
@@ -60,6 +67,10 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 return <p>Select a chart type.</p>;
         }
     };
+
+    const handleClickFormula = (formulaType) => {
+        setSelectedFormula(ChartAggregator[formulaType.toLowerCase()])
+    }
 
     useEffect(() => {
         const fetchChartType = async () => {
@@ -117,6 +128,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                         "dataset_id": datasetId,
                         "selected_row": selectedRow,
                         "selected_column": selectedColumn,
+                        // we need to make chart_aggregator dynamic based on selection
                         "chart_aggregator": ChartAggregator.count
                     }
 
@@ -240,62 +252,115 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     return (
         <div className="w-full px-6 pb-4 overflow-x-auto">
             {/* Column & Row Settings */}
-            <div className="border rounded-md overflow-hidden mb-6 divide-y divide-gray-200">
-                {/* Columns */}
-                <div className="flex items-center bg-gray-50 px-4 py-3 gap-3">
-                    <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
-                        <span className="text-blue-600">{t("columns")}</span>
+            <div className="border rounded-md overflow-hidden mb-4"> {/* overflow-hidden to make sure the edge rounded */}
+                {/* --- FORMULA PART --- */}
+                <div className="grid grid-cols-6 border-b-2 h-[52px]">
+                    <div className="px-6 border-r-2 flex items-center gap-2">
+                        <Image src={FormulaIcon} alt="Column icon" />
+                        <div className="text-sm font-medium text-gray-600">
+                            <span className="text-blue-600">{t("formula")}</span>
+                        </div>
                     </div>
-                    <div
-                        ref={dropColumn}
-                        className={cn(
-                            "flex items-center gap-2 flex-wrap p-2 rounded-md min-h-[40px] min-w-52",
-                            isOverColumn ? "bg-blue-50 border border-blue-400" : "bg-white"
-                        )}
-                    >
-                        {selectedColumn.map((item) => (
+
+                    <div className="col-span-5 pt-1 flex items-center">
+                        <div
+                            className={cn(
+                                "flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 p-2 rounded-md min-h-[40px] min-w-52",
+                                "bg-white"
+                            )}
+                        >
                             <span
-                                key={item.name}
-                                className="inline-flex items-center gap-2 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium"
+                                key={"SUM"}
+                                onClick={() => handleClickFormula("SUM")}
+                                className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#2168AB] text-white px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors hover:bg-[#1a5388]"
                             >
-                                📅 {item.name}
-                                <button
-                                    onClick={() => handleRemoveItem(item, 'column')}
-                                    className="text-blue-500 hover:text-blue-800 cursor-pointer"
-                                >
-                                    &times;
-                                </button>
+                                SUM
                             </span>
-                        ))}
+                            <span
+                                key={"AVERAGE"}
+                                onClick={() => handleClickFormula("AVERAGE")}
+                                className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#2168AB] text-white px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors hover:bg-[#1a5388]"
+                            >
+                                AVERAGE
+                            </span>
+                            <span
+                                key={"COUNT"}
+                                onClick={() => handleClickFormula("COUNT")}
+                                className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#2168AB] text-white px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors hover:bg-[#1a5388]"
+                            >
+                                COUNT
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Rows (with horizontal scroll) */}
-                <div className="flex items-center px-4 py-3 gap-3">
-                    <div className="w-28 flex items-center gap-2 text-sm font-medium text-gray-600">
-                        <span className="text-blue-600">{t("rows")}</span>
+                {/* --- COLUMNS PART --- */}
+                <div className="grid grid-cols-6 border-b-2 h-[52px]">
+                    <div className="px-6 border-r-2 flex items-center gap-2" style={{ backgroundColor: "#EAF3FB" }}>
+                        <Image src={ColumnIcon} alt="Column icon" />
+                        <div className="text-sm font-medium text-gray-600">
+                            <span className="text-blue-600">{t("columns")}</span>
+                        </div>
                     </div>
-                    <div
-                        ref={dropRow}
-                        className={cn(
-                            "flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 p-2 rounded-md min-h-[40px] min-w-52",
-                            isOverRow ? "bg-orange-50 border border-orange-400" : "bg-white"
-                        )}
-                    >
-                        {selectedRow.map((item) => (
-                            <span
-                                key={item.name} // Use item.name as key
-                                className="inline-flex items-center gap-2 rounded-full bg-orange-100 text-orange-700 px-3 py-1 text-sm font-medium whitespace-nowrap"
-                            >
-                                # {item.name} {/* Display item.name */}
-                                <button
-                                    onClick={() => handleRemoveItem(item, 'row')}
-                                    className="cursor-pointer text-blue-500 hover:text-blue-800"
+
+                    <div className="col-span-5 pt-1 flex items-center">
+                        <div
+                            ref={dropColumn}
+                            className={cn(
+                                "flex flex-wrap items-start gap-2 p-2 rounded-md w-full h-full overflow-y-auto scrollbar-thin",
+                                isOverColumn ? "bg-blue-50 border border-blue-400" : "bg-white"
+                            )}
+                        >
+                            {selectedColumn.map((item) => (
+                                <span
+                                    key={item.name}
+                                    className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium"
                                 >
-                                    &times;
-                                </button>
-                            </span>
-                        ))}
+                                    # {item.name}
+                                    <button
+                                        onClick={() => handleRemoveItem(item, 'column')}
+                                        className="text-blue-500 hover:text-blue-800 cursor-pointer ml-2"
+                                    >
+                                        &times;
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* --- ROWS PART --- */}
+                <div className="grid grid-cols-6 h-[52px]">
+                    <div className="px-6 border-r-2 flex items-center gap-2" style={{ backgroundColor: "#FFEFE5" }}>
+                        <Image src={RowIcon} alt="Row icon" />
+                        <div className="text-sm font-medium text-gray-600">
+                            <span className="text-blue-600">{t("rows")}</span>
+                        </div>
+                    </div>
+
+                    <div className="col-span-5 pt-1 flex items-center">
+                        <div
+                            ref={dropRow}
+                            className={cn(
+                                "flex flex-wrap items-start gap-2 p-2 rounded-md w-full h-full overflow-y-auto scrollbar-thin",
+                                isOverRow ? "bg-orange-50 border border-orange-400" : "bg-white"
+                            )}
+                        >
+                            {selectedRow.map((item) => (
+                                <span
+                                    key={item.name}
+                                    className="inline-flex items-center rounded-full bg-orange-100 text-orange-700 px-3 py-1 text-sm font-medium"
+                                >
+                                    # {item.name}
+                                    <button
+                                        onClick={() => handleRemoveItem(item, 'row')}
+                                        className="cursor-pointer text-blue-500 hover:text-blue-800 ml-2"
+                                    >
+                                        &times;
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

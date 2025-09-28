@@ -105,6 +105,7 @@
         "datasetDeleted": "Dataset berhasil dihapus",
         "datasetDeletedFailed": "Dataset gagal dihapus",
         "columns": "Kolom",
-        "rows": "Baris"
+        "rows": "Baris",
+        "formula": "Rumus"
     }
 }

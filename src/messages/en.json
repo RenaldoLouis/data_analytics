@@ -50,7 +50,7 @@
         "fileFormat": "File Format",
         "marginSettings": "Margin Settings",
         "preview": "Preview",
-        "downloadSuccess": "Visualization download success",
+        "downloadSuccess": "Visualization exported",
         "noAvailableChart": "No Available Chart"
     },
     "datasetpage": {
@@ -105,6 +105,7 @@
         "datasetDeleted": "Data set deleted successfully",
         "datasetDeletedFailed": "Fail to delete data set",
         "columns": "Columns",
-        "rows": "Rows"
+        "rows": "Rows",
+        "formula": "Formula"
     }
 }

@@ -1,9 +1,11 @@
 "use client";
 
+import PencilEdit from "@/assets/logo/pencilEdit.svg";
+import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { H3 } from "@/components/ui/typography";
-import { Check, Pencil } from "lucide-react";
+import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from 'react';
 
 export function EditableText({ initialName, onSave }) {
@@ -75,9 +77,10 @@ export function EditableText({ initialName, onSave }) {
                         onClick={() => setIsEditing(true)}
                         variant="outline"
                         size="icon"
-                        className="h-7 w-7"
+                        className="h-7 w-7 border-[#E2E8F0]/80"
                     >
-                        <Pencil className="w-4 h-4 text-muted-foreground" />
+                        {/* <PencilEdit className="w-4 h-4 text-muted-foreground" /> */}
+                        <Image src={PencilEdit} alt="Measure icon" className="w-4 h-4" />
                     </Button>
                 </>
             )}

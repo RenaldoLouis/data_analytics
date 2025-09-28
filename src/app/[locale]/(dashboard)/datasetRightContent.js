@@ -3,10 +3,8 @@
 import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import LoadingScreen from "@/components/ui/loadingScreen";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { useDatasetRightContent } from "@/hooks/useDatasetRightContent";
@@ -310,7 +308,7 @@ export default function DatasetRightContent() {
                                     initialName={currentDataset?.name}
                                     onSave={handleNameSave}
                                 />
-                                <div className="flex items-center gap-2 my-3">
+                                {/* <div className="flex items-center gap-2 my-3">
                                     <Switch disabled={true} id="show-dashboard" checked={currentDataset?.status === 0 ? false : true} />
                                     <Label
                                         htmlFor="show-dashboard"
@@ -318,7 +316,7 @@ export default function DatasetRightContent() {
                                     >
                                         {t("showToDashboard")}
                                     </Label>
-                                </div>
+                                </div> */}
                             </CardHeader>
 
                             {/* Dimensions and Measures */}
@@ -373,34 +371,39 @@ export default function DatasetRightContent() {
 
                             {/* Footer: Details & Actions */}
                             <CardFooter className="flex flex-col items-start gap-4 border-t pt-4 text-sm text-gray-600">
-                                <div className="space-y-1 w-full">
-                                    <p className="mb-4" style={{ fontWeight: 700, fontSize: 12 }}>{t("datasetDetail")}</p>
-                                    <p className="mb-3">
-                                        <span className="font-medium">{t("dataSource")}: </span>
-                                        {currentDataset?.sheet_name}
+                                <div className="w-full">
+                                    <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
+                                        {t("datasetDetail")}
                                     </p>
-                                    <p className="mb-3">
-                                        <span className="font-medium">{t("createdOn")}: </span>
-                                        {moment(currentDataset?.created_at).format("DD/MM/YYYY")}
-                                    </p>
-                                    <p className="mb-3">
-                                        <span className="font-medium">{t("lastEditedOn")}: </span>
-                                        {moment(currentDataset?.updated_at).format("DD/MM/YYYY")}
-                                    </p>
-                                    <p className="mb-3">
-                                        <span className="font-medium">{t("lastEditedBy")}: </span>
-                                        {currentDataset?.updated_by}
-                                    </p>
-                                    <p className="mb-3">
-                                        <span className="font-medium">{t("dataStatus")}:</span>{" "}
-                                        <span className="text-green-600">{dataStatus}</span>
-                                    </p>
-                                    {/* <p className="mb-3">
-                                <span className="font-medium">Quality Score:</span>{" "}
-                                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                                    100%
-                                </span>
-                            </p> */}
+
+                                    {/* The new grid layout with 3 columns */}
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-gray-600">
+                                        {/* Row 1 */}
+                                        <p className=" font-medium text-gray-500">{t("dataSource")}</p>
+                                        <p className=" truncate text-gray-800" title={currentDataset?.sheet_name}>
+                                            {currentDataset?.sheet_name}
+                                        </p>
+
+                                        {/* Row 2 */}
+                                        <p className=" font-medium text-gray-500">{t("createdOn")}</p>
+                                        <p className=" text-gray-800">
+                                            {moment(currentDataset?.created_at).format("DD/MM/YYYY")}
+                                        </p>
+
+                                        {/* Row 3 */}
+                                        <p className=" font-medium text-gray-500">{t("lastEditedOn")}</p>
+                                        <p className=" text-gray-800">
+                                            {moment(currentDataset?.updated_at).format("DD/MM/YYYY")}
+                                        </p>
+
+                                        {/* Row 4 */}
+                                        <p className=" font-medium text-gray-500">{t("lastEditedBy")}</p>
+                                        <p className=" text-gray-800">{currentDataset?.updated_by}</p>
+
+                                        {/* Row 5 */}
+                                        <p className=" font-medium text-gray-500">{t("dataStatus")}</p>
+                                        <p className="font-medium text-green-600">{dataStatus}</p>
+                                    </div>
                                 </div>
 
                                 <div className="flex flex-col gap-2 w-full">
