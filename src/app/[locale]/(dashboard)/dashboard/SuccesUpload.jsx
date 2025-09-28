@@ -39,7 +39,7 @@ const SuccessUpload = (props) => {
             </DialogHeader>
             <DialogFooter className="px-6 py-3">
                 <DialogClose asChild>
-                    <Button className="w-full sm:flex-1" ref={closeRef} variant="outline" type="button">Close</Button>
+                    <Button className="w-full sm:flex-1" style={{ color: "#2168AB", fontWeight: "700" }} ref={closeRef} variant="outline" type="button">Close</Button>
                 </DialogClose>
                 {/* <Button onClick={handleClickNext} type="submit" className="cursor-pointer">Next</Button> */}
             </DialogFooter>
