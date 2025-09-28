@@ -163,7 +163,7 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-              <Image src="/logo.svg" alt="Daya Cipta Tech" width={180} height={28} style={{ width: "fit-content" }} />
+              <Image src="/SiriusIcon.svg" alt="Daya Cipta Tech" width={180} height={28} style={{ width: "fit-content" }} />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

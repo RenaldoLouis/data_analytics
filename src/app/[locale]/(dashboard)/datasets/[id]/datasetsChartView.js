@@ -4,7 +4,7 @@ import {
     ChartContainer
 } from "@/components/ui/chart";
 import { H3 } from "@/components/ui/typography";
-import { ChartAggregator } from "@/constant/ChartTypes";
+import { ChartAggregator, FormulasList } from "@/constant/ChartTypes";
 import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
@@ -19,10 +19,15 @@ import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComp
 import ColumnIcon from "@/assets/logo/ColumnIcon.svg";
 import FormulaIcon from "@/assets/logo/FormulaIcon.svg";
 import RowIcon from "@/assets/logo/RowIcon.svg";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 const DatasetsChartView = ({ chartData, datasetId }) => {
-
-
     const t = useTranslations("datasetpage");
     const { chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
 
@@ -128,8 +133,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                         "dataset_id": datasetId,
                         "selected_row": selectedRow,
                         "selected_column": selectedColumn,
-                        // we need to make chart_aggregator dynamic based on selection
-                        "chart_aggregator": ChartAggregator.count
+                        "chart_aggregator": selectedFormula
                     }
 
                     const res = await services.chart.getChartData(tempObj)
@@ -263,34 +267,36 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                     </div>
 
                     <div className="col-span-5 pt-1 flex items-center">
-                        <div
-                            className={cn(
-                                "flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 p-2 rounded-md min-h-[40px] min-w-52",
-                                "bg-white"
-                            )}
-                        >
-                            <span
-                                key={"SUM"}
-                                onClick={() => handleClickFormula("SUM")}
-                                className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#2168AB] text-white px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors hover:bg-[#1a5388]"
-                            >
-                                SUM
-                            </span>
-                            <span
-                                key={"AVERAGE"}
-                                onClick={() => handleClickFormula("AVERAGE")}
-                                className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#2168AB] text-white px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors hover:bg-[#1a5388]"
-                            >
-                                AVERAGE
-                            </span>
-                            <span
-                                key={"COUNT"}
-                                onClick={() => handleClickFormula("COUNT")}
-                                className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-[#2168AB] text-white px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors hover:bg-[#1a5388]"
-                            >
-                                COUNT
-                            </span>
-                        </div>
+                        <TooltipProvider delayDuration={200}>
+                            <div className="flex gap-2 p-2 rounded-md overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300">
+                                {FormulasList.map((formula) => (
+                                    <Tooltip key={formula.name}>
+                                        <TooltipTrigger asChild>
+                                            <button
+                                                onClick={() => handleClickFormula(formula.value)}
+                                                className={cn(
+                                                    "inline-flex items-center rounded-full px-4 py-1 text-sm font-medium whitespace-nowrap transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
+                                                    selectedFormula === formula.value
+                                                        ? "bg-[#2168AB] text-white hover:bg-[#2c85d6]"
+                                                        : "bg-white text-gray-700 border border-gray-300 hover:bg-blue-100 hover:text-blue-800"
+                                                )}
+                                            >
+                                                {formula.name}
+                                            </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                        // className="bg-[#F2F2F2] text-gray-800 border border-gray-300"
+                                        >
+                                            <p>{formula.tooltip}</p>
+
+                                            <TooltipPrimitive.Arrow
+                                            //  className="fill-[#F2F2F2]"
+                                            />
+                                        </TooltipContent>
+                                    </Tooltip>
+                                ))}
+                            </div>
+                        </TooltipProvider>
                     </div>
                 </div>
 

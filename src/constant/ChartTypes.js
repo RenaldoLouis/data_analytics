@@ -25,3 +25,21 @@ export const ChartAggregator = {
     median: 'Median',
     modus: 'Modus'
 }
+
+export const FormulasList = [
+    {
+        name: "SUM",
+        value: ChartAggregator.sum,
+        tooltip: "Menjumlahkan total dari semua nilai numerik yang dipilih."
+    },
+    {
+        name: "AVERAGE",
+        value: ChartAggregator.average,
+        tooltip: "Menghitung rata-rata dari nilai numerik yang dipilih."
+    },
+    {
+        name: "COUNT",
+        value: ChartAggregator.count,
+        tooltip: "Menghitung jumlah item atau baris dalam kolom yang dipilih."
+    },
+];

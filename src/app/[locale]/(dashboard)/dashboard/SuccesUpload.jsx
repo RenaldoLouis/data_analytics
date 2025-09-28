@@ -23,7 +23,7 @@ const SuccessUpload = (props) => {
     }
 
     return (
-        <div className="pt-8 pb-2 content-center">
+        <div className=" content-center">
             <DialogHeader className="items-center">
                 <Image src={checkMark} alt="checkMark" />
                 <DialogTitle className="">
