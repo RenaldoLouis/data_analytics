@@ -26,7 +26,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { industryOptions } from "@/constant/IndustryOptions";
-import services from "@/services";
 
 const registrationSchema = z.object({
     firstName: z.string().optional(),
@@ -63,7 +62,12 @@ export default function RequestDemoForm() {
             phone: data.phone,
         }
         try {
-            const res = await services.auth.register(tempData);
+            const res = await fetch("/next-api/requestdemo", {
+                method: "POST",
+                body: JSON.stringify(data),
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
 
             if (res.status === 200) {
                 toast("Register success", {

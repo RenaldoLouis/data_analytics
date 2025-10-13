@@ -1,10 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import moment from "moment";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -145,6 +143,7 @@ export default function LoginForm() {
                 // });
                 router.replace("/dashboard");
             } else {
+                setIsLoading(false)
                 form.setError("root", {
                     message: t("invalidCredentials"),
                 });
@@ -155,6 +154,7 @@ export default function LoginForm() {
                 message: err.message || "Unexpected error occurred.",
             });
         }
+        setIsLoading(false)
     };
 
     const handleClickFreeTrial = (e) => {
