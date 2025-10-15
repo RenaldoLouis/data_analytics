@@ -147,7 +147,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
 
             fetchChartData();
         }
-    }, [selectedChartType, selectedRow, selectedColumn])
+    }, [selectedFormula, selectedChartType, selectedRow, selectedColumn])
 
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],

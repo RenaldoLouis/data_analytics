@@ -200,7 +200,7 @@ const FormNewDataSet = (props) => {
                 <DialogTrigger style={{ display: !isShowText ? "none" : "" }} asChild>
                     <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>
                 </DialogTrigger>
-                <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false} style={{ height: uploadDone === UploadStatus.dataClear ? "255" : 500 }} preventClose={true}>
+                <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false} style={{ height: uploadDone === UploadStatus.dataClear ? 255 : 500 }} preventClose={true}>
                     {dialogContent()}
                 </DialogContent>
             </FormProvider>
