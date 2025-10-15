@@ -106,6 +106,14 @@
         "datasetDeletedFailed": "Dataset gagal dihapus",
         "columns": "Kolom",
         "rows": "Baris",
-        "formula": "Rumus"
+        "formula": "Rumus",
+        "sumTooltip": "Calculates the total sum of all selected numeric values.",
+        "averageTooltip": "Calculates the average of the selected numeric values.",
+        "countTooltip": "Counts the number of items or rows in the selected column.",
+        "medianTooltip": "Finds the middle value in a sorted list of numeric data.",
+        "modusTooltip": "Finds the value that appears most frequently in the data.",
+        "minTooltip": "Returns the smallest value from the selected numeric data.",
+        "maxTooltip": "Returns the largest value from the selected numeric data.",
+        "roundTooltip": "Rounds the numeric values in the column to the nearest integer."
     }
 }

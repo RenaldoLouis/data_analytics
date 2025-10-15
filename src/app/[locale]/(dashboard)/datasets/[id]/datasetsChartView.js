@@ -287,7 +287,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                                         <TooltipContent
                                         // className="bg-[#F2F2F2] text-gray-800 border border-gray-300"
                                         >
-                                            <p>{formula.tooltip}</p>
+                                            <p>{t(formula.tooltip)}</p>
 
                                             <TooltipPrimitive.Arrow
                                             //  className="fill-[#F2F2F2]"

@@ -23,23 +23,51 @@ export const ChartAggregator = {
     count: 'Count',
     average: 'Average',
     median: 'Median',
-    modus: 'Modus'
+    modus: 'Modus',
+    min: 'Min',
+    max: 'Max',
+    round: 'Round',
 }
 
 export const FormulasList = [
     {
         name: "SUM",
         value: ChartAggregator.sum,
-        tooltip: "Menjumlahkan total dari semua nilai numerik yang dipilih."
+        tooltip: "sumTooltip"
     },
     {
         name: "AVERAGE",
         value: ChartAggregator.average,
-        tooltip: "Menghitung rata-rata dari nilai numerik yang dipilih."
+        tooltip: "averageTooltip"
     },
     {
         name: "COUNT",
         value: ChartAggregator.count,
-        tooltip: "Menghitung jumlah item atau baris dalam kolom yang dipilih."
+        tooltip: "countTooltip"
+    },
+    {
+        name: "MEDIAN",
+        value: ChartAggregator.median,
+        tooltip: "medianTooltip"
+    },
+    {
+        name: "MODUS",
+        value: ChartAggregator.modus,
+        tooltip: "modusTooltip"
+    },
+    {
+        name: "MIN",
+        value: ChartAggregator.min,
+        tooltip: "minTooltip"
+    },
+    {
+        name: "MAX",
+        value: ChartAggregator.max,
+        tooltip: "maxTooltip"
+    },
+    {
+        name: "ROUND",
+        value: ChartAggregator.round,
+        tooltip: "roundTooltip"
     },
 ];
