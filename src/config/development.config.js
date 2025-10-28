@@ -1,9 +1,9 @@
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
   api: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'https://daycipta-tech.com/api',
   },
   client: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'https://daycipta-tech.com/api',
   },
 };
