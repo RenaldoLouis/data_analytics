@@ -32,7 +32,7 @@
         "invalidEmail": "Invalid email address",
         "minimumPassword": "Password must be at least 6 characters",
         "confirmationTitle": "Thank you for Signing Up!",
-        "confirmationSubtitle": "We&apos;ll contact through your registered email.",
+        "confirmationSubtitle": "We will contact you through your registered email.",
         "backToHome": "Back to Home"
     },
     "dashboardpage": {
