@@ -52,15 +52,6 @@ export default function RequestDemoForm() {
     });
 
     const onSubmit = async (data) => {
-        const tempData = {
-            email: data.email,
-            password: data.password,
-            companyName: data.companyName,
-            industry: data.industry,
-            first_name: data.firstName,
-            last_name: data.lastName,
-            phone: data.phone,
-        }
         try {
             const res = await fetch("/next-api/requestdemo", {
                 method: "POST",

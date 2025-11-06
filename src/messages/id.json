@@ -11,7 +11,20 @@
         "tryFreeTrial": "Coba Gratis",
         "requestFreeDemo": "Request Video Demo",
         "or": "atau",
-        "invalidCredentials": "Kredensial tidak valid. Silahkan coba kembali."
+        "invalidCredentials": "Kredensial tidak valid. Silahkan coba kembali.",
+        "invalidEmail": "Email tidak valid",
+        "otpMinLength": "OTP harus 6 digit",
+        "passwordMinLength": "Password minimal 8 huruf",
+        "passwordsNoMatch": " Password tidak cocok",
+        "forgotPasswordSubtitle": "Masukkan email untuk menerima OTP.",
+        "sendOTP": "Kirim OTP",
+        "backToLogin": "Kembali ke login",
+        "otpSent": "OTP telah dikirim ke",
+        "verifyOTP": "Verifikasi OTP",
+        "createNewPasswordSubtitle": "Buat password baru untuk akun anda",
+        "confirmNewPassword": "Konfirmasi password baru",
+        "newPassword": "Password baru",
+        "setNewPassword": "Pasang password baru"
     },
     "registrationpage": {
         "back": "Kembali",

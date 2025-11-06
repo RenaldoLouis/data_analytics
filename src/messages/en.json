@@ -11,7 +11,20 @@
         "tryFreeTrial": "Try for Free",
         "requestFreeDemo": "Request Video Demo",
         "or": "or",
-        "invalidCredentials": "Invalid credentials. Please try again."
+        "invalidCredentials": "Invalid credentials. Please try again.",
+        "invalidEmail": "Invalid email address",
+        "otpMinLength": "OTP Must be 6 digits",
+        "passwordMinLength": "Password must be at least 8 characters",
+        "passwordsNoMatch": " Password do not match",
+        "forgotPasswordSubtitle": "Enter your email to receive a one-time password.",
+        "sendOTP": "Send OTP",
+        "backToLogin": "Back To Login",
+        "otpSent": "OTP has been sent to",
+        "verifyOTP": "Verify OTP",
+        "createNewPasswordSubtitle": "Please create new password for your account",
+        "confirmNewPassword": "Confirm new password",
+        "newPassword": "New password",
+        "setNewPassword": "Set new password"
     },
     "registrationpage": {
         "back": "Back",
