@@ -5,7 +5,7 @@
 import { DashboardCard } from "@/components/DashboardCard/DashboardCard";
 import { useMemo } from "react";
 
-export default function DashboardLayoutPlaceholder({ layoutId, refetch, listOfChart, setListOfChart, chartComponents }) {
+export default function DashboardLayoutPlaceholder({ layoutId, refetch, listOfChart, setListOfChart, chartComponents, addedCharts }) {
     const layoutConfig1 = [
         { className: "md:col-span-6 md:row-span-2", cardClassName: "min-h-82" }, // Large top card
         { className: "md:col-span-3" },
@@ -73,7 +73,9 @@ export default function DashboardLayoutPlaceholder({ layoutId, refetch, listOfCh
                                 className={cell.cardClassName}
                                 cardIndex={index}
                                 setListOfChart={setListOfChart}
-                                listOfChart={listOfChart} />
+                                listOfChart={listOfChart}
+                                addedCharts={addedCharts}
+                            />
                         )}
                     </div>
                 );

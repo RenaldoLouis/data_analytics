@@ -37,7 +37,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 export const ModalExportDashboard = (props) => {
-    const { layoutRef } = props
+    const { layoutRef, isChartAdded } = props
 
     const t = useTranslations("dashboardpage");
     const [previewUrl, setPreviewUrl] = useState("");
@@ -138,7 +138,9 @@ export const ModalExportDashboard = (props) => {
             }
         }}>
             <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline"
+                    disabled={!isChartAdded}
+                >
                     <Download className="mr-2 h-4 w-4" />
                     {t("download")}
                 </Button>
@@ -231,6 +233,7 @@ export const ModalExportDashboard = (props) => {
                             <Button
                                 type="submit"
                                 className="w-full sm:flex-1"
+                                disabled={!isChartAdded}
                             >
                                 {t("download")}
                             </Button>

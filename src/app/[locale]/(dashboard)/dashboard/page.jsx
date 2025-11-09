@@ -11,14 +11,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { H3, P } from "@/components/ui/typography";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { useDashboardRecords } from "@/hooks/useDashboardRecords";
-import { useRef } from "react";
 import { useTranslations } from "next-intl";
+import { useMemo, useRef } from "react";
 
 export default function Page() {
   const { chartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
+
   const layoutRef = useRef(null);
   const t = useTranslations("dashboardpage");
-
 
   const chartComponents = {
     bar: DashboardCardBarChart,
@@ -30,14 +30,56 @@ export default function Page() {
 
   const { listOfChart, setListOfChart, isLoading, error, refetch } = useDashboardRecords(selectedLayout, chartListType);
 
+  const addedCharts = useMemo(() => {
+    const idsOnCurrentDashboard = listOfChart
+      .filter(chart => chart !== null)
+      .map(chart => chart.dataset_id);
+
+    const chartsOnDashboard = dataSetsList.filter(dataset => {
+      const hasRecords = dataset.dashboard_records && dataset.dashboard_records.length > 0;
+
+      // If it doesn't have records, it can't be an "added" chart.
+      if (!hasRecords) {
+        return false;
+      }
+
+      const isOnThisDashboard = idsOnCurrentDashboard.includes(dataset.id);
+
+      // The dataset will only be included if both conditions are met.
+      return isOnThisDashboard;
+    });
+
+    // 2. Map over the filtered list to create the structure for the UI.
+    const formattedCharts = chartsOnDashboard.map(chart => {
+      // Find the corresponding chart type information
+      const chartTypeInfo = chartListType.find(type => type.id === chart.chart_id);
+      const chartTypeName = chartTypeInfo ? chartTypeInfo.name : 'Chart';
+
+      // Create a descriptive name for the chart.
+      const displayName = `${chart.name}`;
+
+      // Create a placeholder image URL.
+      const imageUrl = `https://placehold.co/96x56/e2e8f0/666?text=${chartTypeName}`;
+
+      // Return the new object in the desired format.
+      return {
+        id: chart.chart_record_id, // Use the unique ID for the chart instance
+        name: displayName,
+        imageUrl: imageUrl,
+      };
+    });
+
+    return formattedCharts;
+  }, [dataSetsList, chartListType, listOfChart]);
+
   const renderlayout = () => {
     switch (selectedLayout) {
       case "layout1":
-        return <DashboardLayoutPlaceholder layoutId={1} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayoutPlaceholder layoutId={1} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} addedCharts={addedCharts} />
       case "layout2":
-        return <DashboardLayoutPlaceholder layoutId={2} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayoutPlaceholder layoutId={2} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} addedCharts={addedCharts} />
       case "layout3":
-        return <DashboardLayoutPlaceholder layoutId={3} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} />
+        return <DashboardLayoutPlaceholder layoutId={3} refetch={refetch} setListOfChart={setListOfChart} listOfChart={listOfChart} chartComponents={chartComponents} addedCharts={addedCharts} />
 
       default:
         return <DashboardLayoutPlaceholder />
@@ -60,7 +102,7 @@ export default function Page() {
             </TabsList>
           </Tabs>
           <div className="pt-3 sm:pt-0">
-            <ModalExportDashboard layoutRef={layoutRef} />
+            <ModalExportDashboard layoutRef={layoutRef} isChartAdded={addedCharts.length > 0} />
           </div>
         </div>
       </div>

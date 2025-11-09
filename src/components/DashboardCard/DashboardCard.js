@@ -63,7 +63,7 @@ const ChartItemDisabled = ({ label, chartImageUrl }) => {
 
 
 // Main Component
-export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfChart, listOfChart }) => {
+export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfChart, listOfChart, addedCharts }) => {
     const { setIsFetchDataSetLists, isFetchDataSetLists, chartListType, setChartListType, setIsDialogOpenAddNewDataSet, dataSetsList, selectedLayout, setSelectedLayout } = useDashboardContext();
     const t = useTranslations("dashboardpage");
     const [isLoading, setIsLoading] = useState(false);
@@ -189,48 +189,6 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
 
         return availableCharts;
     }, [dataSetsList, listOfChart])
-
-    const addedCharts = useMemo(() => {
-        const idsOnCurrentDashboard = listOfChart
-            .filter(chart => chart !== null)
-            .map(chart => chart.dataset_id);
-
-        const chartsOnDashboard = dataSetsList.filter(dataset => {
-            const hasRecords = dataset.dashboard_records && dataset.dashboard_records.length > 0;
-
-            // If it doesn't have records, it can't be an "added" chart.
-            if (!hasRecords) {
-                return false;
-            }
-
-            const isOnThisDashboard = idsOnCurrentDashboard.includes(dataset.id);
-
-            // The dataset will only be included if both conditions are met.
-            return isOnThisDashboard;
-        });
-
-        // 2. Map over the filtered list to create the structure for the UI.
-        const formattedCharts = chartsOnDashboard.map(chart => {
-            // Find the corresponding chart type information
-            const chartTypeInfo = chartListType.find(type => type.id === chart.chart_id);
-            const chartTypeName = chartTypeInfo ? chartTypeInfo.name : 'Chart';
-
-            // Create a descriptive name for the chart.
-            const displayName = `${chart.name}`;
-
-            // Create a placeholder image URL.
-            const imageUrl = `https://placehold.co/96x56/e2e8f0/666?text=${chartTypeName}`;
-
-            // Return the new object in the desired format.
-            return {
-                id: chart.chart_record_id, // Use the unique ID for the chart instance
-                name: displayName,
-                imageUrl: imageUrl,
-            };
-        });
-
-        return formattedCharts;
-    }, [dataSetsList, chartListType, listOfChart]);
 
     return (
         <>
