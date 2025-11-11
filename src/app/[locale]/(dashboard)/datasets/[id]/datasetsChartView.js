@@ -9,13 +9,16 @@ import { ItemTypes } from "@/constant/DragTypes";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
 import services from "@/services";
-import { AreaChartIcon, BarChart, BarChart2, ChartColumnBig, LineChartIcon, PieChartIcon } from "lucide-react";
+import { AreaChartIcon, ChartColumnBig, LineChartIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from 'next/image';
 import { useEffect, useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
 import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComponent } from "./ChartComponent";
 
+import siriuschart from "@/assets/Images/siriuschart.svg";
+import siriuspiechart from "@/assets/Images/siriuspiechart.svg";
+import stackedbarpiechart from "@/assets/Images/stackedbarpiechart.svg";
 import ColumnIcon from "@/assets/logo/ColumnIcon.svg";
 import FormulaIcon from "@/assets/logo/FormulaIcon.svg";
 import RowIcon from "@/assets/logo/RowIcon.svg";
@@ -89,10 +92,10 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
 
                         switch (updatedData.name) {
                             case "Bar":
-                                updatedData.icon = <BarChart2 />;
+                                updatedData.icon = <Image src={siriuschart} alt="Column icon" />
                                 break;
                             case "StackedBar":
-                                updatedData.icon = <BarChart />;
+                                updatedData.icon = <Image src={stackedbarpiechart} alt="Column icon" />
                                 break;
                             case "Groupbar":
                                 updatedData.icon = <ChartColumnBig />;
@@ -104,7 +107,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                                 updatedData.icon = <AreaChartIcon />;
                                 break;
                             case "Pie":
-                                updatedData.icon = <PieChartIcon />;
+                                updatedData.icon = <Image src={siriuspiechart} alt="Column icon" />
                                 break;
                             default:
                                 updatedData.icon = null;
@@ -146,7 +149,10 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
             }
 
             fetchChartData();
+        } else {
+            setChartDrawData([])
         }
+
     }, [selectedFormula, selectedChartType, selectedRow, selectedColumn])
 
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
@@ -371,6 +377,9 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 </div>
             </div>
 
+            <div className="mb-[12px] text-[16px]">
+                Chart Options
+            </div>
             {/* Chart Type Picker */}
             <div className="mb-6 flex gap-4 overflow-x-auto">
                 {chartListType.map((type) => {
@@ -404,7 +413,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                             onClick={() => setSelectedChartType(type)}
                             disabled={isDisabled}
                             className={cn(
-                                "border rounded-md p-3 flex items-center justify-center w-24 h-20 transition cursor-pointer",
+                                "border rounded-md p-3 flex items-center justify-center w-[48px] h-[42px] transition cursor-pointer",
                                 selectedChartType?.name === type.name
                                     ? "border-blue-500 bg-blue-100"
                                     : "border-gray-300 hover:bg-gray-100",

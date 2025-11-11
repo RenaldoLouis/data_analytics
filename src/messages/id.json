@@ -103,6 +103,8 @@
         "lastEditedOn": "Diedit pada",
         "lastEditedBy": "Diedit oleh",
         "dataStatus": "Data status",
+        "syncChanges": "Sync Changes",
+        "syncSuccess": "Sync Success",
         "saveDatasetChanges": "Simpan Perubahan Dataset",
         "saveChartChanges": "Simpan Perubahan Chart",
         "proceedToVisualization": "Mulai Visualisasi Data",

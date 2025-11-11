@@ -103,6 +103,8 @@
         "lastEditedOn": "Edited on",
         "lastEditedBy": "Edited by",
         "dataStatus": "Data status",
+        "syncChanges": "Sync Changes",
+        "syncSuccess": "Sync Success",
         "saveDatasetChanges": "Save Data set Changes",
         "saveChartChanges": "Save Chart Changes",
         "proceedToVisualization": "Proceed to Visualization",

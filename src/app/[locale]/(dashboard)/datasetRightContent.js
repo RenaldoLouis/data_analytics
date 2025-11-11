@@ -1,5 +1,6 @@
 "use client";
 
+import siriussync from "@/assets/Images/siriussync.svg";
 import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import moment from "moment";
 import { useTranslations } from "next-intl";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useDrag } from "react-dnd";
@@ -223,6 +225,72 @@ export default function DatasetRightContent() {
         setIsLoading(false);
     }
 
+    const handleSyncChanges = async () => {
+        setIsLoading(true);
+        let datasetError = null;
+        let chartError = null;
+        let dataUpdated = false;
+
+        // --- 1. Run Data Update Logic (from handleUpdateData) ---
+        try {
+            const datasetContents = dataToUpdate.map((eachData) => ({
+                id: eachData.id,
+                data: eachData,
+            }));
+            const res = await services.dataset.updateDatasetContents(datasetId, {
+                datasetContents,
+            });
+            if (res?.success) {
+                dataUpdated = true;
+            } else {
+                throw new Error(res.message || "Failed to update dataset");
+            }
+        } catch (e) {
+            datasetError = e;
+        }
+
+        // --- 2. Run Chart Save Logic (from handleSaveChart) ---
+        // We only run this if there is chart data, respecting the original button's disabled logic
+        const shouldSaveChart = chartDrawData?.length > 0;
+        if (shouldSaveChart && !datasetError) { // Don't try to save chart if data update failed
+            try {
+                const tempObj = {
+                    "dataset_id": datasetId,
+                    "chart_id": selectedChartType.id,
+                    "chart_content": chartDrawData,
+                    "selected_row": selectedRow,
+                    "selected_column": selectedColumn,
+                }
+                const res = await services.chart.postChartRecords(tempObj);
+                if (!res.success) {
+                    throw new Error(res.message || "Failed to save chart");
+                }
+            } catch (e) {
+                chartError = e;
+            }
+        }
+
+        // --- 3. Stop Loading ---
+        setIsLoading(false);
+
+        // --- 4. Report Results ---
+        if (datasetError || chartError) {
+            // An error occurred in one of the steps
+            const errorMsg = datasetError ? datasetError.message : chartError.message;
+            toast.error(t("uploadFailed"), {
+                description: errorMsg,
+            });
+        } else {
+            // Both steps succeeded (or the skipped chart save was intentional)
+            toast(t("syncSuccess") || "Changes synced successfully");
+        }
+
+        // --- 5. Refetch if data updated ---
+        if (dataUpdated) {
+            setIsFetchDataSetContents(!isFetchDataSetContents);
+        }
+    };
+
 
     const handleDeleteDataset = async () => {
         const res = await services.dataset.deleteDataset(datasetId);
@@ -407,15 +475,18 @@ export default function DatasetRightContent() {
                                 </div>
 
                                 <div className="flex flex-col gap-2 w-full">
-                                    <Button onClick={handleUpdateData} variant="default" className="flex-1 cursor-pointer">
-                                        {/* <Image src={syncIcon} alt="Measure icon" className="w-5 h-5 color-blue-100" />    */}
+                                    {/* <Button onClick={handleUpdateData} variant="default" className="flex-1 cursor-pointer">
                                         {t("saveDatasetChanges")}
                                     </Button>
                                     <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="outline" className="flex-1 cursor-pointer">
                                         {t("saveChartChanges")}
+                                    </Button> */}
+                                    <Button onClick={handleSyncChanges} variant="default" className="flex-1 cursor-pointer">
+                                        {t("syncChanges") || "Sync Changes"}
+                                        <Image src={siriussync} alt="siriussync" />
                                     </Button>
-                                    <Button onClick={updateDataSetReadyVisualization} variant="secondary" className="flex-1 cursor-pointer">
-                                        {t("proceedToVisualization")}
+                                    <Button onClick={updateDataSetReadyVisualization} variant="secondary" className="flex-1 cursor-pointer" style={{ background: "#0B2238" }}>
+                                        {t("showToDashboard")}
                                     </Button>
                                     {/* <Button onClick={handleDeleteDataset} variant="destructive" className="flex-1 cursor-pointer">
                                 Delete Data Set
