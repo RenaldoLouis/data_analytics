@@ -32,7 +32,7 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 const DatasetsChartView = ({ chartData, datasetId }) => {
     const t = useTranslations("datasetpage");
-    const { chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
+    const { chartContainerRef, chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
 
     const [isLoadingChart, setIsLoadingChart] = useState(false);
     const [selectedFormula, setSelectedFormula] = useState(ChartAggregator.sum)
@@ -377,7 +377,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
                 </div>
             </div>
 
-            <div className="mb-[12px] text-[16px]">
+            <div className="mb-[12px] text-[16px]" style={{ color: "#727272" }}>
                 Chart Options
             </div>
             {/* Chart Type Picker */}
@@ -427,7 +427,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
             </div>
 
             {/* Chart View */}
-            <div className="bg-white rounded-md p-4 shadow-sm">
+            <div className="bg-white rounded-md p-4 shadow-sm" ref={chartContainerRef}>
                 <ChartContainer config={dynamicChartConfig} className="w-full flex items-center justify-center">
                     {renderSelectedChart()}
                 </ChartContainer>

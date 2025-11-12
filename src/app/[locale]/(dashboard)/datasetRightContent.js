@@ -11,6 +11,7 @@ import { useDashboardContext } from "@/context/dashboard-context";
 import { useDatasetRightContent } from "@/hooks/useDatasetRightContent";
 import services from "@/services";
 import { AnimatePresence, motion } from "framer-motion";
+import { toJpeg } from 'html-to-image';
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import moment from "moment";
 import { useTranslations } from "next-intl";
@@ -19,7 +20,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useDrag } from "react-dnd";
 import { toast } from "sonner";
-
 const testGetterObj = {
     firstName: "bob",
     lastName: "sagot",
@@ -48,7 +48,7 @@ const DraggableItem = ({ item, type }) => {
 export default function DatasetRightContent() {
     const pathname = usePathname();
     const t = useTranslations("datasetpage");
-    const { selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, chartListType, isFetchDataSetLists, setIsFetchDataSetLists, setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+    const { chartContainerRef, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, chartListType, isFetchDataSetLists, setIsFetchDataSetLists, setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
 
     const [isShowsideContent, setIsShowsideContent] = useState(false);
     const [isOpenSideContent, setIsOpenSideContent] = useState(false);
@@ -195,36 +195,6 @@ export default function DatasetRightContent() {
         setIsLoading(false);
     };
 
-    const handleSaveChart = async () => {
-        setIsLoading(true);
-        const tempObj = {
-            "dataset_id": datasetId,
-            "chart_id": selectedChartType.id,
-            "chart_content": chartDrawData,
-            "selected_row": selectedRow,
-            "selected_column": selectedColumn,
-        }
-
-        // TODO: we should normalize all API call with try catch
-        try {
-            const res = await services.chart.postChartRecords(tempObj)
-            if (res.success) {
-                toast(t("chartUpdated"));
-            } else {
-                setIsLoading(false);
-                // const errorData = await res.json(); // Try to get more details from the response body
-                throw new Error(res.message || `Request failed with status ${res.status}`);
-            }
-        } catch (e) {
-            setIsLoading(false);
-            console.error("An error occurred:", e.message);
-            toast.error(t("uploadFailed"), {
-                description: e.message
-            });
-        }
-        setIsLoading(false);
-    }
-
     const handleSyncChanges = async () => {
         setIsLoading(true);
         let datasetError = null;
@@ -253,6 +223,24 @@ export default function DatasetRightContent() {
         // We only run this if there is chart data, respecting the original button's disabled logic
         const shouldSaveChart = chartDrawData?.length > 0;
         if (shouldSaveChart && !datasetError) { // Don't try to save chart if data update failed
+            // --- 1. Generate the Snapshot ---
+            let chartThumbnail = null;
+            try {
+                if (chartContainerRef.current) {
+                    chartThumbnail = await toJpeg(chartContainerRef.current, {
+                        quality: 0.7,   // JPEG quality (0.0 to 1.0)
+                        backgroundColor: '#ffffff', // Explicitly set a white background
+                        style: {
+                            // This library can be sensitive to margins, so
+                            // we ensure the container itself has none.
+                            margin: 0
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Error generating chart thumbnail:", e);
+            }
+
             try {
                 const tempObj = {
                     "dataset_id": datasetId,
@@ -260,6 +248,7 @@ export default function DatasetRightContent() {
                     "chart_content": chartDrawData,
                     "selected_row": selectedRow,
                     "selected_column": selectedColumn,
+                    "chart_thumbnail": chartThumbnail
                 }
                 const res = await services.chart.postChartRecords(tempObj);
                 if (!res.success) {

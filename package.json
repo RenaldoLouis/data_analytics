@@ -38,6 +38,7 @@
     "cookie": "^1.0.2",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.18.1",
+    "html-to-image": "^1.11.13",
     "html2canvas-pro": "^1.5.11",
     "js-cookie": "^3.0.5",
     "jspdf": "^3.0.1",

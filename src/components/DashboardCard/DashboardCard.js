@@ -157,38 +157,31 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
             .map(chart => chart.dataset_id);
 
         const createdCharts = dataSetsList.filter(dataset => {
-            // Condition 1: The dataset must have been configured as a chart.
             const hasChartContent = dataset.chart_content != null && !isEmpty(dataset.chart_content);
-
             const isNotOnThisDashboard = !idsOnCurrentDashboard.includes(dataset.id);
-
             return hasChartContent && isNotOnThisDashboard;
         });
 
-        // 2. Map over the filtered list to create the new structure.
         const availableCharts = createdCharts.map(chart => {
-            // Find the corresponding chart type information (e.g., "Bar", "Pie")
-            // using the chart_id from the dataset.
             const chartTypeInfo = chartListType.find(type => type.id === chart.chart_id);
             const chartTypeName = chartTypeInfo ? chartTypeInfo.name : 'Chart';
 
-            // Create a descriptive name for the chart.
             const displayName = `${chart.name}`;
 
-            // Create a placeholder image URL.
-            const imageUrl = `https://placehold.co/96x56/a0c4ff/ffffff?text=${chartTypeName}`;
+            const imageUrl = chart.chart_thumbnail
+                ? chart.chart_thumbnail // This is the Base64 data URL
+                : `https://placehold.co/96x56/a0c4ff/ffffff?text=${chartTypeName}`; // Fallback
 
-            // Return the new object in the desired format.
             return {
-                id: chart.chart_record_id, // Use the unique ID for the chart instance
-                dataset_id: chart.id, // Use the unique ID for the chart instance
+                id: chart.chart_record_id,
+                dataset_id: chart.id,
                 name: displayName,
                 imageUrl: imageUrl,
             };
         });
 
         return availableCharts;
-    }, [dataSetsList, listOfChart])
+    }, [dataSetsList, listOfChart, chartListType]);
 
     return (
         <>
@@ -244,7 +237,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                                     )}
                                 />
 
-                                <div className="grid gap-3 pb-13">
+                                {/* <div className="grid gap-3 pb-13">
                                     <h3 className="font-semibold">{t("added")}</h3>
                                     {addedCharts.length > 0
                                         ? addedCharts.map((chart) => (
@@ -256,7 +249,7 @@ export const DashboardCard = ({ refetch, className = "", cardIndex, setListOfCha
                                         ))
                                         : <ChartItemDisabled />
                                     }
-                                </div>
+                                </div> */}
                             </div>
 
                             <DialogFooter>

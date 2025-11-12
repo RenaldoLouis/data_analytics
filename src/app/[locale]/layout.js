@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { routing } from "@/i18n/routing";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages } from "next-intl/server";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, IBM_Plex_Sans, Inter } from "next/font/google";
 import { notFound } from "next/navigation";
 import "../globals.css";
 
@@ -15,6 +15,18 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
+
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'], // Specify the weights you'll use
+  variable: '--font-ibm-plex-sans', // This is the CSS variable name
+});
+
 
 export const metadata = {
   title: "Daya Cipta Tech",
@@ -35,7 +47,7 @@ export default async function RootLayout({ children, params }) {
   return (
     <html lang={locale}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${ibmPlexSans.variable} font-sans`}
       >
         <NextIntlClientProvider messages={messages}>
           {children}

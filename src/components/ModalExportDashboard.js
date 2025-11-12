@@ -142,7 +142,7 @@ export const ModalExportDashboard = (props) => {
                     disabled={!isChartAdded}
                 >
                     <Download className="mr-2 h-4 w-4" />
-                    {t("download")}
+                    {t("exportDashboard")}
                 </Button>
             </DialogTrigger>
 
@@ -235,7 +235,7 @@ export const ModalExportDashboard = (props) => {
                                 className="w-full sm:flex-1"
                                 disabled={!isChartAdded}
                             >
-                                {t("download")}
+                                {t("exportDashboard")}
                             </Button>
                         </DialogFooter>
                     </form>

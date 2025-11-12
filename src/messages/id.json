@@ -53,6 +53,7 @@
         "noDatasetDetected": "Anda belum memiliki Datasets. Tambahkan Datasets terlebih dahulu untuk membuat chart",
         "layout": "Tampilan",
         "download": "Unduh",
+        "exportDashboard": "Export Dashboard",
         "addChart": "Tambah Chart",
         "chooseChart": "Pilih Chart",
         "available": "Tersedia",

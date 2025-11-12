@@ -53,6 +53,7 @@
         "noDatasetDetected": "You don’t have any data sets. Add data set first in order to make dashboard",
         "layout": "Layout",
         "download": "Download",
+        "exportDashboard": "Export Dashboard",
         "addChart": "Add Chart",
         "chooseChart": "Choose Chart",
         "available": "Available",
