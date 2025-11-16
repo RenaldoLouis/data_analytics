@@ -48,7 +48,7 @@ const DraggableItem = ({ item, type }) => {
 export default function DatasetRightContent() {
     const pathname = usePathname();
     const t = useTranslations("datasetpage");
-    const { chartContainerRef, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, chartListType, isFetchDataSetLists, setIsFetchDataSetLists, setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+    const { isChangesExistToSync, setIsChangesExistToSync, chartContainerRef, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, chartListType, isFetchDataSetLists, setIsFetchDataSetLists, setChartDrawData, chartDrawData, setSelectedChartType, selectedChartType, dataSetsList, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
 
     const [isShowsideContent, setIsShowsideContent] = useState(false);
     const [isOpenSideContent, setIsOpenSideContent] = useState(false);
@@ -253,8 +253,11 @@ export default function DatasetRightContent() {
                 const res = await services.chart.postChartRecords(tempObj);
                 if (!res.success) {
                     throw new Error(res.message || "Failed to save chart");
+                } else {
+                    dataUpdated = true;
                 }
             } catch (e) {
+                dataUpdated = false;
                 chartError = e;
             }
         }
@@ -277,6 +280,7 @@ export default function DatasetRightContent() {
         // --- 5. Refetch if data updated ---
         if (dataUpdated) {
             setIsFetchDataSetContents(!isFetchDataSetContents);
+            setIsChangesExistToSync(false)
         }
     };
 
@@ -470,7 +474,7 @@ export default function DatasetRightContent() {
                                     <Button disabled={chartDrawData?.length <= 0 ? true : false} onClick={handleSaveChart} variant="outline" className="flex-1 cursor-pointer">
                                         {t("saveChartChanges")}
                                     </Button> */}
-                                    <Button onClick={handleSyncChanges} variant="default" className="flex-1 cursor-pointer">
+                                    <Button disabled={!isChangesExistToSync} onClick={handleSyncChanges} variant="default" className="flex-1 cursor-pointer">
                                         {t("syncChanges") || "Sync Changes"}
                                         <Image src={siriussync} alt="siriussync" />
                                     </Button>

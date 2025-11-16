@@ -101,7 +101,8 @@ export function DataTable({
   setDataToUpdate,
   pageCount,
   pagination,
-  setPagination
+  setPagination,
+  setIsChangesExistToSync
 }) {
   const t = useTranslations("datasetpage");
   const excludeKeys = ["transaction_id", "customer_id", "id"];
@@ -140,6 +141,7 @@ export function DataTable({
 
         const handleChange = (e) => {
           setLocalValue(e.target.value);
+          setIsChangesExistToSync(true)
         };
 
         const handleBlur = () => {

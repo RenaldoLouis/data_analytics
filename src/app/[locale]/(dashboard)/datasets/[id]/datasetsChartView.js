@@ -32,7 +32,7 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 const DatasetsChartView = ({ chartData, datasetId }) => {
     const t = useTranslations("datasetpage");
-    const { chartContainerRef, chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
+    const { setIsChangesExistToSync, chartContainerRef, chartListType, setChartListType, selectedRow, selectedColumn, setSelectedColumn, setSelectedRow, setSelectedChartType, selectedChartType, setChartDrawData, chartDrawData } = useDashboardContext();
 
     const [isLoadingChart, setIsLoadingChart] = useState(false);
     const [selectedFormula, setSelectedFormula] = useState(ChartAggregator.sum)
@@ -158,6 +158,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     const [{ isOver: isOverColumn }, dropColumn] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
         drop: (item) => {
+            setIsChangesExistToSync(true)
             setSelectedColumn((prev) => {
                 // Check if an item with the same name already exists
                 const alreadyExists = prev.some(existingItem => existingItem.name === item.name);
@@ -179,6 +180,7 @@ const DatasetsChartView = ({ chartData, datasetId }) => {
     const [{ isOver: isOverRow }, dropRow] = useDrop({
         accept: [ItemTypes.DIMENSION, ItemTypes.MEASURE],
         drop: (item) => {
+            setIsChangesExistToSync(true)
             setSelectedRow((prev) => {
                 // Check if an item with the same name already exists
                 const alreadyExists = prev.some(existingItem => existingItem.name === item.name);

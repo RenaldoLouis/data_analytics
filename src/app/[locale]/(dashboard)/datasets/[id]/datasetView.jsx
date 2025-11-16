@@ -1,22 +1,22 @@
 'use client'
 
 import { DataTable } from "@/components/data-table"
+import LoadingScreen from "@/components/ui/loadingScreen"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { H3 } from "@/components/ui/typography"
 import { DatasetViewConst } from "@/constant/DatasetViewConst"
 import { useDashboardContext } from "@/context/dashboard-context"
 import { useDatasetTable } from "@/hooks/useDatasetTable"
+import { useTranslations } from "next-intl"
 import { useEffect, useState } from "react"
 import DatasetsChartView from "./datasetsChartView"
-import { useTranslations } from "next-intl"
-import LoadingScreen from "@/components/ui/loadingScreen"
 
 export default function DataSetView(props) {
     const { datasetId } = props
 
     const t = useTranslations("datasetpage");
-    const { setIsFetchDataSetLists, isFetchDataSetLists, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
+    const { setIsChangesExistToSync, setIsFetchDataSetLists, isFetchDataSetLists, setDataToUpdate, dataToUpdate, setIsFetchDataSetContents, isFetchDataSetContents, } = useDashboardContext();
     const [currentView, setCurrentView] = useState(DatasetViewConst.chart);
     // const [dataToUpdate, setDataToUpdate] = useState([]);
     const [pagination, setPagination] = useState({
@@ -88,6 +88,7 @@ export default function DataSetView(props) {
                             pagination={pagination}
                             setPagination={setPagination}
                             pageCount={data?.totalPages}
+                            setIsChangesExistToSync={setIsChangesExistToSync}
                         />
                     )}
                 </div>
