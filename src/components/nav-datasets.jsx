@@ -8,29 +8,17 @@ import {
   SidebarMenuItem,
   useSidebar
 } from "@/components/ui/sidebar";
+import { predefinedColors } from "@/constant/SidebarColor";
 import { useDashboardContext } from "@/context/dashboard-context";
 import services from "@/services";
 import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EditableSidebarItem } from "./editableTextSidebar";
-import { Skeleton } from "./ui/skeleton";
-import { useTranslations } from "next-intl";
 import LoadingScreen from "./ui/loadingScreen";
-
-const predefinedColors = [
-  "#FF6B6B",
-  "#6BCB77",
-  "#4D96FF",
-  "#FFD93D",
-  "#9D4EDD",
-  "#FF922B",
-  "#00C2D1",
-  "#A29BFE",
-  "#F06595",
-  "#20C997"
-];
+import { Skeleton } from "./ui/skeleton";
 
 export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
   const { isMobile } = useSidebar();

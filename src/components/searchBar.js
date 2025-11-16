@@ -1,6 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { predefinedColors } from "@/constant/SidebarColor";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { cn } from "@/lib/utils";
 import services from "@/services"; // Assuming your API services are exported from here
@@ -24,8 +25,12 @@ export function SearchBar({
         try {
             const res = await services.dataset.getAllDataset(); // Assumes you have this service
             if (res.success) {
-                originalListRef.current = res.data; // Store the full list
-                setDataSetsList(res.data);
+                const dataWithColors = res.data.map((item, index) => ({
+                    ...item,
+                    color: predefinedColors[index % predefinedColors.length], // cycle through colors
+                }));
+                setDataSetsList(dataWithColors);
+                originalListRef.current = dataWithColors;
             }
         } catch (error) {
             console.error("Failed to fetch initial dataset list:", error);
@@ -52,7 +57,11 @@ export function SearchBar({
             const res = await services.dataset.searchDataset(query);
             if (res.success) {
                 // Update the context with the search results
-                setDataSetsList(res.data);
+                const dataWithColors = res.data.map((item, index) => ({
+                    ...item,
+                    color: predefinedColors[index % predefinedColors.length], // cycle through colors
+                }));
+                setDataSetsList(dataWithColors);
             }
         } catch (error) {
             console.error("Search failed:", error);
