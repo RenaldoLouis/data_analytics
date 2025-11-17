@@ -63,10 +63,12 @@ export function NavDatasets({ setSelectedNav, selectedNav, dataSetsList }) {
   }, [isFetchDataSetLists]);
 
   const handleClickNavigateDataSets = (item) => {
-    setChartDrawData([])
-    setSelectedChartType(null)
-    setSelectedColumn([])
-    setSelectedRow([])
+    if (item.id !== selectedNav) {
+      setChartDrawData([])
+      setSelectedChartType(null)
+      setSelectedColumn([])
+      setSelectedRow([])
+    }
 
     setSelectedNav(item.id)
     router.push(`/datasets/${item.id}`);
