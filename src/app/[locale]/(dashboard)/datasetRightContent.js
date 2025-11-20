@@ -1,6 +1,6 @@
 "use client";
 
-import siriussync from "@/assets/Images/siriussync.svg";
+import siriussync from "@/assets/images/siriussync.svg";
 import { EditableText } from "@/components/EditableText";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@/components/ui/card";

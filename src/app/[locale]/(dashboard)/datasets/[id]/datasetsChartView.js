@@ -16,9 +16,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useDrop } from 'react-dnd';
 import { AreaChartComponent, BarChartComponent, LineChartComponent, PieChartComponent } from "./ChartComponent";
 
-import siriuschart from "@/assets/Images/siriuschart.svg";
-import siriuspiechart from "@/assets/Images/siriuspiechart.svg";
-import stackedbarpiechart from "@/assets/Images/stackedbarpiechart.svg";
+import siriuschart from "@/assets/images/siriuschart.svg";
+import siriuspiechart from "@/assets/images/siriuspiechart.svg";
+import stackedbarpiechart from "@/assets/images/stackedbarpiechart.svg";
 import ColumnIcon from "@/assets/logo/ColumnIcon.svg";
 import FormulaIcon from "@/assets/logo/FormulaIcon.svg";
 import RowIcon from "@/assets/logo/RowIcon.svg";
