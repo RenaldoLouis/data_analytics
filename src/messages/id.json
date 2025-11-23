@@ -46,7 +46,17 @@
         "minimumPassword": "Password harus terdiri dari minimal 6 karakter",
         "confirmationTitle": "Terima Kasih telah Bergabung Bersama Kami!",
         "confirmationSubtitle": "Kami akan menghubungi anda melalui email.",
-        "backToHome": "Kembali ke Beranda"
+        "backToHome": "Kembali ke Beranda",
+        "companyName": "Nama Perushaaan",
+        "companyNamePlaceholder": "Masukkan nama perusahaan anda",
+        "package": "Paket",
+        "selectPackagePlaceholder": "Pilih paket",
+        "confirmPassword": "Masukkan kembali password",
+        "confirmPasswordPlaceholder": "Masukkan kembali password anda",
+        "enterCompanyName": "Nama perusahaan dibutuhkan",
+        "selectPackage": "Mohon pilih paket",
+        "confirmPasswordRequired": "Moho konfirmasi password anda",
+        "passwordsDoNotMatch": "Passwords do not match"
     },
     "dashboardpage": {
         "addDataset": "Tambahkan Dataset",

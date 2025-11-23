@@ -46,7 +46,17 @@
         "minimumPassword": "Password must be at least 6 characters",
         "confirmationTitle": "Thank you for Signing Up!",
         "confirmationSubtitle": "We will contact you through your registered email.",
-        "backToHome": "Back to Home"
+        "backToHome": "Back to Home",
+        "companyName": "Company Name",
+        "companyNamePlaceholder": "Enter your company name",
+        "package": "Package",
+        "selectPackagePlaceholder": "Select a package",
+        "confirmPassword": "Re-enter Password",
+        "confirmPasswordPlaceholder": "Re-enter your password",
+        "enterCompanyName": "Company Name is required",
+        "selectPackage": "Please select a package",
+        "confirmPasswordRequired": "Please confirm your password",
+        "passwordsDoNotMatch": "Passwords do not match"
     },
     "dashboardpage": {
         "addDataset": "Add Data set",

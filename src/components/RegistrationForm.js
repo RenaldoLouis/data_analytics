@@ -1,11 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react"; // 1. Import useState
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useTranslations } from "next-intl";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -25,29 +25,41 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import services from "@/services";
-import { Check } from "lucide-react"; // 2. Import a check icon
+import { Check, Eye, EyeOff } from "lucide-react"; // Added Eye icons
 import LoadingScreen from "./ui/loadingScreen";
 
 const registrationSchema = (t) => z.object({
-    // firstName: z.string().min(1, "Enter first name"),
-    // lastName: z.string().min(1, "Enter last name"),
-    // phone: z.string().min(8, "Enter valid phone number"),
-    // email: z.string().email("Invalid email address"),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     phone: z.string().optional(),
     email: z.string().email(t("invalidEmail")),
     username: z.string().optional(),
-    // username: z.string().min(3, "Username too short"),
+    companyName: z.string().min(1, t("enterCompanyName") || "Company Name is required"), // New Field
+    package: z.string().min(1, t("selectPackage") || "Please select a package"), // New Field
     password: z.string().min(6, t("minimumPassword")),
+    confirmPassword: z.string().min(1, t("confirmPasswordRequired") || "Please confirm your password"), // New Field
+}).refine((data) => data.password === data.confirmPassword, {
+    message: t("passwordsDoNotMatch") || "Passwords do not match",
+    path: ["confirmPassword"],
 });
 
 export default function RegistrationForm() {
-    const t = useTranslations("registrationpage")
+    const t = useTranslations("registrationpage");
     const router = useRouter();
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+
+    // State for toggling password visibility
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const form = useForm({
         resolver: zodResolver(registrationSchema(t)),
@@ -57,19 +69,26 @@ export default function RegistrationForm() {
             phone: "",
             email: "",
             username: "",
+            companyName: "",
+            package: "",
             password: "",
+            confirmPassword: "",
         },
     });
 
     const onSubmit = async (data) => {
         setIsLoading(true);
+        // Construct payload
         const tempData = {
             email: data.email,
             password: data.password,
-            first_name: data.firstName,
-            last_name: data.lastName,
+            firstName: data.firstName,
+            lastName: data.lastName,
             phone: data.phone,
+            companyName: data.companyName,
+            pricingPlan: data.package,
         };
+
         try {
             const res = await services.auth.register(tempData);
 
@@ -92,7 +111,7 @@ export default function RegistrationForm() {
     };
 
     return (
-        <div className="w-full max-w-md">
+        <div className="h-full w-full max-w-md py-8">
             {isLoading && (
                 <LoadingScreen />
             )}
@@ -101,6 +120,7 @@ export default function RegistrationForm() {
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
+                    {/* First Name & Last Name */}
                     <div className="lg:flex gap-4 mb-3 lg:mb-6">
                         <FormField
                             control={form.control}
@@ -130,12 +150,12 @@ export default function RegistrationForm() {
                         />
                     </div>
 
+                    {/* Phone */}
                     <FormField
                         control={form.control}
                         name="phone"
                         render={({ field }) => (
-                            <FormItem
-                                className="mb-3 lg:mb-6">
+                            <FormItem className="mb-3 lg:mb-6">
                                 <FormLabel>{t("mobilePhone")}</FormLabel>
                                 <FormControl>
                                     <div className="flex">
@@ -154,6 +174,7 @@ export default function RegistrationForm() {
                         )}
                     />
 
+                    {/* Email */}
                     <FormField
                         control={form.control}
                         name="email"
@@ -168,12 +189,12 @@ export default function RegistrationForm() {
                         )}
                     />
 
+                    {/* Username */}
                     <FormField
                         control={form.control}
                         name="username"
                         render={({ field }) => (
-                            <FormItem
-                                className="mb-3 lg:mb-6">
+                            <FormItem className="mb-3 lg:mb-6">
                                 <FormLabel>{t("createUsername")}</FormLabel>
                                 <FormControl>
                                     <Input placeholder={t("usernamePlaceholder")} {...field} />
@@ -183,15 +204,94 @@ export default function RegistrationForm() {
                         )}
                     />
 
+                    {/* Company Name (New Field) */}
+                    <FormField
+                        control={form.control}
+                        name="companyName"
+                        render={({ field }) => (
+                            <FormItem className="mb-3 lg:mb-6">
+                                <FormLabel>{t("companyName") || "Company Name"}</FormLabel>
+                                <FormControl>
+                                    <Input placeholder={t("companyNamePlaceholder") || "Enter your company name"} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    {/* Package Selection (New Field) */}
+                    <FormField
+                        control={form.control}
+                        name="package"
+                        render={({ field }) => (
+                            <FormItem className="mb-3 lg:mb-6">
+                                <FormLabel>{t("package") || "Select Package"}</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={t("selectPackagePlaceholder") || "Select a package"} />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="freemium">Freemium</SelectItem>
+                                        <SelectItem value="essential">Essential</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    {/* Password with Toggle */}
                     <FormField
                         control={form.control}
                         name="password"
                         render={({ field }) => (
-                            <FormItem
-                                className="mb-12">
+                            <FormItem className="mb-3 lg:mb-6">
                                 <FormLabel>{t("createPassword")}</FormLabel>
                                 <FormControl>
-                                    <Input type="password" placeholder={t("passwordPlaceholder")} {...field} />
+                                    <div className="relative">
+                                        <Input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder={t("passwordPlaceholder")}
+                                            {...field}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                        >
+                                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        </button>
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    {/* Confirm Password with Toggle */}
+                    <FormField
+                        control={form.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                            <FormItem className="mb-12">
+                                <FormLabel>{t("confirmPassword") || "Re-enter Password"}</FormLabel>
+                                <FormControl>
+                                    <div className="relative">
+                                        <Input
+                                            type={showConfirmPassword ? "text" : "password"}
+                                            placeholder={t("confirmPasswordPlaceholder") || "Re-enter your password"}
+                                            {...field}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                        >
+                                            {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        </button>
+                                    </div>
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -206,7 +306,7 @@ export default function RegistrationForm() {
                         {t("submitForm")}
                     </Button>
 
-                    <div className="pt-3 lg:pt-8 flex justify-center pb-6 lg:pb-0">
+                    <div className="pt-3 lg:pt-8 flex justify-center pb-6">
                         <Image src="/logo.svg" alt="Daya Cipta Tech" width={180} height={28} />
                     </div>
                 </form>
@@ -227,7 +327,7 @@ export default function RegistrationForm() {
                     </DialogHeader>
                     <div className="mt-6">
                         <Button
-                            onClick={() => router.push("/login")} // Navigate to home or another page
+                            onClick={() => router.push("/login")}
                             className="w-full bg-slate-800 hover:bg-slate-700 cursor-pointer"
                         >
                             {t("backToHome")}
