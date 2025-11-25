@@ -40,6 +40,15 @@ const postRequest = async (path, payload) => {
     }
 };
 
+const getAPIRequest = async (path) => {
+    try {
+        const res = await http.get(path);
+        return res;
+    } catch (err) {
+        return handleErrors(err);
+    }
+};
+
 const postFormRequest = async (path, payload) => {
     try {
         return apiClient(path, {
@@ -113,6 +122,9 @@ const deleteRequest = async (path) => {
 export default {
     auth: {
         register: (payload) => postRequest('/auth/register', payload),
+        pricingPlans: () => getAPIRequest('/pricing-plans'),
+        verifyEmail: (token) => getAPIRequest(`/auth/verify-email?token=${token}`),
+        resendVerification: (email) => postRequest('/auth/resendVerification', email),
         authenticate: () => postAPIRequest('/next-api/authenticate'),
     },
     aws: {
