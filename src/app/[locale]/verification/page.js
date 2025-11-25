@@ -60,74 +60,76 @@ export default function VerificationForm() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center text-center w-full max-w-md p-6 animate-in fade-in zoom-in duration-500">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+            <div className="flex flex-col items-center justify-center text-center w-full max-w-md p-6 animate-in fade-in zoom-in duration-500">
 
-            {/* --- LOADING STATE --- */}
-            {status === "loading" && (
-                <div className="space-y-6">
-                    <div className="flex justify-center">
-                        <div className="h-20 w-20 bg-blue-50 rounded-full flex items-center justify-center animate-pulse">
-                            <Loader2 className="h-10 w-10 text-blue-600 animate-spin" />
+                {/* --- LOADING STATE --- */}
+                {status === "loading" && (
+                    <div className="space-y-6">
+                        <div className="flex justify-center">
+                            <div className="h-20 w-20 bg-blue-50 rounded-full flex items-center justify-center animate-pulse">
+                                <Loader2 className="h-10 w-10 text-blue-600 animate-spin" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-bold text-gray-900">Verifying your email...</h2>
+                            <p className="text-gray-500">Please wait while we validate your secure token.</p>
                         </div>
                     </div>
-                    <div className="space-y-2">
-                        <h2 className="text-2xl font-bold text-gray-900">Verifying your email...</h2>
-                        <p className="text-gray-500">Please wait while we validate your secure token.</p>
-                    </div>
-                </div>
-            )}
+                )}
 
-            {/* --- SUCCESS STATE --- */}
-            {status === "success" && (
-                <div className="space-y-6">
-                    <div className="flex justify-center">
-                        <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center">
-                            <CheckCircle2 className="h-10 w-10 text-green-600" />
+                {/* --- SUCCESS STATE --- */}
+                {status === "success" && (
+                    <div className="space-y-6">
+                        <div className="flex justify-center">
+                            <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center">
+                                <CheckCircle2 className="h-10 w-10 text-green-600" />
+                            </div>
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <h2 className="text-2xl font-bold text-gray-900">Email Verified!</h2>
-                        <p className="text-gray-500">
-                            Thank you for verifying your email address. Your account is now active.
-                        </p>
-                        <p className="text-sm text-gray-400 pt-2">
-                            Redirecting to login in a few seconds...
-                        </p>
-                    </div>
-                    <Button
-                        onClick={handleGoToLogin}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                        Go to Login Now <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                </div>
-            )}
-
-            {/* --- ERROR STATE --- */}
-            {status === "error" && (
-                <div className="space-y-6">
-                    <div className="flex justify-center">
-                        <div className="h-20 w-20 bg-red-100 rounded-full flex items-center justify-center">
-                            <XCircle className="h-10 w-10 text-red-600" />
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-bold text-gray-900">Email Verified!</h2>
+                            <p className="text-gray-500">
+                                Thank you for verifying your email address. Your account is now active.
+                            </p>
+                            <p className="text-sm text-gray-400 pt-2">
+                                Redirecting to login in a few seconds...
+                            </p>
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <h2 className="text-2xl font-bold text-gray-900">Verification Failed</h2>
-                        <p className="text-gray-500 max-w-xs mx-auto">
-                            {errorMessage || "The link is invalid or has expired."}
-                        </p>
-                    </div>
-                    <div className="space-y-3">
                         <Button
                             onClick={handleGoToLogin}
-                            className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                            Back to Login
+                            Go to Login Now <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                        {/* Optional: Add a 'Resend Link' button logic here if needed */}
                     </div>
-                </div>
-            )}
+                )}
+
+                {/* --- ERROR STATE --- */}
+                {status === "error" && (
+                    <div className="space-y-6">
+                        <div className="flex justify-center">
+                            <div className="h-20 w-20 bg-red-100 rounded-full flex items-center justify-center">
+                                <XCircle className="h-10 w-10 text-red-600" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-bold text-gray-900">Verification Failed</h2>
+                            <p className="text-gray-500 max-w-xs mx-auto">
+                                {errorMessage || "The link is invalid or has expired."}
+                            </p>
+                        </div>
+                        <div className="space-y-3">
+                            <Button
+                                onClick={handleGoToLogin}
+                                className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+                            >
+                                Back to Login
+                            </Button>
+                            {/* Optional: Add a 'Resend Link' button logic here if needed */}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

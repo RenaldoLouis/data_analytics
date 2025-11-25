@@ -148,5 +148,8 @@
         "minTooltip": "Returns the smallest value from the selected numeric data.",
         "maxTooltip": "Returns the largest value from the selected numeric data.",
         "roundTooltip": "Rounds the numeric values in the column to the nearest integer."
+    },
+    "verification": {
+        "asd": "asd"
     }
 }
