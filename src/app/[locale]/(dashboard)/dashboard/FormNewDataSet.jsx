@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { UploadStatus } from "@/constant/UploadStatus"
 import { useDashboardContext } from "@/context/dashboard-context"
+import { usePermissions } from "@/hooks/usePermissions"
 import services from "@/services"
 import { useEffect, useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
@@ -12,10 +13,12 @@ import * as XLSX from 'xlsx'
 import FailedUpload from "./FailedUpload"
 import NewUpload from "./NewUpload"
 import SuccessUpload from "./SuccesUpload"
+import UpgradeWall from "./UpgradeWall"
 import WarningUpload from "./WarningUpload"
 
 const FormNewDataSet = (props) => {
-    const { setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
+    const { dataSetsList, currentPricingPlans, setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
+    const permissions = usePermissions();
 
     const { isShowText = true } = props
 
@@ -133,6 +136,15 @@ const FormNewDataSet = (props) => {
     };
 
     const dialogContent = () => {
+        if (!permissions.canCreateDataset(dataSetsList.length)) {
+            return <UpgradeWall
+                currentPlanName={currentPricingPlans?.name}
+                onUpgrade={() => { }}
+                onClose={() => { }}
+                limit={currentPricingPlans?.max_datasets}
+            />
+        }
+
         switch (uploadDone) {
             case UploadStatus.dataClear:
                 return <SuccessUpload
@@ -200,7 +212,7 @@ const FormNewDataSet = (props) => {
                 <DialogTrigger style={{ display: !isShowText ? "none" : "" }} asChild>
                     <Button onClick={() => setUploadDone(null)} variant="link" className="cursor-pointer">Add data sets</Button>
                 </DialogTrigger>
-                <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false} style={{ height: uploadDone === UploadStatus.dataClear ? 255 : 500 }} preventClose={true}>
+                <DialogContent description="DialogContentAddNewDataSets" className="px-0 py-0" showCloseButton={false} style={{ height: uploadDone === UploadStatus.dataClear ? 255 : 550 }} preventClose={true}>
                     {dialogContent()}
                 </DialogContent>
             </FormProvider>

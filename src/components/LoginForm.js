@@ -214,7 +214,6 @@ export default function LoginForm() {
 
     const onOTPSubmit = async (data) => {
         const dataToSend = { otp: data.otp, email: resetEmail }
-        console.log("dataToSend", dataToSend)
         setIsLoading(true);
         try {
             const res = await fetch("/next-api/verifyResetPasswordOtp", {
@@ -244,9 +243,7 @@ export default function LoginForm() {
     };
 
     const onNewPasswordSubmit = async (data) => {
-        console.log('data', data)
         const dataToSend = { otp: resetOTP, email: resetEmail, newPassword: data.password }
-        console.log("dataToSend", dataToSend)
         setIsLoading(true);
         try {
             const res = await fetch("/next-api/resetPassword", {

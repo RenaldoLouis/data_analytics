@@ -44,7 +44,6 @@ export async function middleware(req) {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            console.log("res", res)
             if (!res.ok) {
                 // IMPORTANT: delete the token so /login doesn't bounce back to /dashboard
                 const resp = NextResponse.redirect(new URL(`/${locale}/login`, req.url));

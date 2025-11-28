@@ -92,8 +92,6 @@ export default function RegistrationForm() {
         fetchPricingPlans();
     }, []);
 
-    console.log("pricingPlans", pricingPlans)
-
     const onSubmit = async (data) => {
         setIsLoading(true);
         const tempData = {

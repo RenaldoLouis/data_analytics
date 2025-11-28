@@ -1,8 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import services from "@/services";
-import { IconBell, IconSettings } from '@tabler/icons-react';
-import { useEffect, useState } from "react";
+import { useDashboardContext } from "@/context/dashboard-context";
 import { useTranslations } from "next-intl";
 import { NavUser } from "./nav-user";
 import { SearchBar } from "./searchBar";
@@ -11,21 +9,7 @@ export function SiteHeader() {
   const t = useTranslations()
 
   const { isMobile } = useSidebar()
-
-  const [userInfo, setUserInfo] = useState(null);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await services.auth.authenticate();
-        setUserInfo(res.data)
-      } catch (e) {
-        console.error(e)
-      }
-    };
-
-    checkAuth();
-  }, []);
+  const { userInfo } = useDashboardContext();
 
   return (
     <header
