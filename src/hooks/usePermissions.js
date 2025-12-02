@@ -1,5 +1,3 @@
-// utils/permissions.js or hooks/usePermissions.js
-
 import { useDashboardContext } from "@/context/dashboard-context";
 import { useMemo } from "react";
 

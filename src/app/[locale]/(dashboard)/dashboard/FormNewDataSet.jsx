@@ -136,54 +136,59 @@ const FormNewDataSet = (props) => {
     };
 
     const dialogContent = () => {
-        if (!permissions.canCreateDataset(dataSetsList.length)) {
+        // 1. PRIORITAS UTAMA: Cek apakah ada status hasil upload (Sukses/Gagal/Warning)
+        // Jika upload sudah selesai, tampilkan hasilnya terlepas dari limit yang baru tercapai.
+        if (uploadDone !== null && uploadDone !== undefined) {
+            switch (uploadDone) {
+                case UploadStatus.dataClear:
+                    return <SuccessUpload
+                        handleSubmit={handleSubmit}
+                        onSubmit={onSubmit}
+                        register={register}
+                        errors={errors}
+                        setUploadDone={setUploadDone}
+                        emptyData={emptyData}
+                    />;
+
+                case UploadStatus.dataNotClear:
+                    return <WarningUpload
+                        handleSubmit={handleSubmit}
+                        onSubmit={onSubmit}
+                        register={register}
+                        errors={errors}
+                        setUploadDone={setUploadDone}
+                    />;
+
+                case UploadStatus.uploadFailed:
+                    return <FailedUpload
+                        handleSubmit={handleSubmit}
+                        onSubmit={onSubmit}
+                        register={register}
+                        errors={errors}
+                        setUploadDone={setUploadDone}
+                        errorMessage={errorMessage}
+                    />;
+            }
+        }
+
+        // 2. PRIORITAS KEDUA: Jika tidak ada status (user baru mau mulai), baru cek limit
+        if (permissions.canCreateDataset(dataSetsList.length)) {
+            return <NewUpload
+                handleSubmit={handleSubmit}
+                onSubmit={onSubmit}
+                register={register}
+                errors={errors}
+                isLoading={isLoading}
+                setIsLoading={setIsLoading}
+            />;
+        } else {
+            // 3. Jika limit tercapai DAN tidak sedang menampilkan hasil sukses
             return <UpgradeWall
                 currentPlanName={currentPricingPlans?.name}
                 onUpgrade={() => { }}
                 onClose={() => { }}
                 limit={currentPricingPlans?.max_datasets}
-            />
-        }
-
-        switch (uploadDone) {
-            case UploadStatus.dataClear:
-                return <SuccessUpload
-                    handleSubmit={handleSubmit}
-                    onSubmit={onSubmit}
-                    register={register}
-                    errors={errors}
-                    setUploadDone={setUploadDone}
-                    emptyData={emptyData}
-                />;
-
-            case UploadStatus.dataNotClear:
-                return <WarningUpload
-                    handleSubmit={handleSubmit}
-                    onSubmit={onSubmit}
-                    register={register}
-                    errors={errors}
-                    setUploadDone={setUploadDone}
-                />;
-
-            case UploadStatus.uploadFailed:
-                return <FailedUpload
-                    handleSubmit={handleSubmit}
-                    onSubmit={onSubmit}
-                    register={register}
-                    errors={errors}
-                    setUploadDone={setUploadDone}
-                    errorMessage={errorMessage}
-                />;
-
-            default:
-                return <NewUpload
-                    handleSubmit={handleSubmit}
-                    onSubmit={onSubmit}
-                    register={register}
-                    errors={errors}
-                    isLoading={isLoading}
-                    setIsLoading={setIsLoading}
-                />;
+            />;
         }
     }
 
