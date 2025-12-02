@@ -17,7 +17,7 @@ import UpgradeWall from "./UpgradeWall"
 import WarningUpload from "./WarningUpload"
 
 const FormNewDataSet = (props) => {
-    const { dataSetsList, currentPricingPlans, setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
+    const { userInfo, dataSetsList, currentPricingPlans, setIsDialogOpenAddNewDataSet, isDialogOpenAddNewDataset, setIsFetchDataSetLists, isFetchDataSetLists } = useDashboardContext();
     const permissions = usePermissions();
 
     const { isShowText = true } = props
@@ -41,6 +41,7 @@ const FormNewDataSet = (props) => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
     const [emptyData, setEmptyData] = useState(0);
+    const [upgradeStatus, setUpgradeStatus] = useState('idle'); // 'idle' | 'loading' | 'success'
 
     const createSingleSheetFile = async (file, selectedSheetIndex) => {
         // Read the file as ArrayBuffer
@@ -134,6 +135,35 @@ const FormNewDataSet = (props) => {
             setIsLoading(false)
         }
     };
+    const handleUpgrade = async () => {
+        // 1. Set status to loading (triggers spinner in UpgradeWall)
+        setUpgradeStatus('loading');
+
+        const dataToSend = {
+            email: `${userInfo.email}`,
+            name: `${userInfo.first_name} ${userInfo.last_name}`,
+            phone: `${userInfo.phone}`,
+            companyName: userInfo.companyName // Assuming you have this now
+        }
+
+        try {
+            await services.auth.upgradePlan(dataToSend);
+
+            // 2. Set status to success (triggers success UI in UpgradeWall)
+            setUpgradeStatus('success');
+
+            // Optional: Still show a small toast or remove it if the modal UI is enough
+            // toast.success("Request sent successfully!"); 
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to send request. Please try again.");
+            setUpgradeStatus('idle'); // Reset to allow retry
+        }
+    };
+
+    const handleCloseDialog = () => {
+        setIsDialogOpenAddNewDataSet(false);
+    };
 
     const dialogContent = () => {
         // 1. PRIORITAS UTAMA: Cek apakah ada status hasil upload (Sukses/Gagal/Warning)
@@ -185,9 +215,10 @@ const FormNewDataSet = (props) => {
             // 3. Jika limit tercapai DAN tidak sedang menampilkan hasil sukses
             return <UpgradeWall
                 currentPlanName={currentPricingPlans?.name}
-                onUpgrade={() => { }}
-                onClose={() => { }}
+                onUpgrade={handleUpgrade}
+                onClose={handleCloseDialog} // Pass the close handler
                 limit={currentPricingPlans?.max_datasets}
+                status={upgradeStatus} // Pass the new status prop!
             />;
         }
     }
@@ -201,13 +232,9 @@ const FormNewDataSet = (props) => {
     }, [isDialogOpenAddNewDataset])
 
     const handleOpenChange = (isOpen) => {
-        // If an action is trying to close the dialog (isOpen would be false)
-        // AND the component is currently in a loading state, we prevent the close.
-        if (!isOpen && isLoading) {
-            return; // Do nothing, keeping the dialog open.
+        if (!isOpen && (isLoading || upgradeStatus === 'loading')) {
+            return;
         }
-
-        // Otherwise, allow the dialog's open state to be updated as usual.
         setIsDialogOpenAddNewDataSet(isOpen);
     };
 

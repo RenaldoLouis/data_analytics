@@ -124,7 +124,8 @@ export default {
         register: (payload) => postRequest('/auth/register', payload),
         pricingPlans: () => getAPIRequest('/pricing-plans'),
         verifyEmail: (token) => getAPIRequest(`/auth/verify-email?token=${token}`),
-        resendVerification: (email) => postRequest('/auth/resendVerification', email),
+        resendVerification: (email) => postRequest('/auth/resend-verification', email),
+        upgradePlan: (email) => postRequest('/auth/upgrade-plan', email),
         authenticate: () => postAPIRequest('/next-api/authenticate'),
     },
     aws: {
