@@ -10,8 +10,10 @@ export default function requestDemoPage() {
                 </div>
 
                 {/* Right Side (Form) */}
-                <div className="w-1/2 bg-white flex items-center justify-center px-12 overflow-y-auto">
-                    <RequestDemoForm />
+                <div className="w-1/2 bg-white flex flex-col overflow-y-auto">
+                    <div className="flex-1 flex items-center justify-center px-12 py-8">
+                        <RequestDemoForm />
+                    </div>
                 </div>
             </div>
         </main>

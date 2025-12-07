@@ -1,7 +1,7 @@
 'use client';
 
 import RegistrationForm from "@/components/RegistrationForm";
-import { useIsMobile } from "@/hooks/use-mobile"
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function RegisterPage() {
     const isMobile = useIsMobile();
@@ -17,8 +17,10 @@ export default function RegisterPage() {
                 )}
 
                 {/* Right Side (Form) */}
-                <div className="w-full lg:w-1/2 bg-white flex items-center justify-center px-12 overflow-y-auto">
-                    <RegistrationForm />
+                <div className="w-1/2 bg-white flex flex-col overflow-y-auto">
+                    <div className="flex-1 flex items-center justify-center px-12 py-8">
+                        <RegistrationForm />
+                    </div>
                 </div>
             </div>
         </main>
