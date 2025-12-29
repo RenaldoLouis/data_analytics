@@ -362,7 +362,7 @@ export default function RegistrationForm() {
                             </Button>
 
                             <div className="pt-3 lg:pt-8 flex justify-center pb-6">
-                                <Image src="/logo.svg" alt="Daya Cipta Tech" width={180} height={28} />
+                                <Image src="/logo.svg" alt="Sirius" width={120} height={28} />
                             </div>
                         </form>
                     </Form>
@@ -405,7 +405,7 @@ export default function RegistrationForm() {
                     </div>
 
                     <div className="pt-12 flex justify-center">
-                        <Image src="/logo.svg" alt="Daya Cipta Tech" width={140} height={22} className="opacity-50" />
+                        <Image src="/logo.svg" alt="Sirius" width={120} height={22} className="opacity-50" />
                     </div>
                 </div>
             )}

@@ -29,7 +29,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata = {
-  title: "Daya Cipta Tech",
+  title: "Sirius",
   description: "Data Visualization Tools",
 };
 

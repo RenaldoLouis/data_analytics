@@ -206,7 +206,7 @@ export default function RequestDemoForm() {
                     </Button>
 
                     <div className="pt-8 flex justify-center">
-                        <Image src="/logo.svg" alt="Daya Cipta Tech" width={180} height={28} />
+                        <Image src="/logo.svg" alt="Sirius" width={120} height={28} />
                     </div>
                 </form >
             </Form >

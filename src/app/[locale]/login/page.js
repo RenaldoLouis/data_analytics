@@ -11,8 +11,8 @@ export default function LoginPage() {
             <div className="flex w-full lg:w-[90%] lg:max-w-6xl h-full lg:h-[85%] lg:rounded-[2rem] overflow-hidden shadow-lg">
                 {/* Left Side */}
                 {!isMobile && (
-                    <div className="w-1/2 bg-[#071d34] flex items-center justify-center rounded-[2rem]">
-                        <div className="w-full h-full bg-[url('/login.jpg')] bg-no-repeat bg-cover rounded-[2rem]" />
+                    <div className="w-1/2 bg-white flex items-center justify-center rounded-[2rem]">
+                        <div className="w-full h-full bg-[url('/login.jpg')] bg-no-repeat bg-cover " />
                     </div>
                 )}
 

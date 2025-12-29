@@ -1,4 +1,3 @@
-import React from "react"
 import { cn } from "@/lib/utils"
 
 export function H1({ className, ...props }) {
@@ -63,7 +62,7 @@ export function Muted({ className, ...props }) {
 
 export function Small({ className, ...props }) {
     return (
-        <small className={cn("text-sm font-medium leading-none", className)} {...props} />
+        <small className={cn("text-sm font-medium leading-none block", className)} {...props} />
     )
 }
 
