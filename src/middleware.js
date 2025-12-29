@@ -9,11 +9,13 @@ const i18n = createIntlMiddleware({
     defaultLocale: 'en'
 });
 
-export async function middleware(req) {
+export function middleware(req) {
     const url = req.nextUrl;
-    const pathname = url.pathname; // /, /en, /en/login, /en/dashboard
+    const pathname = url.pathname;
     const locale = pathname.match(/^\/(en|id)(?=\/|$)/)?.[1] ?? 'en';
     const pathNoLocale = pathname.replace(/^\/(en|id)(?=\/|$)/, '') || '/';
+
+    // Check purely for cookie existence (fast)
     const token = req.cookies.get('token')?.value;
 
     const startsWith = (base) => pathNoLocale === base || pathNoLocale.startsWith(`${base}/`);
@@ -21,43 +23,17 @@ export async function middleware(req) {
     const isProtected = protectedRoutes.some(startsWith);
     const isLocaleRoot = pathNoLocale === '/';
 
-    // 1) Public pages: never auth-check; if logged in, bounce to dashboard.
-    if (isPublic) {
-        if (token) {
-            // If the user is logged in and on a public page, send them to the dashboard.
-            return NextResponse.redirect(new URL(`/${locale}/dashboard`, req.url));
-        }
-        // Otherwise, if they are not logged in on a public page, just let them be.
-        return i18n(req);
+    // 1. If User has token AND tries to access Public Page (Login) -> Go to Dashboard
+    if (isPublic && token) {
+        return NextResponse.redirect(new URL(`/${locale}/dashboard`, req.url));
     }
 
-    // 2) Protected (or locale root) with no token -> go to login
+    // 2. If User has NO token AND tries to access Protected Page -> Go to Login
     if (!token && (isProtected || isLocaleRoot)) {
         return NextResponse.redirect(new URL(`/${locale}/login`, req.url));
     }
 
-    // 3) Verify token only on protected/root and only if we have one
-    if (token && (isProtected || isLocaleRoot)) {
-        try {
-            const res = await fetch(`${process.env.BACKEND_URL}/auth/authenticate`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!res.ok) {
-                // IMPORTANT: delete the token so /login doesn't bounce back to /dashboard
-                const resp = NextResponse.redirect(new URL(`/${locale}/login`, req.url));
-                resp.cookies.delete('token'); // same path/domain as you set it
-                return resp;
-            }
-        } catch {
-            const resp = NextResponse.redirect(new URL(`/${locale}/login`, req.url));
-            resp.cookies.delete('token');
-            return resp;
-        }
-    }
-
-    // 4) Default: locale handling
+    // 3. Otherwise, perform standard localization
     return i18n(req);
 }
 
