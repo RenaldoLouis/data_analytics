@@ -8,9 +8,8 @@ import { DashboardProvider } from "@/context/dashboard-context";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import FormNewDataSet from "./dashboard/FormNewDataSet";
-import DatasetRightContent from "./datasetRightContent";
+import DatasetRightContent from "./datasets/[id]/datasetRightContent"; // ← moved here
 
-// TODO : we can try to move DashboardProvider we do not need this layout to be use client, but yes for dataset page, if somehow the performance suffer greatly
 export default function ClientLayoutShellDashboard({ children }) {
     return (
         <DndProvider backend={HTML5Backend}>
@@ -30,12 +29,7 @@ export default function ClientLayoutShellDashboard({ children }) {
                         >
                             <div
                                 className="@container/main flex-1 overflow-auto"
-                                style={{
-                                    background: "white",
-                                    // margin: 50,
-                                    // borderRadius: 12,
-                                    // border: "1px solid black",
-                                }}
+                                style={{ background: "white" }}
                             >
                                 <div className="flex flex-col gap-4 pt-4 md:gap-6 md:pt-6">
                                     {children}
