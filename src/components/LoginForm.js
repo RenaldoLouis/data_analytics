@@ -301,7 +301,7 @@ export default function LoginForm() {
                             control={loginForm.control}
                             name="email"
                             render={({ field }) => (
-                                <FormItem className="mb-11">
+                                <FormItem className="mb-5">
                                     <FormLabel>Email</FormLabel>
                                     <FormControl>
                                         <Input placeholder={t("emailPlaceholder")} {...field} />
@@ -314,7 +314,7 @@ export default function LoginForm() {
                             control={loginForm.control}
                             name="password"
                             render={({ field }) => (
-                                <FormItem className="mb-11">
+                                <FormItem className="mb-3">
                                     <FormLabel>Password</FormLabel>
                                     <FormControl>
                                         <div className="relative">

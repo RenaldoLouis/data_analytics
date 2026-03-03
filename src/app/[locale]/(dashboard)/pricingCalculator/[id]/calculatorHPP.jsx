@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import LoadingScreen from "@/components/ui/loadingScreen"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { H3 } from "@/components/ui/typography"
 import {
     IconBulb,
@@ -22,6 +23,7 @@ import {
     IconTrash,
     IconUsers,
 } from "@tabler/icons-react"
+import { useTranslations } from "next-intl"
 import { useMemo, useState } from "react"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,12 +31,12 @@ const fmt = (n) => "Rp " + Math.round(n).toLocaleString("id-ID")
 const parseNum = (s) => parseFloat(String(s).replace(/[^\d.]/g, "")) || 0
 
 // ─── Donut Chart (pure SVG) ───────────────────────────────────────────────────
-function DonutChart({ data }) {
+function DonutChart({ data, noDataLabel }) {
     const total = data.reduce((s, d) => s + d.value, 0)
     if (total === 0)
         return (
             <div className="flex items-center justify-center h-36 text-muted-foreground text-sm">
-                Belum ada data
+                {noDataLabel}
             </div>
         )
 
@@ -127,15 +129,14 @@ function FieldInput({ label, value, onChange, prefix, suffix, placeholder = "0" 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CalculatorHPP({ calculatorId }) {
+    const t = useTranslations("calculatorpage")
+
     const [namaProduk, setNamaProduk] = useState("")
     const [jumlahProduk, setJumlahProduk] = useState("1")
-
-    const [bahans, setBahans] = useState([
-        { id: 1, nama: "", jumlah: 0, satuan: "kg", harga: 0 },
-    ])
+    const [bahans, setBahans] = useState([{ id: 1, nama: "", jumlah: 0, satuan: "kg", harga: 0 }])
     const SATUAN = ["kg", "gram", "liter", "ml", "butir", "buah", "pcs", "lusin", "meter", "lembar"]
 
-    const [upahMode, setUpahMode] = useState("harian")
+    const [isBorongan, setIsBorongan] = useState(false)
     const [upahPerHari, setUpahPerHari] = useState("0")
     const [jumlahPekerja, setJumlahPekerja] = useState("1")
     const [jumlahHari, setJumlahHari] = useState("1")
@@ -155,25 +156,21 @@ export default function CalculatorHPP({ calculatorId }) {
     const [isLoading, setIsLoading] = useState(false)
 
     // ─── Calculations ─────────────────────────────────────────────────────────
-    const totalBahan = useMemo(
-        () => bahans.reduce((s, b) => s + b.jumlah * b.harga, 0),
-        [bahans]
-    )
+    const totalBahan = useMemo(() => bahans.reduce((s, b) => s + b.jumlah * b.harga, 0), [bahans])
+
     const totalTenaga = useMemo(() => {
-        if (upahMode === "harian")
+        if (!isBorongan)
             return parseNum(upahPerHari) * parseNum(jumlahPekerja) * parseNum(jumlahHari)
         return parseNum(upahBorongan)
-    }, [upahMode, upahPerHari, jumlahPekerja, jumlahHari, upahBorongan])
+    }, [isBorongan, upahPerHari, jumlahPekerja, jumlahHari, upahBorongan])
 
     const totalOverhead = useMemo(
         () => parseNum(listrik) + parseNum(gas) + parseNum(sewa) + parseNum(penyusutan) +
             biayaLainnya.reduce((s, b) => s + parseNum(b.nilai), 0),
         [listrik, gas, sewa, penyusutan, biayaLainnya]
     )
-    const totalTambahan = useMemo(
-        () => parseNum(kemasan) + parseNum(ongkir),
-        [kemasan, ongkir]
-    )
+
+    const totalTambahan = useMemo(() => parseNum(kemasan) + parseNum(ongkir), [kemasan, ongkir])
 
     const totalProduksi = totalBahan + totalTenaga + totalOverhead + totalTambahan
     const qty = parseNum(jumlahProduk) || 1
@@ -183,10 +180,10 @@ export default function CalculatorHPP({ calculatorId }) {
     const profit = hargaJual - hpp
 
     const chartData = [
-        { label: "Bahan Baku", value: totalBahan, color: "var(--chart-1)" },
-        { label: "Tenaga Kerja", value: totalTenaga, color: "var(--chart-2)" },
-        { label: "Overhead", value: totalOverhead, color: "var(--chart-3)" },
-        { label: "Biaya Tambahan", value: totalTambahan, color: "var(--chart-4)" },
+        { label: t("bahanBaku"), value: totalBahan, color: "var(--chart-1)" },
+        { label: t("tenagaKerja"), value: totalTenaga, color: "var(--chart-2)" },
+        { label: t("overhead"), value: totalOverhead, color: "var(--chart-3)" },
+        { label: t("biayaTambahan"), value: totalTambahan, color: "var(--chart-4)" },
     ]
 
     const addBahan = () =>
@@ -198,7 +195,7 @@ export default function CalculatorHPP({ calculatorId }) {
     const resetAll = () => {
         setNamaProduk(""); setJumlahProduk("1")
         setBahans([{ id: 1, nama: "", jumlah: 0, satuan: "kg", harga: 0 }])
-        setUpahMode("harian"); setUpahPerHari("0"); setJumlahPekerja("1")
+        setIsBorongan(false); setUpahPerHari("0"); setJumlahPekerja("1")
         setJumlahHari("1"); setUpahBorongan("0")
         setListrik("0"); setGas("0"); setSewa("0"); setPenyusutan("0")
         setBiayaLainnya([]); setKemasan("0"); setOngkir("0")
@@ -210,7 +207,7 @@ export default function CalculatorHPP({ calculatorId }) {
             {isLoading && <LoadingScreen />}
 
             <div className="flex justify-between items-center px-4 lg:px-6">
-                <H3 className="text-xl font-bold">HPP Calculator</H3>
+                <H3 className="text-xl font-bold">{t("title")}</H3>
             </div>
             <div className="px-4 lg:px-6">
                 <Separator />
@@ -224,25 +221,25 @@ export default function CalculatorHPP({ calculatorId }) {
 
                         {/* Informasi Produk */}
                         <SectionCard
-                            icon={<IconPackage size={18} className="text-[#2168AB]" />}
-                            title="Informasi Produk"
-                            subtitle="Isi nama produk dan berapa banyak yang kamu produksi"
+                            icon={<IconPackage size={18} />}
+                            title={t("informasiProduk")}
+                            subtitle={t("informasiProdukSubtitle")}
                         >
                             <div className="mt-3 flex flex-col gap-3">
                                 <div className="grid gap-1.5">
-                                    <Label>Nama Produk</Label>
+                                    <Label>{t("namaProduk")}</Label>
                                     <Input
                                         type="text"
                                         value={namaProduk}
                                         onChange={(e) => setNamaProduk(e.target.value)}
-                                        placeholder="Contoh: Kue Brownies Coklat"
+                                        placeholder={t("namaProdukPlaceholder")}
                                     />
                                 </div>
                                 <FieldInput
-                                    label="Jumlah Produk Jadi"
+                                    label={t("jumlahProduk")}
                                     value={jumlahProduk}
                                     onChange={setJumlahProduk}
-                                    suffix="unit"
+                                    suffix={t("unit")}
                                     placeholder="50"
                                 />
                             </div>
@@ -250,13 +247,13 @@ export default function CalculatorHPP({ calculatorId }) {
 
                         {/* Biaya Bahan Baku */}
                         <SectionCard
-                            icon={<IconShoppingCart size={18} className="text-[#2168AB]" />}
-                            title="Biaya Bahan Baku"
-                            subtitle="Daftar semua bahan yang kamu pakai untuk produksi"
+                            icon={<IconShoppingCart size={18} />}
+                            title={t("biayaBahan")}
+                            subtitle={t("biayaBahanSubtitle")}
                         >
                             <div className="mt-3">
                                 <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_2fr_auto] gap-2 mb-2">
-                                    {["Nama Bahan", "Jumlah", "Satuan", "Harga/satuan", ""].map((h) => (
+                                    {[t("namaBahan"), t("jumlah"), t("satuan"), t("hargaSatuan"), ""].map((h) => (
                                         <span key={h} className="text-xs text-muted-foreground">{h}</span>
                                     ))}
                                 </div>
@@ -273,7 +270,7 @@ export default function CalculatorHPP({ calculatorId }) {
                                                     type="text"
                                                     value={b.nama}
                                                     onChange={(e) => updateBahan(b.id, "nama", e.target.value)}
-                                                    placeholder="Nama bahan"
+                                                    placeholder={t("namaBahan")}
                                                 />
                                                 <Input
                                                     type="number"
@@ -318,11 +315,11 @@ export default function CalculatorHPP({ calculatorId }) {
                                 </div>
 
                                 <Button variant="ghost" size="sm" onClick={addBahan} className="mt-3 px-0 justify-start">
-                                    <IconPlus size={15} /> Tambah Bahan
+                                    <IconPlus size={15} /> {t("tambahBahan")}
                                 </Button>
 
                                 <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                                    <span className="text-sm font-medium text-card-foreground">Total Bahan Baku</span>
+                                    <span className="text-sm font-medium text-card-foreground">{t("totalBahanBaku")}</span>
                                     <span className="text-sm font-semibold text-primary">{fmt(totalBahan)}</span>
                                 </div>
                             </div>
@@ -330,38 +327,44 @@ export default function CalculatorHPP({ calculatorId }) {
 
                         {/* Biaya Tenaga Kerja */}
                         <SectionCard
-                            icon={<IconUsers size={18} className="text-[#2168AB]" />}
-                            title="Biaya Tenaga Kerja"
-                            subtitle="Biaya untuk membayar tenaga kerja produksi"
+                            icon={<IconUsers size={18} />}
+                            title={t("biayaTenaga")}
+                            subtitle={t("biayaTenagaSubtitle")}
                         >
                             <div className="mt-3 flex flex-col gap-3">
+                                {/* Switch: Upah Harian ↔ Upah Borongan */}
                                 <div className="flex items-center gap-3">
-                                    <span className={`text-sm ${upahMode === "harian" ? "font-medium text-foreground" : "text-muted-foreground"}`}>
-                                        Upah Harian
-                                    </span>
-                                    <button
-                                        onClick={() => setUpahMode(upahMode === "harian" ? "borongan" : "harian")}
-                                        className={`relative w-10 h-5 rounded-full transition-colors ${upahMode === "borongan" ? "bg-primary" : "bg-input"}`}
+                                    <Label
+                                        htmlFor="upah-mode"
+                                        className={!isBorongan ? "font-medium text-foreground" : "text-muted-foreground"}
                                     >
-                                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-background shadow transition-transform ${upahMode === "borongan" ? "translate-x-5" : "translate-x-0"}`} />
-                                    </button>
-                                    <span className={`text-sm ${upahMode === "borongan" ? "font-medium text-foreground" : "text-muted-foreground"}`}>
-                                        Upah Borongan
-                                    </span>
+                                        {t("upahHarian")}
+                                    </Label>
+                                    <Switch
+                                        id="upah-mode"
+                                        checked={isBorongan}
+                                        onCheckedChange={setIsBorongan}
+                                    />
+                                    <Label
+                                        htmlFor="upah-mode"
+                                        className={isBorongan ? "font-medium text-foreground" : "text-muted-foreground"}
+                                    >
+                                        {t("upahBorongan")}
+                                    </Label>
                                 </div>
 
-                                {upahMode === "harian" ? (
+                                {!isBorongan ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        <FieldInput label="Upah per Hari" value={upahPerHari} onChange={setUpahPerHari} prefix="Rp" />
-                                        <FieldInput label="Jumlah Pekerja" value={jumlahPekerja} onChange={setJumlahPekerja} suffix="orang" />
-                                        <FieldInput label="Jumlah Hari" value={jumlahHari} onChange={setJumlahHari} suffix="hari" />
+                                        <FieldInput label={t("upahPerHari")} value={upahPerHari} onChange={setUpahPerHari} prefix="Rp" />
+                                        <FieldInput label={t("jumlahPekerja")} value={jumlahPekerja} onChange={setJumlahPekerja} suffix={t("orang")} />
+                                        <FieldInput label={t("jumlahHari")} value={jumlahHari} onChange={setJumlahHari} suffix={t("hari")} />
                                     </div>
                                 ) : (
-                                    <FieldInput label="Total Upah Borongan" value={upahBorongan} onChange={setUpahBorongan} prefix="Rp" />
+                                    <FieldInput label={t("totalUpahBorongan")} value={upahBorongan} onChange={setUpahBorongan} prefix="Rp" />
                                 )}
 
                                 <div className="pt-3 border-t flex justify-between items-center">
-                                    <span className="text-sm font-medium text-card-foreground">Total Tenaga Kerja</span>
+                                    <span className="text-sm font-medium text-card-foreground">{t("totalTenagaKerja")}</span>
                                     <span className="text-sm font-semibold text-primary">{fmt(totalTenaga)}</span>
                                 </div>
                             </div>
@@ -369,18 +372,18 @@ export default function CalculatorHPP({ calculatorId }) {
 
                         {/* Biaya Overhead */}
                         <SectionCard
-                            icon={<IconTool size={18} className="text-[#2168AB]" />}
-                            title="Biaya Overhead Produksi"
-                            subtitle="Biaya operasional yang mendukung produksi"
+                            icon={<IconTool size={18} />}
+                            title={t("biayaOverhead")}
+                            subtitle={t("biayaOverheadSubtitle")}
                             collapsible
                             defaultOpen
                         >
                             <div className="mt-3 flex flex-col gap-3">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <FieldInput label="Listrik & Air" value={listrik} onChange={setListrik} prefix="Rp" />
-                                    <FieldInput label="Gas / BBM" value={gas} onChange={setGas} prefix="Rp" />
-                                    <FieldInput label="Sewa Tempat (per bulan)" value={sewa} onChange={setSewa} prefix="Rp" />
-                                    <FieldInput label="Penyusutan Alat" value={penyusutan} onChange={setPenyusutan} prefix="Rp" />
+                                    <FieldInput label={t("listrik")} value={listrik} onChange={setListrik} prefix="Rp" />
+                                    <FieldInput label={t("gas")} value={gas} onChange={setGas} prefix="Rp" />
+                                    <FieldInput label={t("sewaTempat")} value={sewa} onChange={setSewa} prefix="Rp" />
+                                    <FieldInput label={t("penyusutan")} value={penyusutan} onChange={setPenyusutan} prefix="Rp" />
                                 </div>
 
                                 {biayaLainnya.map((item) => (
@@ -391,7 +394,7 @@ export default function CalculatorHPP({ calculatorId }) {
                                             onChange={(e) =>
                                                 setBiayaLainnya((p) => p.map((b) => b.id === item.id ? { ...b, nama: e.target.value } : b))
                                             }
-                                            placeholder="Nama biaya"
+                                            placeholder={t("namaBiaya")}
                                         />
                                         <div className="flex items-center border border-input rounded-md overflow-hidden bg-transparent shadow-xs focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:border-ring transition-all flex-1">
                                             <span className="px-2 text-xs text-muted-foreground border-r border-input bg-muted/50 h-9 flex items-center">Rp</span>
@@ -422,11 +425,11 @@ export default function CalculatorHPP({ calculatorId }) {
                                     onClick={() => setBiayaLainnya((p) => [...p, { id: Date.now(), nama: "", nilai: "0" }])}
                                     className="px-0 justify-start w-fit"
                                 >
-                                    <IconPlus size={15} /> Biaya Lainnya
+                                    <IconPlus size={15} /> {t("biayaLainnya")}
                                 </Button>
 
                                 <div className="pt-3 border-t flex justify-between items-center">
-                                    <span className="text-sm font-medium text-card-foreground">Total Overhead</span>
+                                    <span className="text-sm font-medium text-card-foreground">{t("totalOverhead")}</span>
                                     <span className="text-sm font-semibold text-primary">{fmt(totalOverhead)}</span>
                                 </div>
                             </div>
@@ -434,19 +437,19 @@ export default function CalculatorHPP({ calculatorId }) {
 
                         {/* Biaya Tambahan */}
                         <SectionCard
-                            icon={<IconCurrencyDollar size={18} className="text-[#2168AB]" />}
-                            title="Biaya Tambahan (Opsional)"
-                            subtitle="Opsional - tambahkan jika ada biaya ini"
+                            icon={<IconCurrencyDollar size={18} />}
+                            title={t("biayaTambahan")}
+                            subtitle={t("biayaTambahanSubtitle")}
                             collapsible
                             defaultOpen
                         >
                             <div className="mt-3 flex flex-col gap-3">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <FieldInput label="Biaya Kemasan" value={kemasan} onChange={setKemasan} prefix="Rp" />
-                                    <FieldInput label="Ongkir Bahan Baku" value={ongkir} onChange={setOngkir} prefix="Rp" />
+                                    <FieldInput label={t("kemasan")} value={kemasan} onChange={setKemasan} prefix="Rp" />
+                                    <FieldInput label={t("ongkir")} value={ongkir} onChange={setOngkir} prefix="Rp" />
                                 </div>
                                 <div className="pt-3 border-t flex justify-between items-center">
-                                    <span className="text-sm font-medium text-card-foreground">Total Tambahan</span>
+                                    <span className="text-sm font-medium text-card-foreground">{t("totalTambahan")}</span>
                                     <span className="text-sm font-semibold text-primary">{fmt(totalTambahan)}</span>
                                 </div>
                             </div>
@@ -458,12 +461,12 @@ export default function CalculatorHPP({ calculatorId }) {
 
                         <Card className="py-0 gap-0">
                             <CardHeader className="flex flex-row items-center gap-2 px-5 pt-5 pb-4">
-                                <IconChartDonut size={17} className="text-[#2168AB]" />
-                                <p className="font-semibold text-sm text-card-foreground">Ringkasan Biaya</p>
+                                <IconChartDonut size={17} className="text-primary" />
+                                <p className="font-semibold text-sm text-card-foreground">{t("ringkasanBiaya")}</p>
                             </CardHeader>
                             <CardContent className="px-5 pb-5">
-                                <div className="flex justify-center mb-4 ">
-                                    <DonutChart data={chartData} />
+                                <div className="flex justify-center mb-4">
+                                    <DonutChart data={chartData} noDataLabel={t("noData")} />
                                 </div>
 
                                 <div className="flex flex-col gap-2 mb-4">
@@ -481,28 +484,26 @@ export default function CalculatorHPP({ calculatorId }) {
                                 <Separator className="mb-3" />
 
                                 <div className="flex justify-between items-center">
-                                    <span className="text-sm font-semibold text-card-foreground">Total Produksi</span>
+                                    <span className="text-sm font-semibold text-card-foreground">{t("totalProduksi")}</span>
                                     <span className="text-sm font-bold text-card-foreground">{fmt(totalProduksi)}</span>
                                 </div>
                                 <div className="flex justify-between items-center mt-1 mb-3">
-                                    <span className="text-xs text-muted-foreground">Jumlah Produk</span>
-                                    <span className="text-xs text-muted-foreground">{parseNum(jumlahProduk)} unit</span>
+                                    <span className="text-xs text-muted-foreground">{t("jumlahProdukLabel")}</span>
+                                    <span className="text-xs text-muted-foreground">{parseNum(jumlahProduk)} {t("unit")}</span>
                                 </div>
 
-                                {/* HPP Per Unit — uses primary as accent, only place with intentional gradient */}
-                                <div className="rounded-xl p-4 bg-secondary text-primary-foreground text-center">
-                                    <p className="text-xs text-muted-foreground mb-1">🔥 HPP Per Unit</p>
-                                    <p className="text-2xl text-muted-foreground font-bold">{fmt(hpp)}</p>
-                                    <p className="text-xs text-muted-foreground opacity-70 mt-0.5">per unit</p>
+                                <div className="rounded-xl p-4 bg-primary text-primary-foreground text-center">
+                                    <p className="text-xs opacity-80 mb-1">🔥 {t("hppPerUnit")}</p>
+                                    <p className="text-2xl font-bold">{fmt(hpp)}</p>
+                                    <p className="text-xs opacity-70 mt-0.5">{t("perUnit")}</p>
                                 </div>
 
-                                {/* Hitung Harga Jual */}
                                 <button
                                     onClick={() => setHargaJualOpen((o) => !o)}
                                     className="mt-3 w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors py-2 border-t"
                                 >
                                     <span className="flex items-center gap-1.5">
-                                        <IconBulb size={13} /> Hitung Harga Jual & Profit
+                                        <IconBulb size={13} /> {t("hitungHargaJual")}
                                     </span>
                                     {hargaJualOpen ? <IconChevronUp size={13} /> : <IconChevronDown size={13} />}
                                 </button>
@@ -510,7 +511,7 @@ export default function CalculatorHPP({ calculatorId }) {
                                 {hargaJualOpen && (
                                     <div className="mt-2 flex flex-col gap-3">
                                         <FieldInput
-                                            label="Target Margin Profit (%)"
+                                            label={t("targetMargin")}
                                             value={marginPct}
                                             onChange={setMarginPct}
                                             suffix="%"
@@ -518,15 +519,15 @@ export default function CalculatorHPP({ calculatorId }) {
                                         />
                                         <div className="bg-muted rounded-lg p-3 flex flex-col gap-2">
                                             <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">Harga Jual Rekomendasi</span>
+                                                <span className="text-muted-foreground">{t("hargaJualRekomendasi")}</span>
                                                 <span className="font-semibold text-foreground">{fmt(hargaJual)}</span>
                                             </div>
                                             <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">Profit per Unit</span>
+                                                <span className="text-muted-foreground">{t("profitPerUnit")}</span>
                                                 <span className="font-semibold text-foreground">{fmt(profit)}</span>
                                             </div>
                                             <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">Total Profit ({parseNum(jumlahProduk)} unit)</span>
+                                                <span className="text-muted-foreground">{t("totalProfit")} ({parseNum(jumlahProduk)} {t("unit")})</span>
                                                 <span className="font-semibold text-foreground">{fmt(profit * qty)}</span>
                                             </div>
                                         </div>
@@ -535,14 +536,12 @@ export default function CalculatorHPP({ calculatorId }) {
                             </CardContent>
                         </Card>
 
-                        <div className="flex flex-col gap-2 w-full">
-                            <Button className="w-full" onClick={() => setIsLoading(true)}>
-                                <IconDeviceFloppy size={16} /> Simpan Perhitungan
-                            </Button>
-                            <Button variant="outline" className="w-full" onClick={resetAll}>
-                                <IconRefresh size={16} /> Reset Semua
-                            </Button>
-                        </div>
+                        <Button className="w-full" onClick={() => setIsLoading(true)}>
+                            <IconDeviceFloppy size={16} /> {t("simpan")}
+                        </Button>
+                        <Button variant="outline" className="w-full" onClick={resetAll}>
+                            <IconRefresh size={16} /> {t("reset")}
+                        </Button>
                     </div>
                 </div>
             </div>

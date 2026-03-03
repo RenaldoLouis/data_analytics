@@ -72,12 +72,12 @@ export default function GenericDashboardCardChart({ title, description, chartInf
                 {children} {/* The specific chart will be rendered here */}
             </CardContent>
             <CardFooter className="flex-col items-start gap-2 text-sm">
-                <div className="flex gap-2 leading-none font-medium">
+                {/* <div className="flex gap-2 leading-none font-medium">
                     Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
                 </div>
                 <div className="text-muted-foreground leading-none">
                     Showing total visitors for the last 6 months
-                </div>
+                </div> */}
                 <div className="flex self-end mt-auto pt-2">
                     <NextImage onClick={handleDownloadImage} src={downloadIcon} alt="Download icon" className="w-5 h-5 mr-3 cursor-pointer" />
                     <NextImage onClick={handleClickEditChart} src={editIcon} alt="Edit icon" className="w-5 h-5 cursor-pointer" />
