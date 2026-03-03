@@ -6,13 +6,19 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { IconCalculator } from "@tabler/icons-react"
+import { IconCalculator, IconTag } from "@tabler/icons-react"
 import { useRouter } from "next/navigation"
 
 export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
     const router = useRouter()
 
     const items = [
+        {
+            id: "pricing-sku",
+            title: "SKU",
+            url: "/pricingCalculator/sku",
+            icon: IconTag,
+        },
         {
             id: "pricing-calculator",
             title: "HPP Calculator",

@@ -151,5 +151,16 @@ export default {
         getDashboard: (layoutNumber) => getRequest(`/next-api/dashboard/${layoutNumber}`),
         postSaveDashboardRecord: (data) => postAPIRequest(`/next-api/dashboard`, data),
         deleteDashboardChart: (id) => deleteRequestMiddleware(`/next-api/dashboard/chart/${id}`),
-    }
+    },
+    sku: {
+        getSkus: () => getRequest('/next-api/sku'),
+        getSkuById: (skuId) => getRequest(`/next-api/sku/${skuId}`),
+        createSku: (payload) => postAPIRequest('/next-api/sku', payload),
+        updateSku: (skuId, payload) => putRequestMiddleware(`/next-api/sku/${skuId}`, payload),
+        deleteSku: (skuId) => deleteRequestMiddleware(`/next-api/sku/${skuId}`),
+        getCategories: () => getRequest('/next-api/sku/categories'),
+        getCategoryById: (categoryId) => getRequest(`/next-api/sku/categories/${categoryId}`),
+        getSubCategories: () => getRequest('/next-api/sku/subcategories'),
+        getSubCategoriesByCategory: (categoryId) => getRequest(`/next-api/sku/subcategories?categoryId=${categoryId}`),
+    },
 };

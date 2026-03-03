@@ -41,6 +41,8 @@ export function AppSidebar({ ...props }) {
   useEffect(() => {
     if (pathname === "/dashboard") {
       setSelectedNav("1")
+    } else if (pathname.startsWith("/pricingCalculator/sku")) {
+      setSelectedNav("pricing-sku")
     } else if (pathname.startsWith("/pricingCalculator")) {
       setSelectedNav("pricing-calculator")
     } else {

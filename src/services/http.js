@@ -77,24 +77,22 @@ class HttpService {
   }
 
   put(url, payload) {
-    return this.axios.put(url, {
+    return this.axios.put(url, payload, {
       baseURL: this.baseURL,
       headers: {
         'Authorization': `Bearer ${this.authToken ?? ''}`,
         'Content-Type': 'application/json',
       },
-      data: payload,
     });
   }
 
   patch(url, payload) {
-    return this.axios.patch(url, {
+    return this.axios.patch(url, payload, {
       baseURL: this.baseURL,
       headers: {
         'Authorization': `Bearer ${this.authToken ?? ''}`,
         'Content-Type': 'application/json',
       },
-      data: payload,
     });
   }
 
