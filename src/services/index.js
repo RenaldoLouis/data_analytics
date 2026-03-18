@@ -152,6 +152,16 @@ export default {
         postSaveDashboardRecord: (data) => postAPIRequest(`/next-api/dashboard`, data),
         deleteDashboardChart: (id) => deleteRequestMiddleware(`/next-api/dashboard/chart/${id}`),
     },
+    pl: {
+        getPls: () => getRequest('/next-api/pl'),
+        getPlById: (plId) => getRequest(`/next-api/pl/${plId}`),
+        createPl: (payload) => postAPIRequest('/next-api/pl', payload),
+        updatePl: (plId, payload) => putRequestMiddleware(`/next-api/pl/${plId}`, payload),
+        deletePl: (plId) => deleteRequestMiddleware(`/next-api/pl/${plId}`),
+        getChannels: () => getRequest('/next-api/pl/lookup/channels'),
+        getPaymentTerms: () => getRequest('/next-api/pl/lookup/payment-terms'),
+        getEnablers: () => getRequest('/next-api/pl/lookup/enablers'),
+    },
     sku: {
         getSkus: () => getRequest('/next-api/sku'),
         getSkuById: (skuId) => getRequest(`/next-api/sku/${skuId}`),

@@ -78,7 +78,7 @@ function SectionCard({ icon, title, subtitle, children, collapsible = false, def
     return (
         <Card className="gap-0 py-0 overflow-hidden">
             <CardHeader
-                className={`flex flex-row items-start gap-3 px-5 pt-5 ${collapsible ? "cursor-pointer select-none" : ""} ${subtitle ? "pb-1" : "pb-5"}`}
+                className={`flex flex-row items-start gap-3 px-5 pt-5 pb-5 ${collapsible ? "cursor-pointer select-none" : ""}`}
                 onClick={collapsible ? () => setOpen((o) => !o) : undefined}
             >
                 <span className="mt-0.5 text-primary flex-shrink-0">{icon}</span>

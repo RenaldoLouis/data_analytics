@@ -43,6 +43,8 @@ export function AppSidebar({ ...props }) {
       setSelectedNav("1")
     } else if (pathname.startsWith("/pricingCalculator/sku")) {
       setSelectedNav("pricing-sku")
+    } else if (pathname.startsWith("/pricingCalculator/pl")) {
+      setSelectedNav("pricing-pl")
     } else if (pathname.startsWith("/pricingCalculator")) {
       setSelectedNav("pricing-calculator")
     } else {

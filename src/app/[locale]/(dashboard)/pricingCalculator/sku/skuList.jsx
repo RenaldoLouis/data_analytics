@@ -14,6 +14,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { H3 } from "@/components/ui/typography"
 import services from "@/services"
 import {
     IconChevronLeft,
@@ -157,7 +158,7 @@ export default function SkuList() {
                 </div>
             ),
         },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     ], [categoryMap, subCategoryMap, t])
 
     const table = useReactTable({
@@ -175,9 +176,9 @@ export default function SkuList() {
         <>
             {isMutating && <LoadingScreen />}
 
-            <div className="p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-semibold">{t('title')}</h1>
+            <div className="space-y-4">
+                <div className="flex justify-between items-center px-4 lg:px-6">
+                    <H3 className="text-xl font-bold">{t("title")}</H3>
                     <Button
                         onClick={() => { setEditingSku(null); setIsModalOpen(true) }}
                         disabled={isPageLoading}
@@ -187,118 +188,122 @@ export default function SkuList() {
                     </Button>
                 </div>
 
-                <Separator />
+                <div className="px-4 lg:px-6">
+                    <Separator />
+                </div>
 
-                <div className="overflow-hidden rounded-lg border">
-                    {isPageLoading ? (
-                        <Table>
-                            <TableHeader className="bg-muted sticky top-0 z-10">
-                                <TableRow>
-                                    {Array.from({ length: SKELETON_COLS }).map((_, i) => (
-                                        <TableHead key={i}>
-                                            <Skeleton className="h-4 w-20" />
-                                        </TableHead>
-                                    ))}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {Array.from({ length: SKELETON_ROWS }).map((_, rowIdx) => (
-                                    <TableRow key={rowIdx}>
-                                        {Array.from({ length: SKELETON_COLS }).map((_, colIdx) => (
-                                            <TableCell key={colIdx}>
-                                                <Skeleton className="h-4 w-full" />
-                                            </TableCell>
-                                        ))}
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    ) : (
-                        <Table>
-                            <TableHeader className="bg-muted sticky top-0 z-10">
-                                {table.getHeaderGroups().map((headerGroup) => (
-                                    <TableRow key={headerGroup.id}>
-                                        {headerGroup.headers.map((header) => (
-                                            <TableHead key={header.id} colSpan={header.colSpan}>
-                                                {header.isPlaceholder
-                                                    ? null
-                                                    : flexRender(header.column.columnDef.header, header.getContext())}
+                <div className="px-4 lg:px-6 py-4 space-y-4">
+                    <div className="overflow-hidden rounded-lg border">
+                        {isPageLoading ? (
+                            <Table>
+                                <TableHeader className="bg-muted sticky top-0 z-10">
+                                    <TableRow>
+                                        {Array.from({ length: SKELETON_COLS }).map((_, i) => (
+                                            <TableHead key={i}>
+                                                <Skeleton className="h-4 w-20" />
                                             </TableHead>
                                         ))}
                                     </TableRow>
-                                ))}
-                            </TableHeader>
-                            <TableBody>
-                                {table.getRowModel().rows.length ? (
-                                    table.getRowModel().rows.map((row) => (
-                                        <TableRow key={row.id}>
-                                            {row.getVisibleCells().map((cell) => (
-                                                <TableCell key={cell.id}>
-                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </TableHeader>
+                                <TableBody>
+                                    {Array.from({ length: SKELETON_ROWS }).map((_, rowIdx) => (
+                                        <TableRow key={rowIdx}>
+                                            {Array.from({ length: SKELETON_COLS }).map((_, colIdx) => (
+                                                <TableCell key={colIdx}>
+                                                    <Skeleton className="h-4 w-full" />
                                                 </TableCell>
                                             ))}
                                         </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground text-sm">
-                                            {t('noData')}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <Table>
+                                <TableHeader className="bg-muted sticky top-0 z-10">
+                                    {table.getHeaderGroups().map((headerGroup) => (
+                                        <TableRow key={headerGroup.id}>
+                                            {headerGroup.headers.map((header) => (
+                                                <TableHead key={header.id} colSpan={header.colSpan}>
+                                                    {header.isPlaceholder
+                                                        ? null
+                                                        : flexRender(header.column.columnDef.header, header.getContext())}
+                                                </TableHead>
+                                            ))}
+                                        </TableRow>
+                                    ))}
+                                </TableHeader>
+                                <TableBody>
+                                    {table.getRowModel().rows.length ? (
+                                        table.getRowModel().rows.map((row) => (
+                                            <TableRow key={row.id}>
+                                                {row.getVisibleCells().map((cell) => (
+                                                    <TableCell key={cell.id}>
+                                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                    </TableCell>
+                                                ))}
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground text-sm">
+                                                {t('noData')}
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </div>
+
+                    {!isPageLoading && (
+                        <div className="flex items-center justify-end gap-8 px-2">
+                            <div className="flex w-fit items-center justify-center text-sm font-medium">
+                                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="hidden h-8 w-8 p-0 lg:flex"
+                                    onClick={() => table.setPageIndex(0)}
+                                    disabled={!table.getCanPreviousPage()}
+                                >
+                                    <span className="sr-only">Go to first page</span>
+                                    <IconChevronsLeft />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="size-8"
+                                    size="icon"
+                                    onClick={() => table.previousPage()}
+                                    disabled={!table.getCanPreviousPage()}
+                                >
+                                    <span className="sr-only">Go to previous page</span>
+                                    <IconChevronLeft />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="size-8"
+                                    size="icon"
+                                    onClick={() => table.nextPage()}
+                                    disabled={!table.getCanNextPage()}
+                                >
+                                    <span className="sr-only">Go to next page</span>
+                                    <IconChevronRight />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="hidden size-8 lg:flex"
+                                    size="icon"
+                                    onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                                    disabled={!table.getCanNextPage()}
+                                >
+                                    <span className="sr-only">Go to last page</span>
+                                    <IconChevronsRight />
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </div>
-
-                {!isPageLoading && (
-                    <div className="flex items-center justify-end gap-8 px-2">
-                        <div className="flex w-fit items-center justify-center text-sm font-medium">
-                            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                className="hidden h-8 w-8 p-0 lg:flex"
-                                onClick={() => table.setPageIndex(0)}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <span className="sr-only">Go to first page</span>
-                                <IconChevronsLeft />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                size="icon"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <span className="sr-only">Go to previous page</span>
-                                <IconChevronLeft />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                size="icon"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <span className="sr-only">Go to next page</span>
-                                <IconChevronRight />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="hidden size-8 lg:flex"
-                                size="icon"
-                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <span className="sr-only">Go to last page</span>
-                                <IconChevronsRight />
-                            </Button>
-                        </div>
-                    </div>
-                )}
             </div>
 
             <ModalSkuForm

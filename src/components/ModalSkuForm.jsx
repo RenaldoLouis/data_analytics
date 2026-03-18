@@ -164,8 +164,12 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
             ...(form.product_name && { product_name: form.product_name }),
             ...(form.variant && { variant: form.variant }),
             ...(form.size && { size: form.size }),
-            ...(form.sku_image && { sku_image: form.sku_image }),
-            ...(form.sku_barcode && { sku_barcode: form.sku_barcode }),
+            ...(editingSku
+                ? { sku_image: form.sku_image || null, sku_barcode: form.sku_barcode || null }
+                : {
+                    ...(form.sku_image && { sku_image: form.sku_image }),
+                    ...(form.sku_barcode && { sku_barcode: form.sku_barcode }),
+                }),
         }
 
         setIsSubmitting(true)
