@@ -6,7 +6,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { IconCalculator, IconPresentationAnalytics, IconTag } from "@tabler/icons-react"
+import { IconBuildingStore, IconCalculator, IconPresentationAnalytics, IconTag } from "@tabler/icons-react"
 import { useRouter } from "next/navigation"
 
 export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
@@ -26,8 +26,14 @@ export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
             icon: IconCalculator,
         },
         {
+            id: "pricing-brand",
+            title: "Brand",
+            url: "/pricingCalculator/brand",
+            icon: IconBuildingStore,
+        },
+        {
             id: "pricing-pl",
-            title: "P&L Calculator",
+            title: "Profit & Loss",
             url: "/pricingCalculator/pl",
             icon: IconPresentationAnalytics,
         },

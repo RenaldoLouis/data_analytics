@@ -11,7 +11,7 @@ export async function GET() {
     }
 
     try {
-        const backendRes = await axios.get(`${process.env.BACKEND_URL}/pl/lookup/payment-terms`, {
+        const backendRes = await axios.get(`${process.env.BACKEND_URL}/brands/lookup/payment-terms`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         return NextResponse.json(backendRes.data, { status: backendRes.status });

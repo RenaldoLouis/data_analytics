@@ -7,7 +7,12 @@
       "Bash(node -e \"const p = require\\(''d:/Programming/git/data_analytics/package.json''\\); console.log\\(p.scripts.dev\\)\")",
       "Bash(node -e \"const id = require\\(''./src/messages/id.json''\\); const en = require\\(''./src/messages/en.json''\\); const idKeys = Object.keys\\(id.plpage\\); const enKeys = Object.keys\\(en.plpage\\); const onlyInId = idKeys.filter\\(k => !enKeys.includes\\(k\\)\\); const onlyInEn = enKeys.filter\\(k => !idKeys.includes\\(k\\)\\); console.log\\(''ID keys:'', idKeys.length\\); console.log\\(''EN keys:'', enKeys.length\\); console.log\\(''Only in ID:'', onlyInId\\); console.log\\(''Only in EN:'', onlyInEn\\);\")",
       "Bash(node -e \"const id = require\\(''./src/messages/id.json''\\); const en = require\\(''./src/messages/en.json''\\); const idKeys = Object.keys\\(id.plpage\\); const enKeys = Object.keys\\(en.plpage\\); const onlyInId = idKeys.filter\\(k => enKeys.indexOf\\(k\\) === -1\\); const onlyInEn = enKeys.filter\\(k => idKeys.indexOf\\(k\\) === -1\\); console.log\\(''ID keys:'', idKeys.length\\); console.log\\(''EN keys:'', enKeys.length\\); console.log\\(''Only in ID:'', JSON.stringify\\(onlyInId\\)\\); console.log\\(''Only in EN:'', JSON.stringify\\(onlyInEn\\)\\);\")",
-      "Bash(node -e \"const fs=require\\(''fs''\\); const j=JSON.parse\\(fs.readFileSync\\(''src/messages/en.json'',''utf8''\\)\\); const keys=Object.keys\\(j.plpage\\); console.log\\(keys.join\\(''\\\\n''\\)\\);\")"
+      "Bash(node -e \"const fs=require\\(''fs''\\); const j=JSON.parse\\(fs.readFileSync\\(''src/messages/en.json'',''utf8''\\)\\); const keys=Object.keys\\(j.plpage\\); console.log\\(keys.join\\(''\\\\n''\\)\\);\")",
+      "Bash(node -e \"JSON.parse\\(require\\(''fs''\\).readFileSync\\(''d:/Programming/git/data_analytics/src/messages/en.json'',''utf8''\\)\\); console.log\\(''valid''\\)\")",
+      "Bash(ls \"d:/Programming/git/data_analytics/src/app/[locale]/\\(dashboard\\)/pricingCalculator/pl/\")",
+      "Bash(wc -l \"d:/Programming/git/data_analytics/src/app/[locale]/\\(dashboard\\)/pricingCalculator/pl/plCalculator.jsx\")",
+      "Bash(mkdir -p \"d:/Programming/git/data_analytics/src/app/next-api/pl/monthly/[updateId]\")",
+      "Bash(mkdir -p \"d:/Programming/git/data_analytics/src/app/next-api/pl/brands/[brandId]/monthly\")"
     ]
   }
 }

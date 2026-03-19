@@ -11,13 +11,13 @@ export async function GET(request, { params }) {
     }
 
     try {
-        const { plId } = await params;
-        const backendRes = await axios.get(`${process.env.BACKEND_URL}/brands/${plId}`, {
+        const { updateId } = await params;
+        const backendRes = await axios.get(`${process.env.BACKEND_URL}/pl/${updateId}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         return NextResponse.json(backendRes.data, { status: backendRes.status });
     } catch (error) {
-        console.error('PL GET by id proxy error:', error.message);
+        console.error('PL monthly GET by id proxy error:', error.message);
         const status = error.response?.status || 500;
         const message = error.response?.data?.message || 'Internal Server Error';
         return NextResponse.json({ message }, { status });
@@ -33,9 +33,9 @@ export async function PUT(request, { params }) {
     }
 
     try {
-        const { plId } = await params;
+        const { updateId } = await params;
         const body = await request.json();
-        const backendRes = await axios.put(`${process.env.BACKEND_URL}/brands/${plId}`, body, {
+        const backendRes = await axios.put(`${process.env.BACKEND_URL}/pl/${updateId}`, body, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -43,7 +43,7 @@ export async function PUT(request, { params }) {
         });
         return NextResponse.json({ success: true, data: backendRes.data }, { status: backendRes.status });
     } catch (error) {
-        console.error('PL PUT proxy error:', error.message);
+        console.error('PL monthly PUT proxy error:', error.message);
         const status = error.response?.status || 500;
         const message = error.response?.data?.message || 'Internal Server Error';
         return NextResponse.json({ success: false, message }, { status });
@@ -59,13 +59,13 @@ export async function DELETE(request, { params }) {
     }
 
     try {
-        const { plId } = await params;
-        const backendRes = await axios.delete(`${process.env.BACKEND_URL}/brands/${plId}`, {
+        const { updateId } = await params;
+        const backendRes = await axios.delete(`${process.env.BACKEND_URL}/pl/${updateId}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         return NextResponse.json({ success: true, data: backendRes.data }, { status: backendRes.status });
     } catch (error) {
-        console.error('PL DELETE proxy error:', error.message);
+        console.error('PL monthly DELETE proxy error:', error.message);
         const status = error.response?.status || 500;
         const message = error.response?.data?.message || 'Internal Server Error';
         return NextResponse.json({ success: false, message }, { status });

@@ -11,11 +11,12 @@ export async function GET() {
     }
 
     try {
-        const backendRes = await axios.get(`${process.env.BACKEND_URL}/brands/lookup/enablers`, {
+        const backendRes = await axios.get(`${process.env.BACKEND_URL}/brands`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         return NextResponse.json(backendRes.data, { status: backendRes.status });
     } catch (error) {
+        console.error('Brand GET proxy error:', error.message);
         const status = error.response?.status || 500;
         const message = error.response?.data?.message || 'Internal Server Error';
         return NextResponse.json({ message }, { status });

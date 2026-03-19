@@ -33,7 +33,7 @@ export async function POST(request) {
 
     try {
         const body = await request.json();
-        const backendRes = await axios.post(`${process.env.BACKEND_URL}/pl`, body, {
+        const backendRes = await axios.post(`${process.env.BACKEND_URL}/brands`, body, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',

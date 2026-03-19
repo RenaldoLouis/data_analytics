@@ -154,6 +154,7 @@ export default {
     },
     pl: {
         getPls: () => getRequest('/next-api/pl'),
+        getBrands: () => getRequest('/next-api/pl/brand'),
         getPlById: (plId) => getRequest(`/next-api/pl/${plId}`),
         createPl: (payload) => postAPIRequest('/next-api/pl', payload),
         updatePl: (plId, payload) => putRequestMiddleware(`/next-api/pl/${plId}`, payload),
@@ -161,6 +162,12 @@ export default {
         getChannels: () => getRequest('/next-api/pl/lookup/channels'),
         getPaymentTerms: () => getRequest('/next-api/pl/lookup/payment-terms'),
         getEnablers: () => getRequest('/next-api/pl/lookup/enablers'),
+        getMonthlyByBrand: (brandId) => getRequest(`/next-api/pl/brands/${brandId}/monthly`),
+        getMonthlyById: (updateId) => getRequest(`/next-api/pl/monthly/${updateId}`),
+        getPreviousMonthly: (params) => getRequest(`/next-api/pl/monthly/previous?brandId=${params.brandId}&skuId=${params.skuId}&periodMonth=${params.periodMonth}&periodYear=${params.periodYear}`),
+        createMonthly: (payload) => postAPIRequest('/next-api/pl/monthly', payload),
+        updateMonthly: (updateId, payload) => putRequestMiddleware(`/next-api/pl/monthly/${updateId}`, payload),
+        deleteMonthly: (updateId) => deleteRequestMiddleware(`/next-api/pl/monthly/${updateId}`),
     },
     sku: {
         getSkus: () => getRequest('/next-api/sku'),

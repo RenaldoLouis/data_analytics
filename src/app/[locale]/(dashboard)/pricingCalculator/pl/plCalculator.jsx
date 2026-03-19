@@ -10,12 +10,20 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSidebar } from "@/components/ui/sidebar"
 import { H3 } from "@/components/ui/typography"
 import services from "@/services"
 import {
+    IconArrowLeft,
     IconChevronDown,
     IconChevronUp,
     IconPresentationAnalytics,
@@ -23,12 +31,21 @@ import {
     IconSettings,
 } from "@tabler/icons-react"
 import { useTranslations } from "next-intl"
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
+const MONTH_LABELS_CONST = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 const fmt = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
 const pct = (n) => (isFinite(n) ? n.toFixed(1) : '0.0') + '%'
 const num = (s) => parseFloat(String(s).replace(/[^\d.]/g, '')) || 0
+
+// Currency input helpers — format raw integer string → "13.000", strip on change
+const fmtCurrency = (v) => {
+    if (v === '' || v == null) return ''
+    const n = parseInt(String(v).replace(/\D/g, ''), 10)
+    return isNaN(n) ? '' : n.toLocaleString('id-ID')
+}
+const parseCurrency = (v) => String(v).replace(/\D/g, '')
 
 const DISKON_KEYS = ["voucher", "subsidi", "flash", "coin", "affiliate", "bundling", "loyalty"]
 
@@ -55,7 +72,7 @@ function ChBadge({ code, label }) {
 }
 
 // ─── ChInput: compact number input for channel tables ─────────────────────────
-function ChInput({ value, onChange, placeholder = "0", step, highlight }) {
+function ChInput({ value, onChange, placeholder = "0", step, highlight, currency = false }) {
     const cls = highlight === 'filled'
         ? 'bg-green-50 border-green-300 text-green-900'
         : highlight === 'warn'
@@ -63,10 +80,10 @@ function ChInput({ value, onChange, placeholder = "0", step, highlight }) {
             : 'bg-background border-input'
     return (
         <input
-            type="number"
-            step={step}
-            value={value}
-            onChange={e => onChange(e.target.value)}
+            type={currency ? 'text' : 'number'}
+            step={!currency ? step : undefined}
+            value={currency ? fmtCurrency(value) : value}
+            onChange={e => onChange(currency ? parseCurrency(e.target.value) : e.target.value)}
             placeholder={placeholder}
             className={`w-20 text-right text-xs px-2 py-1.5 rounded border outline-none transition-colors focus:ring-1 focus:ring-ring focus:border-ring ${cls}`}
         />
@@ -201,14 +218,6 @@ function SetupSummaryCard({ setup, activeChannels, onEditSetup, editLabel }) {
                     </div>
                 </div>
             </div>
-            <button
-                type="button"
-                onClick={onEditSetup}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 border rounded-md px-2.5 py-1.5"
-            >
-                <IconSettings size={13} />
-                {editLabel}
-            </button>
         </div>
     )
 }
@@ -227,6 +236,7 @@ function InnerCard({ title, children, className = '' }) {
 
 // ─── FieldInput ───────────────────────────────────────────────────────────────
 function FieldInput({ label, subtitle, value, onChange, prefix, suffix, placeholder = '0', type = 'number' }) {
+    const isCurrency = prefix === 'Rp'
     return (
         <div className="grid gap-1">
             {label && <Label>{label}</Label>}
@@ -236,9 +246,9 @@ function FieldInput({ label, subtitle, value, onChange, prefix, suffix, placehol
                     <span className="px-3 text-xs text-muted-foreground border-r border-input bg-muted/50 self-stretch flex items-center">Rp</span>
                 )}
                 <input
-                    type={type}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
+                    type={isCurrency ? 'text' : type}
+                    value={isCurrency ? fmtCurrency(value) : value}
+                    onChange={(e) => onChange(isCurrency ? parseCurrency(e.target.value) : e.target.value)}
                     placeholder={placeholder}
                     className="flex-1 px-3 h-9 text-sm text-foreground outline-none bg-transparent min-w-0"
                 />
@@ -274,7 +284,7 @@ function ProductTabs({ products, activeIndex, onSelect, onAdd, onRemove, addLabe
                     className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors
                         ${i === activeIndex ? 'bg-primary text-primary-foreground' : 'border bg-card hover:bg-muted'}`}
                 >
-                    {p.name}
+                    {p.name || `SKU ${i + 1}`}
                     {products.length > 1 && (
                         <span
                             className="ml-0.5 opacity-60 hover:opacity-100 leading-none"
@@ -329,7 +339,7 @@ function SectionCard({ icon, title, subtitle, children }) {
 function makeProduct(index, label = 'Product') {
     return {
         id: Date.now() + index,
-        name: `${label} ${index + 1}`,
+        name: '',
         sku: null,
         cogs: '',
         pkg: '',
@@ -338,7 +348,7 @@ function makeProduct(index, label = 'Product') {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function PlCalculator() {
+export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly = false, startAtMonthly = false }) {
     const t = useTranslations('plpage')
     const { open: sidebarOpen } = useSidebar()
 
@@ -360,7 +370,7 @@ export default function PlCalculator() {
     // ── Setup step state ──────────────────────────────────────────────────────
     const [setupStep, setSetupStep] = useState(1)
     const [completedSetupSteps, setCompletedSetupSteps] = useState([])
-    const [setupDone, setSetupDone] = useState(false)
+    const [setupDone, setSetupDone] = useState(startAtMonthly)
 
     const doneSetupStep = (n) => {
         setCompletedSetupSteps(prev => [...new Set([...prev, n])])
@@ -440,6 +450,102 @@ export default function PlCalculator() {
         setActiveIdx(prev => Math.max(0, prev >= index ? prev - 1 : prev))
     }
 
+    // ── Pre-fill state when editing ───────────────────────────────────────────
+    useEffect(() => {
+        if (!editId && !startAtMonthly) return
+        const load = async () => {
+            let brandId = null
+
+            if (editId && brandOnly) {
+                // brandOnly: editId is a brand ID directly
+                brandId = editId
+            } else if (editId) {
+                // editId is a monthly record ID — fetch it first to get brand_id + period data
+                const monthlyRes = await services.pl.getMonthlyById(editId)
+                const m = monthlyRes?.data?.data ?? monthlyRes?.data
+                if (!m) return
+                setMonthlyId(m.id ?? editId)
+                const skuId = m.sku_id ?? m.sku?.id
+                if (skuId)          setSelectedSku(skuId)
+                if (m.period_month) setActiveMo(MONTH_LABELS_CONST[parseInt(m.period_month) - 1] ?? '')
+                if (m.period_year)  setActiveYear(String(m.period_year))
+                brandId = m.brand_id ?? m.brand?.id
+            } else if (startAtMonthly) {
+                // Add New flow — fetch first available brand
+                const listRes = await services.pl.getBrands()
+                const raw = listRes?.data?.data ?? listRes?.data ?? null
+                const brands = Array.isArray(raw) ? raw : (raw ? [raw] : [])
+                if (!brands.length) return
+                brandId = brands[0].id
+            }
+
+            if (!brandId) return
+            const res = await services.pl.getBrands()
+            const raw = res?.data?.data ?? res?.data ?? null
+            const brandList = Array.isArray(raw) ? raw : (raw ? [raw] : [])
+            const d = brandList.find(b => b.id === brandId) ?? brandList[0]
+            if (!d) return
+
+            // Helpers: strip float artifacts from API values
+            const toAmt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v))) : ''
+            const toRate = (v, scale = 100) => v != null ? String(parseFloat((parseFloat(v) * scale).toFixed(4))) : '0'
+
+            setSetup({ brand_name: d.name || '', kategori: d.category || '', enabler: d.enabler_name || '' })
+
+            const chs = [...(d.channels || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+            const chIdToName = Object.fromEntries(chs.map(ch => [ch.id, ch.name]))
+            setChannels(chs.map(ch => ch.name))
+            setMallStatus(Object.fromEntries(chs.map(ch => [ch.name, ch.is_mall || false])))
+            setChannelFees(Object.fromEntries(chs.map(ch => [ch.name, {
+                comm: toRate(ch.fee_config?.commission_rate),
+                mall: toRate(ch.fee_config?.mall_fee_rate),
+                pgw:  toRate(ch.fee_config?.pgw_rate),
+            }])))
+
+            const ec = d.enabler_fee_config
+            if (ec) {
+                setEnablerConfig({
+                    model:      { RETAINER: 'ret', KOMISI: 'kom', HYBRID: 'hyb' }[ec.model_type] || 'ret',
+                    retainer:   toAmt(ec.retainer_amount),
+                    komisiRate: toRate(ec.commission_gmv_rate),
+                    sof:        toAmt(ec.store_operation_fee),
+                    swift:      toAmt(ec.platform_fee),
+                    live:       toAmt(ec.live_commerce_cost),
+                    gudang:     toAmt(ec.gudang_cost),
+                    fulfilRate: toAmt(ec.fulfillment_per_order) || '12000',
+                    customFixed: (ec.custom_fixed_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
+                    customVar:   (ec.custom_var_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
+                })
+            }
+
+            if (d.skus?.length) {
+                setProducts(d.skus.map((sku, i) => ({
+                    id: sku.id || i,
+                    name: sku.name || '',
+                    sku,
+                    cogs: toAmt(sku.cogs_per_unit),
+                    pkg:  toAmt(sku.packaging_cost),
+                    hj:   Object.fromEntries(
+                        (sku.channel_prices || [])
+                            .map(cp => {
+                                const chName = cp.channel_name || chIdToName[cp.channel_id] || ''
+                                return [chName, { harga: toAmt(cp.selling_price), diskon: toRate(cp.diskon_default_pct) }]
+                            })
+                            .filter(([k]) => k)
+                    ),
+                })))
+                setActiveIdx(0)
+            }
+
+            setBrandData(d)
+            setCompletedSetupSteps([1, 2, 3])
+            setSetupStep(1)
+            setSetupDone(startAtMonthly)
+        }
+        load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editId, startAtMonthly])
+
     // ── SKU modal ─────────────────────────────────────────────────────────────
     const [skuModalOpen, setSkuModalOpen]   = useState(false)
     const [skuList, setSkuList]             = useState([])
@@ -451,7 +557,7 @@ export default function PlCalculator() {
         if (skuList.length === 0) {
             setIsSkusLoading(true)
             const res = await services.sku.getSkus()
-            setSkuList(res?.data ?? res ?? [])
+            setSkuList(res?.data?.data ?? res?.data ?? [])
             setIsSkusLoading(false)
         }
     }
@@ -462,15 +568,30 @@ export default function PlCalculator() {
         setSkuModalOpen(false)
         setSkuSearch('')
     }
+    const usedSkuKeys = useMemo(() => {
+        const currentSku = products[activeIdx]?.sku
+        return new Set(
+            products
+                .filter((_, i) => i !== activeIdx)
+                .flatMap(p => [p.sku?.id, p.sku?.sku_code, p.sku?.name].filter(Boolean))
+                .filter(k => k !== currentSku?.id && k !== currentSku?.sku_code && k !== currentSku?.name)
+        )
+    }, [products, activeIdx])
+
     const filteredSkus = useMemo(() =>
         skuList.filter(s =>
-            !skuSearch ||
-            s.product_name?.toLowerCase().includes(skuSearch.toLowerCase()) ||
-            s.sku_code?.toLowerCase().includes(skuSearch.toLowerCase())
-        ), [skuList, skuSearch])
+            !usedSkuKeys.has(s.id) &&
+            !usedSkuKeys.has(s.sku_code) &&
+            !usedSkuKeys.has(s.product_name) &&
+            (!skuSearch ||
+                s.product_name?.toLowerCase().includes(skuSearch.toLowerCase()) ||
+                s.sku_code?.toLowerCase().includes(skuSearch.toLowerCase()))
+        ), [skuList, skuSearch, usedSkuKeys])
 
     // ── Monthly P&L state ─────────────────────────────────────────────────────
+    const [monthlyId, setMonthlyId] = useState(null)
     const [activeMo, setActiveMo] = useState('')
+    const [activeYear, setActiveYear] = useState(String(new Date().getFullYear()))
     const [selectedSku, setSelectedSku] = useState('')
     const [infoData, setInfoData]     = useState({})
     const [diskonData, setDiskonData] = useState({})
@@ -485,7 +606,7 @@ export default function PlCalculator() {
     const markFilled = (sec) => setSecFilled(prev => ({ ...prev, [sec]: true }))
 
     // ── Active SKU for monthly ─────────────────────────────────────────────────
-    const activeSku = products.find(prod => prod.name === selectedSku) || products[0] || {}
+    const activeSku = products.find(prod => prod.id === selectedSku) || products[0] || {}
     const cogsUnit = (parseFloat(activeSku.cogs) || 0) + (parseFloat(activeSku.pkg) || 0)
 
     // ── P&L multi-channel calculations ───────────────────────────────────────
@@ -533,8 +654,11 @@ export default function PlCalculator() {
                       + customRows.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
 
     const blendedAmt  = netTotal - cogsTotal - channelCost - enablerTotal
+    const netPlAmt    = blendedAmt - fixedTotal
     const blendedPct  = netTotal > 0 ? (blendedAmt / netTotal) * 100 : 0
+    const netPlPct    = netTotal > 0 ? (netPlAmt / netTotal) * 100 : 0
     const marginColor = blendedPct >= 30 ? 'text-green-700' : blendedPct >= 15 ? 'text-amber-600' : 'text-red-600'
+    const netPlColor  = netPlPct  >= 20 ? 'text-green-700' : netPlPct  >= 10 ? 'text-amber-600' : 'text-red-600'
     const modelText   = {
         ret: `Retainer Only · ${fmt(retainerVal)}`,
         kom: `Komisi GMV · ${enablerConfig.komisiRate || '0'}%`,
@@ -544,36 +668,235 @@ export default function PlCalculator() {
 
     // ── Save / Calculate ──────────────────────────────────────────────────────
     const [isSaving, setIsSaving] = useState(false)
+    const [brandData, setBrandData] = useState(null)
 
-    const handleCalculate = async () => {
-        if (!setup.brand_name) return toast.error(t('errorBrandRequired'))
+    const channelMap = useMemo(() => Object.fromEntries((brandData?.channels ?? []).map(ch => [ch.name, ch.id])), [brandData])
+    const skuMap = useMemo(() => Object.fromEntries((brandData?.skus ?? []).map(s => [s.name, s.id])), [brandData])
 
-        const skusPayload = products
-            .filter(prod => prod.name && (parseFloat(prod.cogs) >= 0))
-            .map(prod => ({
-                name:   prod.name,
-                cogs:   num(prod.cogs),
-                pkg:    num(prod.pkg),
-                channels: channels.map(ch => ({
-                    channel:    ch,
-                    harga_jual: parseFloat(infoData[ch]?.hj) || parseFloat(prod.hj?.[ch]?.harga) || 0,
-                    volume:     parseFloat(infoData[ch]?.vol) || 0,
-                })),
-            }))
+    const errMsg = (msg, fallback) =>
+        typeof msg === 'string' ? msg : msg ? JSON.stringify(msg) : fallback
 
-        const payload = {
-            brand_name: setup.brand_name,
-            kategori:   setup.kategori,
-            ...(setup.enabler && { enabler: { enabled: true, name: setup.enabler } }),
-            channels,
-            ...(skusPayload.length && { skus: skusPayload }),
+    const MONTH_LABELS = MONTH_LABELS_CONST
+
+    const buildMonthlyPayload = (resolvedBrandId, resolvedChannels) => {
+        const chId = (ch) => resolvedChannels.find(c => c.name === ch)?.id ?? channelMap[ch]
+        const periodMonth = String(MONTH_LABELS.indexOf(activeMo) + 1).padStart(2, '0')
+        const periodYear = parseInt(activeYear)
+        const resolvedSkuId = selectedSku
+        return {
+            brand_id: resolvedBrandId,
+            sku_id: resolvedSkuId,
+            period_month: periodMonth,
+            period_year: periodYear,
+            status: 'DRAFT',
+            sales: channels.map((ch, i) => ({
+                channel_id: chId(ch),
+                units_sold: parseFloat(infoData[ch]?.vol) || 0,
+                actual_selling_price: parseFloat(infoData[ch]?.hj ?? activeSku.hj?.[ch]?.harga) || 0,
+                ads_spend_rate: (parseFloat(adsData[ch]?.rate) || 0) / 100,
+                ads_spend_amount: grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100),
+            })),
+            diskons: channels.map((ch, i) => ({
+                channel_id: chId(ch),
+                voucher_pct:      (parseFloat(diskonData[ch]?.voucher)   || 0) / 100,
+                subsidy_pct:      (parseFloat(diskonData[ch]?.subsidi)   || 0) / 100,
+                flash_sale_pct:   (parseFloat(diskonData[ch]?.flash)     || 0) / 100,
+                coin_pct:         (parseFloat(diskonData[ch]?.coin)      || 0) / 100,
+                affiliate_pct:    (parseFloat(diskonData[ch]?.affiliate) || 0) / 100,
+                bundling_pct:     (parseFloat(diskonData[ch]?.bundling)  || 0) / 100,
+                loyalty_pct:      (parseFloat(diskonData[ch]?.loyalty)   || 0) / 100,
+                total_discount_pct: totalDiskonPct(ch) / 100,
+                discount_amount:  discByChannel[i],
+            })),
+            returns: channels.map(ch => ({
+                channel_id: chId(ch),
+                return_rate_pct:        (parseFloat(returnData[ch]?.rate)   || 0) / 100,
+                return_units:            parseFloat(returnData[ch]?.units)  || 0,
+                estimated_return_value:  parseFloat(returnData[ch]?.est)    || 0,
+                actual_refund_amount:    parseFloat(returnData[ch]?.aktual) || 0,
+            })),
+            ongkirs: channels.map(ch => ({
+                channel_id: chId(ch),
+                shipping_subsidy:    parseFloat(ongkirData[ch]?.subsidi)    || 0,
+                actual_shipping_cost: parseFloat(ongkirData[ch]?.aktual)     || 0,
+                processing_fee:      parseFloat(ongkirData[ch]?.processing) || 0,
+                weight_diff_kg:      parseFloat(ongkirData[ch]?.berat)      || 0,
+            })),
+            enabler_var: {
+                order_count:      parseFloat(orders) || 0,
+                claim_support:    parseFloat(claimData.support)     || 0,
+                claim_voucher:    parseFloat(claimData.voucher)     || 0,
+                claim_mp_fee:     parseFloat(claimData.mpFee)       || 0,
+                mp_affiliate:     parseFloat(claimData.mpAffiliate) || 0,
+                campaign_ads_fee: parseFloat(claimData.campaign)    || 0,
+                custom_var_items: Object.fromEntries(
+                    enablerConfig.customVar.filter(r => r.name).map(r => [r.name, parseFloat(r.val) || 0])
+                ),
+            },
+            fixed_costs: [
+                ...FC_FIELDS
+                    .filter(f => parseFloat(fixedData[f.id]) > 0)
+                    .map(f => ({ item_name: f.id, category: f.group || 'Umum', amount: parseFloat(fixedData[f.id]) || 0 })),
+                ...customRows
+                    .filter(r => r.name && parseFloat(r.val) > 0)
+                    .map(r => ({ item_name: r.name, category: 'Custom', amount: parseFloat(r.val) || 0 })),
+            ],
+            cogs_overrides: channels.map(ch => ({
+                channel_id: chId(ch),
+                cogs_override: null,
+                packaging_override: null,
+                cogs_bundling: null,
+                units_per_bundle: null,
+            })),
+        }
+    }
+
+    const handleSaveChanges = async () => {
+        if (!brandOnly) {
+            if (!activeMo) return toast.error(t('selectMonthFirst'))
+            if (!activeYear) return toast.error(t('selectYearFirst'))
+            if (!selectedSku) return toast.error(t('selectSkuFirst'))
         }
 
         setIsSaving(true)
         try {
-            const res = await services.pl.createPl(payload)
-            if (res?.success) toast.success(t('saveSuccess'))
-            else toast.error(res?.message || t('saveError'))
+            // ── Flow 1: brandOnly (Brand tab) ─────────────────────────────────
+            if (brandOnly) {
+                const skusPayload = products.filter(p => p.name).map(p => ({
+                    name: p.name,
+                    cogs_per_unit: num(p.cogs),
+                    packaging_cost: num(p.pkg),
+                    is_active: true,
+                    channel_prices: channels.map(ch => ({
+                        channel_name: ch,
+                        selling_price: parseFloat(p.hj?.[ch]?.harga) || 0,
+                        diskon_default_pct: (parseFloat(p.hj?.[ch]?.diskon) || 0) / 100,
+                    })),
+                }))
+                const brandPayload = {
+                    name: setup.brand_name,
+                    category: setup.kategori,
+                    ...(setup.enabler && { enabler_name: setup.enabler }),
+                    via_enabler: !!setup.enabler,
+                    ecom_model: 'MARKETPLACE',
+                    status: 'active',
+                    channels: channels.map((ch, i) => ({
+                        name: ch,
+                        is_mall: mallStatus[ch] ?? false,
+                        is_active: true,
+                        sort_order: i + 1,
+                        fee_config: {
+                            commission_rate: parseFloat(getChFee(ch, 'comm')) / 100,
+                            mall_fee_rate: parseFloat(getChFee(ch, 'mall')) / 100,
+                            pgw_rate: parseFloat(getChFee(ch, 'pgw')) / 100,
+                        },
+                    })),
+                    ...(skusPayload.length && { skus: skusPayload }),
+                    ...(setup.enabler && {
+                        enabler_fee_config: {
+                            model_type: { ret: 'RETAINER', kom: 'KOMISI', hyb: 'HYBRID' }[enablerConfig.model] || 'RETAINER',
+                            retainer_amount: retainerVal,
+                            store_operation_fee: sofVal,
+                            platform_fee: swiftVal,
+                            live_commerce_cost: liveVal,
+                            gudang_cost: gudangVal,
+                            commission_gmv_rate: (parseFloat(enablerConfig.komisiRate) || 0) / 100,
+                            fulfillment_per_order: fulfilRate,
+                            custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
+                            custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
+                        },
+                    }),
+                }
+                const brandId = brandData?.id ?? editId
+                const res = brandId
+                    ? await services.pl.updatePl(brandId, brandPayload)
+                    : await services.pl.createPl(brandPayload)
+                if (!res?.success) return toast.error(errMsg(res?.message, t('saveError')))
+                const saved = res.data?.data ?? res.data ?? null
+                setBrandData(saved)
+                toast.success(t('saveSuccess'))
+                if (onSaveComplete) onSaveComplete(saved?.id ?? brandId)
+                return
+            }
+
+            // ── Flow 2: startAtMonthly (Add New / Edit from list) ─────────────
+            // Brand already exists — skip brand save, only save monthly
+            if (startAtMonthly) {
+                if (!brandData?.id) return toast.error(t('errorBrandRequired'))
+                const payload = buildMonthlyPayload(brandData.id, brandData.channels ?? [])
+                const res = monthlyId
+                    ? await services.pl.updateMonthly(monthlyId, payload)
+                    : await services.pl.createMonthly(payload)
+                if (res?.success) {
+                    toast.success(t('saveSuccess'))
+                    if (!monthlyId) {
+                        const newId = res.data?.data?.id ?? res.data?.id
+                        if (newId) setMonthlyId(newId)
+                    }
+                } else {
+                    toast.error(errMsg(res?.message, t('saveError')))
+                }
+                return
+            }
+
+            // ── Flow 3: Full setup (new brand + monthly) ──────────────────────
+            const skusPayload = products.filter(p => p.name).map(p => ({
+                name: p.name,
+                cogs_per_unit: num(p.cogs),
+                packaging_cost: num(p.pkg),
+                is_active: true,
+                channel_prices: channels.map(ch => ({
+                    channel_name: ch,
+                    harga_jual: parseFloat(p.hj?.[ch]?.harga) || 0,
+                    diskon_default_pct: (parseFloat(p.hj?.[ch]?.diskon) || 0) / 100,
+                })),
+            }))
+            const brandPayload = {
+                name: setup.brand_name,
+                category: setup.kategori,
+                ...(setup.enabler && { enabler_name: setup.enabler }),
+                via_enabler: !!setup.enabler,
+                ecom_model: 'MARKETPLACE',
+                status: 'active',
+                channels: channels.map((ch, i) => ({
+                    name: ch,
+                    is_mall: mallStatus[ch] ?? false,
+                    is_active: true,
+                    sort_order: i + 1,
+                    fee_config: {
+                        commission_rate: parseFloat(getChFee(ch, 'comm')) / 100,
+                        mall_fee_rate: parseFloat(getChFee(ch, 'mall')) / 100,
+                        pgw_rate: parseFloat(getChFee(ch, 'pgw')) / 100,
+                    },
+                })),
+                ...(skusPayload.length && { skus: skusPayload }),
+                ...(setup.enabler && {
+                    enabler_fee_config: {
+                        model_type: { ret: 'RETAINER', kom: 'KOMISI', hyb: 'HYBRID' }[enablerConfig.model] || 'RETAINER',
+                        retainer_amount: retainerVal,
+                        store_operation_fee: sofVal,
+                        platform_fee: swiftVal,
+                        live_commerce_cost: liveVal,
+                        gudang_cost: gudangVal,
+                        komisi_gmv_rate: (parseFloat(enablerConfig.komisiRate) || 0) / 100,
+                        fulfillment_per_order: fulfilRate,
+                        custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
+                        custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
+                    },
+                }),
+            }
+            const brandId = brandData?.id ?? editId
+            const brandRes = brandId
+                ? await services.pl.updatePl(brandId, brandPayload)
+                : await services.pl.createPl(brandPayload)
+            if (!brandRes?.success) return toast.error(errMsg(brandRes?.message, t('saveError')))
+            const saved = brandRes.data?.data ?? brandRes.data ?? null
+            setBrandData(saved)
+
+            const payload = buildMonthlyPayload(saved.id, saved.channels ?? [])
+            const monthlyRes = await services.pl.createMonthly(payload)
+            if (monthlyRes?.success) toast.success(t('saveSuccess'))
+            else toast.error(errMsg(monthlyRes?.message, t('saveError')))
         } catch {
             toast.error(t('saveError'))
         } finally {
@@ -590,7 +913,14 @@ export default function PlCalculator() {
         <>
             <div className="space-y-4">
                 <div className="flex justify-between items-center px-4 lg:px-6">
-                    <H3 className="text-xl font-bold">{t('title')}</H3>
+                    <div className="flex items-center gap-3">
+                        {onBack && (
+                            <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8">
+                                <IconArrowLeft size={16} />
+                            </Button>
+                        )}
+                        <H3 className="text-xl font-bold">{editId ? t('editTitle') : t('title')}</H3>
+                    </div>
                 </div>
                 <div className="px-4 lg:px-6"><Separator /></div>
 
@@ -616,7 +946,11 @@ export default function PlCalculator() {
                                 subtitle={t('step1Subtitle')}
                                 {...step1}
                                 onOpen={() => handleStepOpen(1)}
-                                onNext={() => doneSetupStep(1)}
+                                onNext={() => {
+                                    if (!setup.brand_name) return toast.error(t('errorBrandRequired'))
+                                    if (channels.length === 0) return toast.error(t('errorChannelRequired'))
+                                    doneSetupStep(1)
+                                }}
                                 nextLabel={t('nextStep')}
                                 finishLabel={t('finishSetup')}
                                 donePillLabel={t('stepStatusDone')}
@@ -834,9 +1168,18 @@ export default function PlCalculator() {
                                 subtitle={t('step3Subtitle')}
                                 {...step3}
                                 onOpen={() => handleStepOpen(3)}
-                                onNext={() => doneSetupStep(3)}
+                                onNext={() => {
+                                    const named = products.filter(p => p.name)
+                                    if (named.length === 0) return toast.error(t('errorSkuRequired'))
+                                    const missingPrice = named.some(p =>
+                                        channels.some(ch => !(parseFloat(p.hj?.[ch]?.harga) > 0))
+                                    )
+                                    if (missingPrice) return toast.error(t('errorSkuPriceRequired'))
+                                    if (brandOnly) handleSaveChanges()
+                                    else doneSetupStep(3)
+                                }}
                                 nextLabel={t('nextStep')}
-                                finishLabel={t('finishSetup')}
+                                finishLabel={brandOnly ? t('saveBrand') : t('finishSetup')}
                                 donePillLabel={t('stepStatusDone')}
                                 activePillLabel={t('stepStatusActive')}
                                 pendingPillLabel={t('stepStatusPending')}
@@ -857,7 +1200,7 @@ export default function PlCalculator() {
                                         {p.sku ? (
                                             <div className="space-y-2">
                                                 <div className="rounded-md border bg-card p-3 space-y-0.5">
-                                                    <p className="text-sm font-semibold">{p.sku.product_name || '—'}</p>
+                                                    <p className="text-sm font-semibold">{p.sku.product_name || p.sku.name || '—'}</p>
                                                     <p className="text-xs text-muted-foreground">
                                                         {p.sku.sku_code}
                                                         {p.sku.variant && ` · ${p.sku.variant}`}
@@ -903,6 +1246,7 @@ export default function PlCalculator() {
                                                                 <td className="px-4 py-2.5"><ChBadge code={ch} label={ch} /></td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput
+                                                                        currency
                                                                         value={p.hj[ch]?.harga ?? ''}
                                                                         onChange={v => updateP('hj', { ...p.hj, [ch]: { ...p.hj[ch], harga: v } })}
                                                                     />
@@ -929,7 +1273,7 @@ export default function PlCalculator() {
                     {/* ═══════════════════════════════════════════════════════
                         MONTHLY P&L PHASE
                     ═══════════════════════════════════════════════════════ */}
-                    {setupDone && (
+                    {setupDone && !brandOnly && (
                         <>
                             {/* Setup summary */}
                             <SetupSummaryCard
@@ -941,9 +1285,9 @@ export default function PlCalculator() {
 
                             {/* Month selector */}
                             <div className="rounded-lg border bg-card p-4">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">{t('periodeTitle')}</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'].map(m => (
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">{t('periodeTitle')} <span className="text-red-500">*</span></p>
+                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                    {MONTH_LABELS_CONST.map(m => (
                                         <button
                                             key={m}
                                             type="button"
@@ -952,27 +1296,38 @@ export default function PlCalculator() {
                                         >{m}</button>
                                     ))}
                                 </div>
+                                <input
+                                    type="number"
+                                    min="2000"
+                                    max="2100"
+                                    value={activeYear}
+                                    onChange={e => setActiveYear(e.target.value)}
+                                    placeholder={t('yearPlaceholder')}
+                                    className="w-28 text-sm rounded-md border border-input bg-background px-3 py-1.5 outline-none focus:ring-1 focus:ring-ring"
+                                />
                             </div>
 
                             {/* SKU selector */}
-                            {products.filter(prod => prod.name).length > 0 && (
-                                <div className="rounded-lg border bg-card p-4">
-                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{t('skuTitle')}</p>
-                                    <select
-                                        className="w-full text-sm rounded-md border border-input bg-background px-3 py-2 outline-none"
-                                        value={selectedSku}
-                                        onChange={e => setSelectedSku(e.target.value)}
-                                    >
-                                        <option value="">{t('selectSkuDropdown')}</option>
-                                        {products.filter(prod => prod.name).map((prod) => (
-                                            <option key={prod.id} value={prod.name}>{prod.name}</option>
+                            <div className="rounded-lg border bg-card p-4">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{t('skuTitle')}</p>
+                                <Select value={selectedSku} onValueChange={setSelectedSku}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder={t('selectSkuDropdown')}>
+                                            {selectedSku
+                                                ? (products.find(p => p.id === selectedSku)?.name || t('selectSkuDropdown'))
+                                                : null}
+                                        </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {products.filter(p => p.name).map((p) => (
+                                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                                         ))}
-                                    </select>
-                                    {selectedSku && activeSku.cogs && (
-                                        <p className="text-xs text-muted-foreground mt-1.5">COGS: {fmt(parseFloat(activeSku.cogs)||0)} · Packaging: {fmt(parseFloat(activeSku.pkg)||0)}</p>
-                                    )}
-                                </div>
-                            )}
+                                    </SelectContent>
+                                </Select>
+                                {selectedSku && activeSku.cogs && (
+                                    <p className="text-xs text-muted-foreground mt-1.5">COGS: {fmt(parseFloat(activeSku.cogs)||0)} · Packaging: {fmt(parseFloat(activeSku.pkg)||0)}</p>
+                                )}
+                            </div>
 
                             {/* Monthly P&L accordion card */}
                             {channels.length > 0 && (
@@ -1010,6 +1365,7 @@ export default function PlCalculator() {
                                                                     <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
                                                                     <td className="py-2.5 px-2 text-right">
                                                                         <ChInput
+                                                                            currency
                                                                             value={hjVal ?? activeSku.hj?.[ch]?.harga ?? ''}
                                                                             onChange={v => setInfoData(prev => ({ ...prev, [ch]: { ...prev[ch], hj: v } }))}
                                                                             highlight={hjVal !== undefined ? 'filled' : undefined}
@@ -1129,12 +1485,14 @@ export default function PlCalculator() {
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput
+                                                                        currency
                                                                         value={returnData[ch]?.est ?? ''}
                                                                         onChange={v => setReturnData(prev => ({ ...prev, [ch]: { ...prev[ch], est: v } }))}
                                                                     />
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput
+                                                                        currency
                                                                         value={returnData[ch]?.aktual ?? ''}
                                                                         onChange={v => setReturnData(prev => ({ ...prev, [ch]: { ...prev[ch], aktual: v } }))}
                                                                     />
@@ -1187,6 +1545,7 @@ export default function PlCalculator() {
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput
+                                                                        currency
                                                                         value={diskonData[ch]?.nilai ?? ''}
                                                                         onChange={v => setDiskonData(prev => ({ ...prev, [ch]: { ...prev[ch], nilai: v } }))}
                                                                     />
@@ -1222,6 +1581,7 @@ export default function PlCalculator() {
                                                                 <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput
+                                                                        currency
                                                                         value={ongkirData[ch]?.subsidi ?? ''}
                                                                         onChange={v => setOngkirData(prev => ({ ...prev, [ch]: { ...prev[ch], subsidi: v } }))}
                                                                         highlight={(parseFloat(ongkirData[ch]?.subsidi) || 0) > 0 ? 'filled' : undefined}
@@ -1229,12 +1589,13 @@ export default function PlCalculator() {
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput
+                                                                        currency
                                                                         value={ongkirData[ch]?.aktual ?? ''}
                                                                         onChange={v => setOngkirData(prev => ({ ...prev, [ch]: { ...prev[ch], aktual: v } }))}
                                                                     />
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput value={ongkirData[ch]?.processing ?? ''} onChange={v => setOngkirData(prev => ({ ...prev, [ch]: { ...prev[ch], processing: v } }))} />
+                                                                    <ChInput currency value={ongkirData[ch]?.processing ?? ''} onChange={v => setOngkirData(prev => ({ ...prev, [ch]: { ...prev[ch], processing: v } }))} />
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput value={ongkirData[ch]?.berat ?? ''} onChange={v => setOngkirData(prev => ({ ...prev, [ch]: { ...prev[ch], berat: v } }))} step="0.01" />
@@ -1430,6 +1791,7 @@ export default function PlCalculator() {
                                                             <div className="flex items-center gap-2 flex-shrink-0">
                                                                 <span className="text-xs text-muted-foreground">Rp</span>
                                                                 <ChInput
+                                                                    currency
                                                                     value={claimData[key] ?? ''}
                                                                     onChange={v => setClaimData(prev => ({ ...prev, [key]: v }))}
                                                                     highlight={(parseFloat(claimData[key]) || 0) > 0 ? 'filled' : 'warn'}
@@ -1472,6 +1834,7 @@ export default function PlCalculator() {
                                                                     <div className="flex items-center gap-2 flex-shrink-0">
                                                                         <span className="text-xs text-muted-foreground">Rp</span>
                                                                         <ChInput
+                                                                            currency
                                                                             value={fixedData[f.id] ?? ''}
                                                                             onChange={v => {
                                                                                 setFixedData(prev => ({ ...prev, [f.id]: v }))
@@ -1496,6 +1859,7 @@ export default function PlCalculator() {
                                                         />
                                                         <span className="text-xs text-muted-foreground flex-shrink-0">Rp</span>
                                                         <ChInput
+                                                            currency
                                                             value={r.val}
                                                             onChange={v => {
                                                                 setCustomRows(prev => prev.map(x => x.id === r.id ? { ...x, val: v } : x))
@@ -1527,11 +1891,12 @@ export default function PlCalculator() {
                                         </PnLAccordion>
 
                                     </div>
+
                                 </SectionCard>
                             )}
 
                             {/* Hasil Kalkulasi */}
-                            {hasVolInput && channels.length > 0 && (
+                            {channels.length > 0 && (
                                 <SectionCard
                                     icon={<IconPresentationAnalytics size={18} />}
                                     title={t('hasilKalkulasiTitle')}
@@ -1607,6 +1972,16 @@ export default function PlCalculator() {
                                                         <span className="text-xs font-semibold">{t('rowGrossMarginRp')}</span>
                                                         <span className={`text-xs font-bold tabular-nums ${marginColor}`}>{fmt(blendedAmt)}</span>
                                                     </div>
+                                                    {fixedTotal > 0 && (<>
+                                                        <div className="flex justify-between mt-1">
+                                                            <span className="text-xs text-muted-foreground">{t('rowDeductFixedCost')}</span>
+                                                            <span className="text-xs tabular-nums text-red-600">{fmt(fixedTotal)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between border-t pt-2 mt-1">
+                                                            <span className="text-xs font-semibold">{t('rowNetPL')}</span>
+                                                            <span className={`text-xs font-bold tabular-nums ${netPlColor}`}>{fmt(netPlAmt)}</span>
+                                                        </div>
+                                                    </>)}
                                                 </div>
                                             </div>
                                         </div>
@@ -1666,14 +2041,14 @@ export default function PlCalculator() {
             </div>
 
             {/* ── Fixed Footer (only in Monthly P&L phase) ──────────────────── */}
-            {setupDone && (
+            {setupDone && !brandOnly && (
                 <div
                     className="fixed bottom-0 right-0 z-10 border-t bg-background transition-[left] duration-200 ease-linear"
                     style={{ left: sidebarOpen ? 'var(--sidebar-width)' : '0' }}
                 >
                     <div className="flex justify-end px-4 lg:px-6 py-3">
-                        <Button size="lg" onClick={handleCalculate} disabled={isSaving}>
-                            {isSaving ? t('saving') : t('calculate')}
+                        <Button size="lg" onClick={handleSaveChanges} disabled={isSaving}>
+                            {isSaving ? t('saving') : t('saveChanges')}
                         </Button>
                     </div>
                 </div>
@@ -1704,21 +2079,24 @@ export default function PlCalculator() {
                         ) : filteredSkus.length === 0 ? (
                             <p className="text-center text-sm text-muted-foreground py-8">{t('noSkusFound')}</p>
                         ) : (
-                            filteredSkus.map(sku => (
-                                <button
-                                    key={sku.id}
-                                    type="button"
-                                    onClick={() => selectSku(sku)}
-                                    className="w-full text-left rounded-md border p-3 hover:bg-muted/60 transition-colors space-y-0.5"
-                                >
-                                    <p className="text-sm font-medium">{sku.product_name || '—'}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {sku.sku_code}
-                                        {sku.brand && ` · ${sku.brand}`}
-                                        {sku.variant && ` · ${sku.variant}`}
-                                    </p>
-                                </button>
-                            ))
+                            filteredSkus.map(sku => {
+                                const isSelected = p.sku?.id === sku.id
+                                return (
+                                    <button
+                                        key={sku.id}
+                                        type="button"
+                                        onClick={() => selectSku(sku)}
+                                        className={`w-full text-left rounded-md border p-3 transition-colors space-y-0.5 ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/60'}`}
+                                    >
+                                        <p className={`text-sm font-medium ${isSelected ? 'text-primary' : ''}`}>{sku.product_name || '—'}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {sku.sku_code}
+                                            {sku.brand && ` · ${sku.brand}`}
+                                            {sku.variant && ` · ${sku.variant}`}
+                                        </p>
+                                    </button>
+                                )
+                            })
                         )}
                     </div>
                 </DialogContent>
