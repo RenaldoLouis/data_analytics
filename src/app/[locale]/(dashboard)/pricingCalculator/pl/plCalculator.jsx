@@ -145,7 +145,7 @@ function mapMonthlyRecordToFormData(mr, chIdToName) {
             const ch = chIdToName[co.channel_id]
             if (!ch) return
             data.bundlingData[ch] = {
-                cogs:  co.cogs_bundling    != null ? toAmt(co.cogs_bundling)     : '',
+                cogs: co.cogs_bundling != null ? toAmt(co.cogs_bundling) : '',
                 units: co.units_per_bundle != null ? String(co.units_per_bundle) : '',
             }
         })
@@ -831,12 +831,19 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         const vol = parseFloat(infoData[ch]?.vol) || 0
         const bundCogs = parseFloat(bundlingData[ch]?.cogs) || 0
         const unitsPerBundle = parseFloat(bundlingData[ch]?.units) || 1
-        return s + vol * (bundCogs + unitsPerBundle * cogsUnit)
+        return s + vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * cogsUnit)
     }, 0)
-    const commCost = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'comm')) / 100), 0)
-    const mallCost = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'mall')) / 100), 0)
-    const pgwCost = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'pgw')) / 100), 0)
-    const adsCostTotal = channels.reduce((s, ch) => s + grossTotal * ((parseFloat(adsData[ch]?.rate) || 0) / 100), 0)
+    const commCost = channels.reduce((s, ch, i) =>
+        s + grossByChannel[i] * (parseFloat(getChFee(ch, 'comm')) / 100), 0)
+
+    const mallCost = channels.reduce((s, ch, i) =>
+        s + grossByChannel[i] * (parseFloat(getChFee(ch, 'mall')) / 100), 0)
+
+    const pgwCost = channels.reduce((s, ch, i) =>
+        s + grossByChannel[i] * (parseFloat(getChFee(ch, 'pgw')) / 100), 0)
+
+    const adsCostTotal = channels.reduce((s, ch, i) =>
+        s + grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100), 0)
     const channelCost = commCost + mallCost + pgwCost + adsCostTotal
 
     const retainerVal = parseFloat((enablerConfig.retainer || '').replace(/\./g, '')) || 0
@@ -861,7 +868,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     // ── Per-SKU metrics helper ────────────────────────────────────────────────
     const computeSkuMetrics = (formData, sku) => {
         const { infoData: fi = {}, diskonData: fd = {}, returnData: fr = {},
-                ongkirData: fo = {}, adsData: fa = {}, customRows: fc = [], bundlingData: fb = {} } = formData
+            ongkirData: fo = {}, adsData: fa = {}, customRows: fc = [], bundlingData: fb = {} } = formData
         const cu = (parseFloat(sku.cogs) || 0) + (parseFloat(sku.pkg) || 0)
         const gByCh = channels.map(ch => (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(sku.hj?.[ch]?.harga) || 0))
         const gTot = gByCh.reduce((a, b) => a + b, 0)
@@ -874,7 +881,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             const vol = parseFloat(fi[ch]?.vol) || 0
             const bundCogs = parseFloat(fb[ch]?.cogs) || 0
             const unitsPerBundle = parseFloat(fb[ch]?.units) || 1
-            return s + vol * (bundCogs + unitsPerBundle * cu)
+            return s + vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * cogsUnit)
         }, 0)
         const chCost = channels.reduce((s, ch) => s + gTot * (
             (parseFloat(getChFee(ch, 'comm')) + parseFloat(getChFee(ch, 'mall')) + parseFloat(getChFee(ch, 'pgw'))) / 100 +
@@ -883,11 +890,13 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         const fcTot = fc.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
         const gpTot = nTot - cogsTot                    // Gross Profit
         const opTot = gpTot - chCost - fcTot             // Operating Profit
-        return { grossTotal: gTot, netTotal: nTot, cogsTotal: cogsTot, channelCost: chCost,
-                 fixedCost: fcTot, grossProfit: gpTot, operatingProfit: opTot,
-                 grossMarginPct: nTot > 0 ? (gpTot / nTot) * 100 : 0,
-                 operatingMarginPct: nTot > 0 ? (opTot / nTot) * 100 : 0,
-                 grossByCh: gByCh, discByCh: dByCh, retByCh: rByCh, shipByCh: sByCh, netByCh: nByCh }
+        return {
+            grossTotal: gTot, netTotal: nTot, cogsTotal: cogsTot, channelCost: chCost,
+            fixedCost: fcTot, grossProfit: gpTot, operatingProfit: opTot,
+            grossMarginPct: nTot > 0 ? (gpTot / nTot) * 100 : 0,
+            operatingMarginPct: nTot > 0 ? (opTot / nTot) * 100 : 0,
+            grossByCh: gByCh, discByCh: dByCh, retByCh: rByCh, shipByCh: sByCh, netByCh: nByCh
+        }
     }
 
     // ── All-SKU aggregated metrics ────────────────────────────────────────────
@@ -896,21 +905,23 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         if (p.id === selectedSku) {
             const gp = netTotal - cogsTotal
             const op = gp - channelCost - fixedTotal
-            return { sku: p, grossTotal, netTotal, cogsTotal, channelCost, fixedCost: fixedTotal,
-                     grossProfit: gp, operatingProfit: op,
-                     grossMarginPct:    netTotal > 0 ? (gp / netTotal) * 100 : 0,
-                     operatingMarginPct: netTotal > 0 ? (op / netTotal) * 100 : 0,
-                     grossByCh: grossByChannel, discByCh: discByChannel, retByCh: retByChannel,
-                     shipByCh: shipByChannel, netByCh: netByChannel }
+            return {
+                sku: p, grossTotal, netTotal, cogsTotal, channelCost, fixedCost: fixedTotal,
+                grossProfit: gp, operatingProfit: op,
+                grossMarginPct: netTotal > 0 ? (gp / netTotal) * 100 : 0,
+                operatingMarginPct: netTotal > 0 ? (op / netTotal) * 100 : 0,
+                grossByCh: grossByChannel, discByCh: discByChannel, retByCh: retByChannel,
+                shipByCh: shipByChannel, netByCh: netByChannel
+            }
         }
         return { sku: p, ...computeSkuMetrics(skuDataCacheRef.current[p.id]?.data ?? {}, p) }
     })
-    const allSkuGrossTotal   = allSkuMetrics.reduce((s, m) => s + m.grossTotal,        0)
-    const allSkuNetTotal     = allSkuMetrics.reduce((s, m) => s + m.netTotal,          0)
-    const allSkuFixedTotal   = allSkuMetrics.reduce((s, m) => s + m.fixedCost,         0)
-    const allSkuOpProfit     = allSkuMetrics.reduce((s, m) => s + m.operatingProfit,   0)
-    const finalMonthlyPL     = allSkuOpProfit - enablerTotal
-    const finalMonthlyPLPct  = allSkuNetTotal > 0 ? (finalMonthlyPL / allSkuNetTotal) * 100 : 0
+    const allSkuGrossTotal = allSkuMetrics.reduce((s, m) => s + m.grossTotal, 0)
+    const allSkuNetTotal = allSkuMetrics.reduce((s, m) => s + m.netTotal, 0)
+    const allSkuFixedTotal = allSkuMetrics.reduce((s, m) => s + m.fixedCost, 0)
+    const allSkuOpProfit = allSkuMetrics.reduce((s, m) => s + m.operatingProfit, 0)
+    const finalMonthlyPL = allSkuOpProfit - enablerTotal
+    const finalMonthlyPLPct = allSkuNetTotal > 0 ? (finalMonthlyPL / allSkuNetTotal) * 100 : 0
     const finalPlColor = finalMonthlyPLPct >= 20 ? 'text-green-700' : finalMonthlyPLPct >= 10 ? 'text-amber-600' : 'text-red-600'
 
     // ── Detail modal data ─────────────────────────────────────────────────────
