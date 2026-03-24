@@ -165,6 +165,8 @@ export default {
         getMonthlyByBrand: (brandId) => getRequest(`/next-api/pl/brands/${brandId}/monthly`),
         getMonthlyById: (updateId) => getRequest(`/next-api/pl/monthly/${updateId}`),
         getPreviousMonthly: (params) => getRequest(`/next-api/pl/monthly/previous?brandId=${params.brandId}&skuId=${params.skuId}&periodMonth=${params.periodMonth}&periodYear=${params.periodYear}`),
+        getTakenMonths: (brandId, year) => getRequest(`/next-api/pl/monthly/taken-months?brandId=${brandId}&periodYear=${year}`),
+        getMonthlyByPeriod: (brandId, skuId, periodMonth, periodYear) => getRequest(`/next-api/pl/monthly/by-period?brandId=${brandId}&skuId=${skuId}&periodMonth=${periodMonth}&periodYear=${periodYear}`),
         createMonthly: (payload) => postAPIRequest('/next-api/pl/monthly', payload),
         updateMonthly: (updateId, payload) => putRequestMiddleware(`/next-api/pl/monthly/${updateId}`, payload),
         deleteMonthly: (updateId) => deleteRequestMiddleware(`/next-api/pl/monthly/${updateId}`),

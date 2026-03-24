@@ -35,6 +35,30 @@ import { useTranslations } from "next-intl"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
+// Group raw monthly records by brand+period so the list shows one row per period.
+// Each group carries `all_ids` (all record IDs) and `sku_names` (all SKU names).
+function groupByPeriod(pls) {
+    const map = new Map()
+    pls.forEach(pl => {
+        const key = `${pl.brand_id}_${pl.period_month}_${pl.period_year}`
+        if (!map.has(key)) {
+            map.set(key, {
+                ...pl,
+                sku_names: pl.sku_name ? [pl.sku_name] : [],
+                all_ids:   [pl.id],
+            })
+        } else {
+            const g = map.get(key)
+            g.all_ids.push(pl.id)
+            if (pl.sku_name && !g.sku_names.includes(pl.sku_name))
+                g.sku_names.push(pl.sku_name)
+            if (new Date(pl.updated_at) > new Date(g.updated_at))
+                g.updated_at = pl.updated_at
+        }
+    })
+    return Array.from(map.values())
+}
+
 const SKELETON_ROWS = 5
 const SKELETON_COLS = 5
 
@@ -56,13 +80,15 @@ export default function PlList({ onAdd, onEdit }) {
         fetchData()
     }, [isFetch])
 
-    const handleDelete = async (id) => {
+    const groupedPls = useMemo(() => groupByPeriod(pls), [pls])
+
+    const handleDelete = async (allIds) => {
         setIsMutating(true)
-        const res = await services.pl.deletePl(id)
-        if (res?.success) {
+        try {
+            await Promise.all(allIds.map(id => services.pl.deleteMonthly(id)))
             toast.success(t('deleteSuccess'))
             setIsFetch(prev => !prev)
-        } else {
+        } catch {
             toast.error(t('deleteFailed'))
         }
         setIsMutating(false)
@@ -73,6 +99,11 @@ export default function PlList({ onAdd, onEdit }) {
             accessorKey: 'name',
             header: t('colBrand'),
             cell: ({ row }) => <span className="font-medium">{row.original.name || row.original.brand_name || '-'}</span>,
+        },
+        {
+            id: 'sku',
+            header: t('colSku'),
+            cell: ({ row }) => <span>{row.original.sku_names?.join(', ') || '-'}</span>,
         },
         {
             id: 'period',
@@ -116,7 +147,7 @@ export default function PlList({ onAdd, onEdit }) {
                     <IconTrash
                         size={16}
                         className="cursor-pointer text-red-500 hover:text-red-700 transition-colors"
-                        onClick={() => handleDelete(row.original.id)}
+                        onClick={() => handleDelete(row.original.all_ids)}
                     />
                 </div>
             ),
@@ -125,7 +156,7 @@ export default function PlList({ onAdd, onEdit }) {
     ], [t])
 
     const table = useReactTable({
-        data: pls,
+        data: groupedPls,
         columns,
         state: { pagination },
         onPaginationChange: setPagination,

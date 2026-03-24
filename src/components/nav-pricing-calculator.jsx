@@ -19,12 +19,12 @@ export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
             url: "/pricingCalculator/sku",
             icon: IconTag,
         },
-        {
-            id: "pricing-calculator",
-            title: "HPP Calculator",
-            url: "/pricingCalculator/hpp",
-            icon: IconCalculator,
-        },
+        // {
+        //     id: "pricing-calculator",
+        //     title: "HPP Calculator",
+        //     url: "/pricingCalculator/hpp",
+        //     icon: IconCalculator,
+        // },
         {
             id: "pricing-brand",
             title: "Brand",

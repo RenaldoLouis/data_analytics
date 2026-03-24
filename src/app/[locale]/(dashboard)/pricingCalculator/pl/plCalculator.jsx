@@ -24,6 +24,7 @@ import { H3 } from "@/components/ui/typography"
 import services from "@/services"
 import {
     IconArrowLeft,
+    IconBuildingStore,
     IconChevronDown,
     IconChevronUp,
     IconPresentationAnalytics,
@@ -31,10 +32,10 @@ import {
     IconSettings,
 } from "@tabler/icons-react"
 import { useTranslations } from "next-intl"
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
-const MONTH_LABELS_CONST = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+const MONTH_LABELS_CONST = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const fmt = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
 const pct = (n) => (isFinite(n) ? n.toFixed(1) : '0.0') + '%'
 const num = (s) => parseFloat(String(s).replace(/[^\d.]/g, '')) || 0
@@ -49,12 +50,115 @@ const parseCurrency = (v) => String(v).replace(/\D/g, '')
 
 const DISKON_KEYS = ["voucher", "subsidi", "flash", "coin", "affiliate", "bundling", "loyalty"]
 
+// ─── API value helpers (module-scope so effects and helpers can share them) ───
+const toAmt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v))) : ''
+const toRate = (v, scale = 100) => v != null ? String(parseFloat((parseFloat(v) * scale).toFixed(4))) : '0'
+
+// ─── Map a monthly DB record to form-state shape ───────────────────────────────
+function mapMonthlyRecordToFormData(mr, chIdToName) {
+    const data = {
+        infoData: {},
+        diskonData: {},
+        returnData: {},
+        ongkirData: {},
+        adsData: {},
+        claimData: { support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' },
+        varData: {},
+        monthlyKomisiRate: '',
+        customRows: [],
+        bundlingData: {},
+        orders: '',
+        secFilled: { info: false, diskon: false, ret: false, ads: false, fixed: false },
+    }
+    if (mr.sales?.length) {
+        mr.sales.forEach(s => {
+            const ch = chIdToName[s.channel_id]
+            if (!ch) return
+            data.infoData[ch] = { vol: s.units_sold != null ? String(s.units_sold) : '' }
+            data.adsData[ch] = { rate: s.ads_spend_rate != null ? toRate(s.ads_spend_rate) : '0' }
+        })
+    }
+    if (mr.diskons?.length) {
+        mr.diskons.forEach(d => {
+            const ch = chIdToName[d.channel_id]
+            if (!ch) return
+            data.diskonData[ch] = {
+                voucher: toRate(d.voucher_pct),
+                subsidi: toRate(d.subsidy_pct),
+                flash: toRate(d.flash_sale_pct),
+                coin: toRate(d.coin_pct),
+                affiliate: toRate(d.affiliate_pct),
+                bundling: toRate(d.bundling_pct),
+                loyalty: toRate(d.loyalty_pct),
+                nilai: d.discount_amount != null ? toAmt(d.discount_amount) : '',
+            }
+        })
+    }
+    if (mr.returns?.length) {
+        mr.returns.forEach(r => {
+            const ch = chIdToName[r.channel_id]
+            if (!ch) return
+            data.returnData[ch] = {
+                rate: toRate(r.return_rate_pct),
+                units: r.return_units != null ? String(r.return_units) : '',
+                est: r.estimated_return_value != null ? toAmt(r.estimated_return_value) : '',
+                aktual: r.actual_refund_amount != null ? toAmt(r.actual_refund_amount) : '',
+            }
+        })
+    }
+    if (mr.ongkirs?.length) {
+        mr.ongkirs.forEach(o => {
+            const ch = chIdToName[o.channel_id]
+            if (!ch) return
+            data.ongkirData[ch] = {
+                subsidi: o.shipping_subsidy != null ? toAmt(o.shipping_subsidy) : '',
+                aktual: o.actual_shipping_cost != null ? toAmt(o.actual_shipping_cost) : '',
+                processing: o.processing_fee != null ? toAmt(o.processing_fee) : '',
+                berat: o.weight_diff_kg != null ? String(o.weight_diff_kg) : '',
+            }
+        })
+    }
+    if (mr.enabler_var) {
+        const ev = mr.enabler_var
+        data.claimData = {
+            support: ev.claim_support != null ? toAmt(ev.claim_support) : '',
+            voucher: ev.claim_voucher != null ? toAmt(ev.claim_voucher) : '',
+            mpFee: ev.claim_mp_fee != null ? toAmt(ev.claim_mp_fee) : '',
+            mpAffiliate: ev.mp_affiliate != null ? toAmt(ev.mp_affiliate) : '',
+            campaign: ev.campaign_ads_fee != null ? toAmt(ev.campaign_ads_fee) : '',
+        }
+        if (ev.order_count != null) data.orders = String(ev.order_count)
+        if (ev.commission_gmv_rate != null) data.monthlyKomisiRate = toRate(ev.commission_gmv_rate)
+        if (ev.custom_var_items && typeof ev.custom_var_items === 'object') {
+            data.varData = Object.fromEntries(
+                Object.entries(ev.custom_var_items).map(([k, v]) => [k, toAmt(v)])
+            )
+        }
+    }
+    if (mr.fixed_costs?.length) {
+        data.customRows = mr.fixed_costs
+            .filter(fc => fc.item_name)
+            .map((fc, i) => ({ id: i, name: fc.item_name, val: toAmt(fc.amount) }))
+    }
+    if (mr.cogs_overrides?.length) {
+        mr.cogs_overrides.forEach(co => {
+            const ch = chIdToName[co.channel_id]
+            if (!ch) return
+            data.bundlingData[ch] = {
+                cogs:  co.cogs_bundling    != null ? toAmt(co.cogs_bundling)     : '',
+                units: co.units_per_bundle != null ? String(co.units_per_bundle) : '',
+            }
+        })
+    }
+    return data
+}
+
 function getChColor(code, label) {
     const key = (label || code || "").toLowerCase()
-    if (key.includes("shopee"))    return { bg: "#fff7f0", color: "#c83200" }
+    if (key.includes("shopee")) return { bg: "#fff7f0", color: "#c83200" }
     if (key.includes("tokopedia")) return { bg: "#f0fff4", color: "#1a6e42" }
-    if (key.includes("tiktok"))    return { bg: "#f0f8ff", color: "#0a4a8c" }
-    if (key.includes("lazada"))    return { bg: "#f5f0ff", color: "#4a1fcc" }
+    if (key.includes("tiktok")) return { bg: "#f0f8ff", color: "#0a4a8c" }
+    if (key.includes("lazada")) return { bg: "#f5f0ff", color: "#4a1fcc" }
     return { bg: "#f5f5f5", color: "#555" }
 }
 
@@ -96,7 +200,7 @@ function PnLAccordion({ title, subtitle, pillText, pillVariant = "optional", def
     const pillClass = {
         required: "bg-orange-50 text-orange-700 border border-orange-200",
         prefilled: "bg-teal-50 text-teal-700 border border-teal-200",
-        filled:   "bg-green-50 text-green-700 border border-green-300",
+        filled: "bg-green-50 text-green-700 border border-green-300",
         optional: "bg-muted text-muted-foreground border",
     }[pillVariant] || "bg-muted text-muted-foreground border"
     return (
@@ -235,22 +339,23 @@ function InnerCard({ title, children, className = '' }) {
 }
 
 // ─── FieldInput ───────────────────────────────────────────────────────────────
-function FieldInput({ label, subtitle, value, onChange, prefix, suffix, placeholder = '0', type = 'number' }) {
+function FieldInput({ label, subtitle, value, onChange, prefix, suffix, placeholder = '0', type = 'number', disabled = false }) {
     const isCurrency = prefix === 'Rp'
     return (
         <div className="grid gap-1">
             {label && <Label>{label}</Label>}
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-            <div className="flex items-center border border-input rounded-md overflow-hidden bg-transparent shadow-xs focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:border-ring transition-all">
+            <div className={`flex items-center border border-input rounded-md overflow-hidden shadow-xs transition-all ${disabled ? 'bg-muted/50 opacity-60' : 'bg-transparent focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:border-ring'}`}>
                 {prefix && (
                     <span className="px-3 text-xs text-muted-foreground border-r border-input bg-muted/50 self-stretch flex items-center">Rp</span>
                 )}
                 <input
                     type={isCurrency ? 'text' : type}
                     value={isCurrency ? fmtCurrency(value) : value}
-                    onChange={(e) => onChange(isCurrency ? parseCurrency(e.target.value) : e.target.value)}
+                    onChange={(e) => !disabled && onChange(isCurrency ? parseCurrency(e.target.value) : e.target.value)}
                     placeholder={placeholder}
-                    className="flex-1 px-3 h-9 text-sm text-foreground outline-none bg-transparent min-w-0"
+                    disabled={disabled}
+                    className="flex-1 px-3 h-9 text-sm text-foreground outline-none bg-transparent min-w-0 disabled:cursor-not-allowed"
                 />
                 {suffix && (
                     <span className="px-3 text-xs text-muted-foreground border-l border-input bg-muted/50 self-stretch flex items-center whitespace-nowrap">{suffix}</span>
@@ -357,15 +462,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         t('diskonAffiliate'), t('diskonBundling'), t('diskonLoyalty'),
     ]
 
-    const FC_FIELDS = [
-        { id: "gaji",     label: t('fcGajiLabel'),     sub: t('fcGajiSub'),     group: t('fcGroupHR') },
-        { id: "bpjs",     label: t('fcBpjsLabel'),     sub: t('fcBpjsSub') },
-        { id: "konten",   label: t('fcKontenLabel'),   sub: t('fcKontenSub'),   group: t('fcGroupMarketing') },
-        { id: "kol",      label: t('fcKolLabel'),      sub: t('fcKolSub') },
-        { id: "sampling", label: t('fcSamplingLabel'), sub: t('fcSamplingSub') },
-        { id: "sewa",     label: t('fcSewaLabel'),     sub: t('fcSewaSub'),     group: t('fcGroupOps') },
-        { id: "tools",    label: t('fcToolsLabel'),    sub: t('fcToolsSub') },
-    ]
 
     // ── Setup step state ──────────────────────────────────────────────────────
     const [setupStep, setSetupStep] = useState(1)
@@ -382,7 +478,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     }
 
     const getStepStatus = (n) => ({
-        isDone:   completedSetupSteps.includes(n),
+        isDone: completedSetupSteps.includes(n),
         isActive: setupStep === n,
         isLocked: !completedSetupSteps.includes(n) && setupStep < n,
     })
@@ -421,7 +517,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
     // ── Enabler config ────────────────────────────────────────────────────────
     const [enablerConfig, setEnablerConfig] = useState({
-        model: 'ret',
         retainer: '', komisiRate: '',
         sof: '', swift: '', live: '', gudang: '',
         fulfilRate: '12000',
@@ -455,6 +550,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         if (!editId && !startAtMonthly) return
         const load = async () => {
             let brandId = null
+            let monthlyRecord = null
 
             if (editId && brandOnly) {
                 // brandOnly: editId is a brand ID directly
@@ -464,11 +560,16 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 const monthlyRes = await services.pl.getMonthlyById(editId)
                 const m = monthlyRes?.data?.data ?? monthlyRes?.data
                 if (!m) return
+                monthlyRecord = m
                 setMonthlyId(m.id ?? editId)
                 const skuId = m.sku_id ?? m.sku?.id
-                if (skuId)          setSelectedSku(skuId)
-                if (m.period_month) setActiveMo(MONTH_LABELS_CONST[parseInt(m.period_month) - 1] ?? '')
-                if (m.period_year)  setActiveYear(String(m.period_year))
+                if (skuId) setSelectedSku(skuId)
+                if (m.period_month && m.period_year) {
+                    const yr = String(m.period_year)
+                    const mo = MONTH_LABELS_CONST[parseInt(m.period_month) - 1] ?? ''
+                    setActiveYear(yr)
+                    setMoByYear(prev => ({ ...prev, [yr]: mo }))
+                }
                 brandId = m.brand_id ?? m.brand?.id
             } else if (startAtMonthly) {
                 // Add New flow — fetch first available brand
@@ -486,10 +587,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             const d = brandList.find(b => b.id === brandId) ?? brandList[0]
             if (!d) return
 
-            // Helpers: strip float artifacts from API values
-            const toAmt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v))) : ''
-            const toRate = (v, scale = 100) => v != null ? String(parseFloat((parseFloat(v) * scale).toFixed(4))) : '0'
-
             setSetup({ brand_name: d.name || '', kategori: d.category || '', enabler: d.enabler_name || '' })
 
             const chs = [...(d.channels || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
@@ -499,22 +596,21 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             setChannelFees(Object.fromEntries(chs.map(ch => [ch.name, {
                 comm: toRate(ch.fee_config?.commission_rate),
                 mall: toRate(ch.fee_config?.mall_fee_rate),
-                pgw:  toRate(ch.fee_config?.pgw_rate),
+                pgw: toRate(ch.fee_config?.pgw_rate),
             }])))
 
             const ec = d.enabler_fee_config
             if (ec) {
                 setEnablerConfig({
-                    model:      { RETAINER: 'ret', KOMISI: 'kom', HYBRID: 'hyb' }[ec.model_type] || 'ret',
-                    retainer:   toAmt(ec.retainer_amount),
+                    retainer: toAmt(ec.retainer_amount),
                     komisiRate: toRate(ec.commission_gmv_rate),
-                    sof:        toAmt(ec.store_operation_fee),
-                    swift:      toAmt(ec.platform_fee),
-                    live:       toAmt(ec.live_commerce_cost),
-                    gudang:     toAmt(ec.gudang_cost),
+                    sof: toAmt(ec.store_operation_fee),
+                    swift: toAmt(ec.platform_fee),
+                    live: toAmt(ec.live_commerce_cost),
+                    gudang: toAmt(ec.warehouse_cost),
                     fulfilRate: toAmt(ec.fulfillment_per_order) || '12000',
                     customFixed: (ec.custom_fixed_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
-                    customVar:   (ec.custom_var_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
+                    customVar: (ec.custom_var_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
                 })
             }
 
@@ -524,8 +620,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     name: sku.name || '',
                     sku,
                     cogs: toAmt(sku.cogs_per_unit),
-                    pkg:  toAmt(sku.packaging_cost),
-                    hj:   Object.fromEntries(
+                    pkg: toAmt(sku.packaging_cost),
+                    hj: Object.fromEntries(
                         (sku.channel_prices || [])
                             .map(cp => {
                                 const chName = cp.channel_name || chIdToName[cp.channel_id] || ''
@@ -537,19 +633,33 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 setActiveIdx(0)
             }
 
+            // Pre-fill monthly form fields from saved record
+            if (monthlyRecord) {
+                const fd = mapMonthlyRecordToFormData(monthlyRecord, chIdToName)
+                setInfoData(fd.infoData)
+                setAdsData(fd.adsData)
+                setDiskonData(fd.diskonData)
+                setReturnData(fd.returnData)
+                setOngkirData(fd.ongkirData)
+                setClaimData(fd.claimData)
+                if (fd.orders) setOrders(fd.orders)
+                if (fd.customRows?.length) setCustomRows(fd.customRows)
+            }
+
             setBrandData(d)
             setCompletedSetupSteps([1, 2, 3])
             setSetupStep(1)
             setSetupDone(startAtMonthly)
         }
         load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editId, startAtMonthly])
 
     // ── SKU modal ─────────────────────────────────────────────────────────────
-    const [skuModalOpen, setSkuModalOpen]   = useState(false)
-    const [skuList, setSkuList]             = useState([])
-    const [skuSearch, setSkuSearch]         = useState('')
+    const [skuModalOpen, setSkuModalOpen] = useState(false)
+    const [detailModalSku, setDetailModalSku] = useState(null)
+    const [skuList, setSkuList] = useState([])
+    const [skuSearch, setSkuSearch] = useState('')
     const [isSkusLoading, setIsSkusLoading] = useState(false)
 
     const openSkuModal = async () => {
@@ -590,24 +700,115 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
     // ── Monthly P&L state ─────────────────────────────────────────────────────
     const [monthlyId, setMonthlyId] = useState(null)
-    const [activeMo, setActiveMo] = useState('')
     const [activeYear, setActiveYear] = useState(String(new Date().getFullYear()))
+    const [takenMonths, setTakenMonths] = useState([])
+    const [isMonthsLoading, setIsMonthsLoading] = useState(false)
+    const [moByYear, setMoByYear] = useState({})
+    const activeMo = moByYear[activeYear] ?? ''
+    const setActiveMo = (m) => setMoByYear(prev => ({ ...prev, [activeYear]: m }))
     const [selectedSku, setSelectedSku] = useState('')
-    const [infoData, setInfoData]     = useState({})
+    const skuInitRef = useRef(false)
+    const skuDataCacheRef = useRef({})   // { [skuId]: { data: formSnapshot, recordId: id|null } }
+    const prevSkuRef = useRef(null)
+    const formDataRef = useRef({})   // always-current form state snapshot
+    const contextRef = useRef({})   // always-current context snapshot
+    const [infoData, setInfoData] = useState({})
     const [diskonData, setDiskonData] = useState({})
     const [returnData, setReturnData] = useState({})
     const [ongkirData, setOngkirData] = useState({})
-    const [adsData, setAdsData]       = useState({})
-    const [fixedData, setFixedData]   = useState({})
-    const [claimData, setClaimData]   = useState({ support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' })
+    const [adsData, setAdsData] = useState({})
+    const [claimData, setClaimData] = useState({ support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' })
+    const [varData, setVarData] = useState({})
+    const [monthlyKomisiRate, setMonthlyKomisiRate] = useState('')
     const [customRows, setCustomRows] = useState([])
-    const [orders, setOrders]         = useState('')
-    const [secFilled, setSecFilled]   = useState({ info: false, diskon: false, ret: false, ads: false, fixed: false })
+    const [bundlingData, setBundlingData] = useState({})
+    const [orders, setOrders] = useState('')
+    const [secFilled, setSecFilled] = useState({ info: false, diskon: false, ret: false, ads: false, fixed: false })
     const markFilled = (sec) => setSecFilled(prev => ({ ...prev, [sec]: true }))
 
     // ── Active SKU for monthly ─────────────────────────────────────────────────
     const activeSku = products.find(prod => prod.id === selectedSku) || products[0] || {}
     const cogsUnit = (parseFloat(activeSku.cogs) || 0) + (parseFloat(activeSku.pkg) || 0)
+
+    // ── Keep refs always current (no deps — runs after every render) ───────────
+    // Must be declared BEFORE the SKU-change effect so they run first each cycle.
+    useEffect(() => {
+        formDataRef.current = { infoData, diskonData, returnData, ongkirData, adsData, claimData, varData, monthlyKomisiRate, customRows, bundlingData, orders, secFilled }
+    })
+    useEffect(() => {
+        contextRef.current = { brandData, activeMo, activeYear, monthlyId }
+    })
+
+    // ── Restore all form fields from a cached snapshot ─────────────────────────
+    const restoreFromFormData = (d) => {
+        setInfoData(d.infoData ?? {})
+        setDiskonData(d.diskonData ?? {})
+        setReturnData(d.returnData ?? {})
+        setOngkirData(d.ongkirData ?? {})
+        setAdsData(d.adsData ?? {})
+        setClaimData(d.claimData ?? { support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' })
+        setVarData(d.varData ?? {})
+        setMonthlyKomisiRate(d.monthlyKomisiRate ?? '')
+        setCustomRows(d.customRows ?? [])
+        setBundlingData(d.bundlingData ?? {})
+        setOrders(d.orders ?? '')
+        setSecFilled(d.secFilled ?? { info: false, diskon: false, ret: false, ads: false, fixed: false })
+    }
+
+    // ── SKU switch: save previous data, then restore/load for new SKU ──────────
+    useEffect(() => {
+        if (!selectedSku) return
+        if (!skuInitRef.current) {
+            skuInitRef.current = true
+            prevSkuRef.current = selectedSku
+            return
+        }
+
+        const prevSku = prevSkuRef.current
+        prevSkuRef.current = selectedSku
+
+        // Save current data to cache for the SKU we are leaving
+        if (prevSku) {
+            skuDataCacheRef.current[prevSku] = {
+                data: { ...formDataRef.current },
+                recordId: contextRef.current.monthlyId ?? null,
+            }
+        }
+
+        // If we already have cached data for the new SKU, restore it
+        const cached = skuDataCacheRef.current[selectedSku]
+        if (cached) {
+            restoreFromFormData(cached.data)
+            setMonthlyId(cached.recordId ?? null)
+            return
+        }
+
+        // Otherwise try to load from DB for current period
+        const { brandData: bd, activeMo: mo, activeYear: yr } = contextRef.current
+        if (bd?.id && mo && yr) {
+            const periodMonth = String(MONTH_LABELS_CONST.indexOf(mo) + 1).padStart(2, '0')
+            const periodYear = parseInt(yr)
+            services.pl.getMonthlyByPeriod(bd.id, selectedSku, periodMonth, periodYear)
+                .then(res => {
+                    const mr = res?.data?.data ?? res?.data ?? null
+                    if (mr && mr.id) {
+                        const chIdToName = Object.fromEntries((bd.channels ?? []).map(ch => [ch.id, ch.name]))
+                        const fd = mapMonthlyRecordToFormData(mr, chIdToName)
+                        restoreFromFormData(fd)
+                        setMonthlyId(mr.id)
+                        skuDataCacheRef.current[selectedSku] = { data: fd, recordId: mr.id }
+                    } else {
+                        restoreFromFormData({})
+                        setMonthlyId(null)
+                    }
+                })
+                .catch(() => { restoreFromFormData({}); setMonthlyId(null) })
+        } else {
+            restoreFromFormData({})
+            setMonthlyId(null)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSku])
 
     // ── P&L multi-channel calculations ───────────────────────────────────────
     const totalDiskonPct = (ch) =>
@@ -615,60 +816,149 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
     const grossByChannel = channels.map(ch => {
         const vol = parseFloat(infoData[ch]?.vol) || 0
-        const hj  = parseFloat(infoData[ch]?.hj ?? activeSku.hj?.[ch]?.harga) || 0
+        const hj = parseFloat(activeSku.hj?.[ch]?.harga) || 0
         return vol * hj
     })
-    const grossTotal     = grossByChannel.reduce((a, b) => a + b, 0)
-    const discByChannel  = channels.map((ch, i) => grossByChannel[i] * totalDiskonPct(ch) / 100)
-    const retByChannel   = channels.map((ch, i) => grossByChannel[i] * ((parseFloat(returnData[ch]?.rate) || 0) / 100))
-    const shipByChannel  = channels.map(ch => parseFloat(ongkirData[ch]?.subsidi) || 0)
-    const netByChannel   = channels.map((_, i) => grossByChannel[i] - discByChannel[i] - retByChannel[i] - shipByChannel[i])
-    const netTotal       = netByChannel.reduce((a, b) => a + b, 0)
+    const grossTotal = grossByChannel.reduce((a, b) => a + b, 0)
+    const discByChannel = channels.map((ch, i) => grossByChannel[i] * totalDiskonPct(ch) / 100)
+    const retByChannel = channels.map((ch, i) => grossByChannel[i] * ((parseFloat(returnData[ch]?.rate) || 0) / 100))
+    const shipByChannel = channels.map(ch => parseFloat(ongkirData[ch]?.subsidi) || 0)
+    const netByChannel = channels.map((_, i) => grossByChannel[i] - discByChannel[i] - retByChannel[i] - shipByChannel[i])
+    const netTotal = netByChannel.reduce((a, b) => a + b, 0)
 
-    const totalVol   = channels.reduce((s, ch) => s + (parseFloat(infoData[ch]?.vol) || 0), 0)
-    const cogsTotal  = totalVol * cogsUnit
-    const commCost   = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'comm')) / 100), 0)
-    const mallCost   = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'mall')) / 100), 0)
-    const pgwCost    = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'pgw'))  / 100), 0)
+    const totalVol = channels.reduce((s, ch) => s + (parseFloat(infoData[ch]?.vol) || 0), 0)
+    const cogsTotal = channels.reduce((s, ch) => {
+        const vol = parseFloat(infoData[ch]?.vol) || 0
+        const bundCogs = parseFloat(bundlingData[ch]?.cogs) || 0
+        const unitsPerBundle = parseFloat(bundlingData[ch]?.units) || 1
+        return s + vol * (bundCogs + unitsPerBundle * cogsUnit)
+    }, 0)
+    const commCost = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'comm')) / 100), 0)
+    const mallCost = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'mall')) / 100), 0)
+    const pgwCost = channels.reduce((s, ch) => s + grossTotal * (parseFloat(getChFee(ch, 'pgw')) / 100), 0)
     const adsCostTotal = channels.reduce((s, ch) => s + grossTotal * ((parseFloat(adsData[ch]?.rate) || 0) / 100), 0)
-    const channelCost  = commCost + mallCost + pgwCost + adsCostTotal
+    const channelCost = commCost + mallCost + pgwCost + adsCostTotal
 
     const retainerVal = parseFloat((enablerConfig.retainer || '').replace(/\./g, '')) || 0
-    const sofVal      = parseFloat((enablerConfig.sof     || '').replace(/\./g, '')) || 0
-    const swiftVal    = parseFloat((enablerConfig.swift   || '').replace(/\./g, '')) || 0
-    const liveVal     = parseFloat((enablerConfig.live    || '').replace(/\./g, '')) || 0
-    const gudangVal   = parseFloat((enablerConfig.gudang  || '').replace(/\./g, '')) || 0
-    const komisiVal   = grossTotal * ((parseFloat(enablerConfig.komisiRate) || 0) / 100)
-    const fulfilRate  = parseFloat((enablerConfig.fulfilRate || '').replace(/\./g, '').replace(',', '.')) || 12000
+    const sofVal = parseFloat((enablerConfig.sof || '').replace(/\./g, '')) || 0
+    const swiftVal = parseFloat((enablerConfig.swift || '').replace(/\./g, '')) || 0
+    const liveVal = parseFloat((enablerConfig.live || '').replace(/\./g, '')) || 0
+    const gudangVal = parseFloat((enablerConfig.gudang || '').replace(/\./g, '')) || 0
+    const komisiVal = grossTotal * ((parseFloat(monthlyKomisiRate) || 0) / 100)
+    const fulfilRate = parseFloat((enablerConfig.fulfilRate || '').replace(/\./g, '').replace(',', '.')) || 12000
     const fulfilTotal = (parseFloat(orders) || 0) * fulfilRate
-    const claimTotal  = Object.values(claimData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+    const claimTotal = Object.values(claimData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
 
     const customFixedTotal = enablerConfig.customFixed.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
-    const enablerFixedTotal = (enablerConfig.model === 'ret' || enablerConfig.model === 'hyb' ? retainerVal : 0) + sofVal + swiftVal + liveVal + gudangVal + customFixedTotal
+    const enablerFixedTotal = retainerVal + sofVal + swiftVal + liveVal + gudangVal + customFixedTotal
 
-    const customVarTotal = enablerConfig.customVar.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
-    const enablerVarTotal   = (enablerConfig.model === 'kom' || enablerConfig.model === 'hyb' ? komisiVal : 0) + fulfilTotal + claimTotal + customVarTotal
-    const enablerTotal      = enablerFixedTotal + enablerVarTotal
+    const customVarTotal = Object.values(varData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+    const enablerVarTotal = komisiVal + fulfilTotal + claimTotal + customVarTotal
+    const enablerTotal = enablerFixedTotal + enablerVarTotal
 
-    const fixedTotal  = FC_FIELDS.reduce((s, f) => s + (parseFloat(fixedData[f.id]) || 0), 0)
-                      + customRows.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
+    const fixedTotal = customRows.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
 
-    const blendedAmt  = netTotal - cogsTotal - channelCost - enablerTotal
-    const netPlAmt    = blendedAmt - fixedTotal
-    const blendedPct  = netTotal > 0 ? (blendedAmt / netTotal) * 100 : 0
-    const netPlPct    = netTotal > 0 ? (netPlAmt / netTotal) * 100 : 0
-    const marginColor = blendedPct >= 30 ? 'text-green-700' : blendedPct >= 15 ? 'text-amber-600' : 'text-red-600'
-    const netPlColor  = netPlPct  >= 20 ? 'text-green-700' : netPlPct  >= 10 ? 'text-amber-600' : 'text-red-600'
-    const modelText   = {
-        ret: `Retainer Only · ${fmt(retainerVal)}`,
-        kom: `Komisi GMV · ${enablerConfig.komisiRate || '0'}%`,
-        hyb: `Hybrid · ${fmt(retainerVal)} + ${enablerConfig.komisiRate || '0'}% GMV`,
-    }[enablerConfig.model] || '—'
+    // ── Per-SKU metrics helper ────────────────────────────────────────────────
+    const computeSkuMetrics = (formData, sku) => {
+        const { infoData: fi = {}, diskonData: fd = {}, returnData: fr = {},
+                ongkirData: fo = {}, adsData: fa = {}, customRows: fc = [], bundlingData: fb = {} } = formData
+        const cu = (parseFloat(sku.cogs) || 0) + (parseFloat(sku.pkg) || 0)
+        const gByCh = channels.map(ch => (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(sku.hj?.[ch]?.harga) || 0))
+        const gTot = gByCh.reduce((a, b) => a + b, 0)
+        const dByCh = channels.map((ch, i) => gByCh[i] * DISKON_KEYS.reduce((s, k) => s + (parseFloat(fd[ch]?.[k]) || 0), 0) / 100)
+        const rByCh = channels.map((ch, i) => gByCh[i] * ((parseFloat(fr[ch]?.rate) || 0) / 100))
+        const sByCh = channels.map(ch => parseFloat(fo[ch]?.subsidi) || 0)
+        const nByCh = channels.map((_, i) => gByCh[i] - dByCh[i] - rByCh[i] - sByCh[i])
+        const nTot = nByCh.reduce((a, b) => a + b, 0)
+        const cogsTot = channels.reduce((s, ch) => {
+            const vol = parseFloat(fi[ch]?.vol) || 0
+            const bundCogs = parseFloat(fb[ch]?.cogs) || 0
+            const unitsPerBundle = parseFloat(fb[ch]?.units) || 1
+            return s + vol * (bundCogs + unitsPerBundle * cu)
+        }, 0)
+        const chCost = channels.reduce((s, ch) => s + gTot * (
+            (parseFloat(getChFee(ch, 'comm')) + parseFloat(getChFee(ch, 'mall')) + parseFloat(getChFee(ch, 'pgw'))) / 100 +
+            (parseFloat(fa[ch]?.rate) || 0) / 100
+        ), 0)
+        const fcTot = fc.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
+        const gpTot = nTot - cogsTot                    // Gross Profit
+        const opTot = gpTot - chCost - fcTot             // Operating Profit
+        return { grossTotal: gTot, netTotal: nTot, cogsTotal: cogsTot, channelCost: chCost,
+                 fixedCost: fcTot, grossProfit: gpTot, operatingProfit: opTot,
+                 grossMarginPct: nTot > 0 ? (gpTot / nTot) * 100 : 0,
+                 operatingMarginPct: nTot > 0 ? (opTot / nTot) * 100 : 0,
+                 grossByCh: gByCh, discByCh: dByCh, retByCh: rByCh, shipByCh: sByCh, netByCh: nByCh }
+    }
+
+    // ── All-SKU aggregated metrics ────────────────────────────────────────────
+    const namedProducts = products.filter(p => p.name)
+    const allSkuMetrics = namedProducts.map(p => {
+        if (p.id === selectedSku) {
+            const gp = netTotal - cogsTotal
+            const op = gp - channelCost - fixedTotal
+            return { sku: p, grossTotal, netTotal, cogsTotal, channelCost, fixedCost: fixedTotal,
+                     grossProfit: gp, operatingProfit: op,
+                     grossMarginPct:    netTotal > 0 ? (gp / netTotal) * 100 : 0,
+                     operatingMarginPct: netTotal > 0 ? (op / netTotal) * 100 : 0,
+                     grossByCh: grossByChannel, discByCh: discByChannel, retByCh: retByChannel,
+                     shipByCh: shipByChannel, netByCh: netByChannel }
+        }
+        return { sku: p, ...computeSkuMetrics(skuDataCacheRef.current[p.id]?.data ?? {}, p) }
+    })
+    const allSkuGrossTotal   = allSkuMetrics.reduce((s, m) => s + m.grossTotal,        0)
+    const allSkuNetTotal     = allSkuMetrics.reduce((s, m) => s + m.netTotal,          0)
+    const allSkuFixedTotal   = allSkuMetrics.reduce((s, m) => s + m.fixedCost,         0)
+    const allSkuOpProfit     = allSkuMetrics.reduce((s, m) => s + m.operatingProfit,   0)
+    const finalMonthlyPL     = allSkuOpProfit - enablerTotal
+    const finalMonthlyPLPct  = allSkuNetTotal > 0 ? (finalMonthlyPL / allSkuNetTotal) * 100 : 0
+    const finalPlColor = finalMonthlyPLPct >= 20 ? 'text-green-700' : finalMonthlyPLPct >= 10 ? 'text-amber-600' : 'text-red-600'
+
+    // ── Detail modal data ─────────────────────────────────────────────────────
+    const skuDetailData = detailModalSku
+        ? allSkuMetrics.find(m => m.sku.id === detailModalSku.id) ?? null
+        : null
+    const d = skuDetailData
+    const gpColor = (d?.grossMarginPct ?? 0) >= 30 ? 'text-green-700' : (d?.grossMarginPct ?? 0) >= 15 ? 'text-amber-600' : 'text-red-600'
+    const opColor = (d?.operatingMarginPct ?? 0) >= 20 ? 'text-green-700' : (d?.operatingMarginPct ?? 0) >= 10 ? 'text-amber-600' : 'text-red-600'
+
     const hasVolInput = channels.some(ch => parseFloat(infoData[ch]?.vol) > 0)
 
     // ── Save / Calculate ──────────────────────────────────────────────────────
     const [isSaving, setIsSaving] = useState(false)
     const [brandData, setBrandData] = useState(null)
+
+    // ── Taken months loader ───────────────────────────────────────────────────
+    useEffect(() => {
+        if (!startAtMonthly || !brandData?.id || !activeYear) return
+        const load = async () => {
+            setIsMonthsLoading(true)
+            try {
+                const res = await services.pl.getTakenMonths(brandData.id, activeYear)
+                const rows = res?.data?.data ?? res?.data ?? []
+                // Use contextRef to get the latest monthlyId at the time the API
+                // response arrives, avoiding stale-closure from the dep array.
+                const currentMonthlyId = contextRef.current.monthlyId
+                const { activeMo } = contextRef.current
+                const editingMonthCode = currentMonthlyId && activeMo
+                    ? String(MONTH_LABELS_CONST.indexOf(activeMo) + 1).padStart(2, '0')
+                    : null
+                const taken = rows.filter(r =>
+                    editingMonthCode ? r.period_month !== editingMonthCode : r.id !== currentMonthlyId
+                ).map(r => r.period_month)
+                setTakenMonths(taken)
+                setMoByYear(prev => {
+                    const cur = prev[activeYear] ?? ''
+                    if (!cur) return prev
+                    const moCode = String(MONTH_LABELS_CONST.indexOf(cur) + 1).padStart(2, '0')
+                    return taken.includes(moCode) ? { ...prev, [activeYear]: '' } : prev
+                })
+            } finally {
+                setIsMonthsLoading(false)
+            }
+        }
+        load()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeYear, brandData?.id, startAtMonthly])
 
     const channelMap = useMemo(() => Object.fromEntries((brandData?.channels ?? []).map(ch => [ch.name, ch.id])), [brandData])
     const skuMap = useMemo(() => Object.fromEntries((brandData?.skus ?? []).map(s => [s.name, s.id])), [brandData])
@@ -692,61 +982,57 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             sales: channels.map((ch, i) => ({
                 channel_id: chId(ch),
                 units_sold: parseFloat(infoData[ch]?.vol) || 0,
-                actual_selling_price: parseFloat(infoData[ch]?.hj ?? activeSku.hj?.[ch]?.harga) || 0,
+                actual_selling_price: parseFloat(activeSku.hj?.[ch]?.harga) || 0,
                 ads_spend_rate: (parseFloat(adsData[ch]?.rate) || 0) / 100,
                 ads_spend_amount: grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100),
             })),
             diskons: channels.map((ch, i) => ({
                 channel_id: chId(ch),
-                voucher_pct:      (parseFloat(diskonData[ch]?.voucher)   || 0) / 100,
-                subsidy_pct:      (parseFloat(diskonData[ch]?.subsidi)   || 0) / 100,
-                flash_sale_pct:   (parseFloat(diskonData[ch]?.flash)     || 0) / 100,
-                coin_pct:         (parseFloat(diskonData[ch]?.coin)      || 0) / 100,
-                affiliate_pct:    (parseFloat(diskonData[ch]?.affiliate) || 0) / 100,
-                bundling_pct:     (parseFloat(diskonData[ch]?.bundling)  || 0) / 100,
-                loyalty_pct:      (parseFloat(diskonData[ch]?.loyalty)   || 0) / 100,
+                voucher_pct: (parseFloat(diskonData[ch]?.voucher) || 0) / 100,
+                subsidy_pct: (parseFloat(diskonData[ch]?.subsidi) || 0) / 100,
+                flash_sale_pct: (parseFloat(diskonData[ch]?.flash) || 0) / 100,
+                coin_pct: (parseFloat(diskonData[ch]?.coin) || 0) / 100,
+                affiliate_pct: (parseFloat(diskonData[ch]?.affiliate) || 0) / 100,
+                bundling_pct: (parseFloat(diskonData[ch]?.bundling) || 0) / 100,
+                loyalty_pct: (parseFloat(diskonData[ch]?.loyalty) || 0) / 100,
                 total_discount_pct: totalDiskonPct(ch) / 100,
-                discount_amount:  discByChannel[i],
+                discount_amount: discByChannel[i],
             })),
             returns: channels.map(ch => ({
                 channel_id: chId(ch),
-                return_rate_pct:        (parseFloat(returnData[ch]?.rate)   || 0) / 100,
-                return_units:            parseFloat(returnData[ch]?.units)  || 0,
-                estimated_return_value:  parseFloat(returnData[ch]?.est)    || 0,
-                actual_refund_amount:    parseFloat(returnData[ch]?.aktual) || 0,
+                return_rate_pct: (parseFloat(returnData[ch]?.rate) || 0) / 100,
+                return_units: parseFloat(returnData[ch]?.units) || 0,
+                estimated_return_value: parseFloat(returnData[ch]?.est) || 0,
+                actual_refund_amount: parseFloat(returnData[ch]?.aktual) || 0,
             })),
             ongkirs: channels.map(ch => ({
                 channel_id: chId(ch),
-                shipping_subsidy:    parseFloat(ongkirData[ch]?.subsidi)    || 0,
-                actual_shipping_cost: parseFloat(ongkirData[ch]?.aktual)     || 0,
-                processing_fee:      parseFloat(ongkirData[ch]?.processing) || 0,
-                weight_diff_kg:      parseFloat(ongkirData[ch]?.berat)      || 0,
+                shipping_subsidy: parseFloat(ongkirData[ch]?.subsidi) || 0,
+                actual_shipping_cost: parseFloat(ongkirData[ch]?.aktual) || 0,
+                processing_fee: parseFloat(ongkirData[ch]?.processing) || 0,
+                weight_diff_kg: parseFloat(ongkirData[ch]?.berat) || 0,
             })),
             enabler_var: {
-                order_count:      parseFloat(orders) || 0,
-                claim_support:    parseFloat(claimData.support)     || 0,
-                claim_voucher:    parseFloat(claimData.voucher)     || 0,
-                claim_mp_fee:     parseFloat(claimData.mpFee)       || 0,
-                mp_affiliate:     parseFloat(claimData.mpAffiliate) || 0,
-                campaign_ads_fee: parseFloat(claimData.campaign)    || 0,
+                commission_gmv_rate: (parseFloat(monthlyKomisiRate) || 0) / 100,
+                order_count: parseFloat(orders) || 0,
+                claim_support: parseFloat(claimData.support) || 0,
+                claim_voucher: parseFloat(claimData.voucher) || 0,
+                claim_mp_fee: parseFloat(claimData.mpFee) || 0,
+                mp_affiliate: parseFloat(claimData.mpAffiliate) || 0,
+                campaign_ads_fee: parseFloat(claimData.campaign) || 0,
                 custom_var_items: Object.fromEntries(
-                    enablerConfig.customVar.filter(r => r.name).map(r => [r.name, parseFloat(r.val) || 0])
+                    Object.entries(varData).map(([k, v]) => [k, parseFloat(v) || 0])
                 ),
             },
-            fixed_costs: [
-                ...FC_FIELDS
-                    .filter(f => parseFloat(fixedData[f.id]) > 0)
-                    .map(f => ({ item_name: f.id, category: f.group || 'Umum', amount: parseFloat(fixedData[f.id]) || 0 })),
-                ...customRows
-                    .filter(r => r.name && parseFloat(r.val) > 0)
-                    .map(r => ({ item_name: r.name, category: 'Custom', amount: parseFloat(r.val) || 0 })),
-            ],
+            fixed_costs: customRows
+                .filter(r => r.name && parseFloat(r.val) > 0)
+                .map(r => ({ item_name: r.name, amount: parseFloat(r.val) || 0 })),
             cogs_overrides: channels.map(ch => ({
                 channel_id: chId(ch),
                 cogs_override: null,
                 packaging_override: null,
-                cogs_bundling: null,
-                units_per_bundle: null,
+                cogs_bundling: parseFloat(bundlingData[ch]?.cogs) || null,
+                units_per_bundle: parseFloat(bundlingData[ch]?.units) || null,
             })),
         }
     }
@@ -792,20 +1078,17 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                         },
                     })),
                     ...(skusPayload.length && { skus: skusPayload }),
-                    ...(setup.enabler && {
-                        enabler_fee_config: {
-                            model_type: { ret: 'RETAINER', kom: 'KOMISI', hyb: 'HYBRID' }[enablerConfig.model] || 'RETAINER',
-                            retainer_amount: retainerVal,
-                            store_operation_fee: sofVal,
-                            platform_fee: swiftVal,
-                            live_commerce_cost: liveVal,
-                            gudang_cost: gudangVal,
-                            commission_gmv_rate: (parseFloat(enablerConfig.komisiRate) || 0) / 100,
-                            fulfillment_per_order: fulfilRate,
-                            custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
-                            custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
-                        },
-                    }),
+                    enabler_fee_config: {
+                        retainer_amount: retainerVal,
+                        store_operation_fee: sofVal,
+                        platform_fee: swiftVal,
+                        live_commerce_cost: liveVal,
+                        warehouse_cost: gudangVal,
+                        commission_gmv_rate: (parseFloat(enablerConfig.komisiRate) || 0) / 100,
+                        fulfillment_per_order: fulfilRate,
+                        custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
+                        custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
+                    },
                 }
                 const brandId = brandData?.id ?? editId
                 const res = brandId
@@ -824,12 +1107,26 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             if (startAtMonthly) {
                 if (!brandData?.id) return toast.error(t('errorBrandRequired'))
                 const payload = buildMonthlyPayload(brandData.id, brandData.channels ?? [])
-                const res = monthlyId
-                    ? await services.pl.updateMonthly(monthlyId, payload)
+
+                // Resolve monthlyId — if null, check if a record already exists for this
+                // brand+sku+period (guards against duplicate creates after SKU switching)
+                let resolvedMonthlyId = monthlyId
+                if (!resolvedMonthlyId) {
+                    const periodMonth = String(MONTH_LABELS_CONST.indexOf(activeMo) + 1).padStart(2, '0')
+                    const chk = await services.pl.getMonthlyByPeriod(brandData.id, selectedSku, periodMonth, parseInt(activeYear))
+                    const existing = chk?.data?.data ?? chk?.data ?? null
+                    if (existing?.id) {
+                        resolvedMonthlyId = existing.id
+                        setMonthlyId(existing.id)
+                    }
+                }
+
+                const res = resolvedMonthlyId
+                    ? await services.pl.updateMonthly(resolvedMonthlyId, payload)
                     : await services.pl.createMonthly(payload)
                 if (res?.success) {
                     toast.success(t('saveSuccess'))
-                    if (!monthlyId) {
+                    if (!resolvedMonthlyId) {
                         const newId = res.data?.data?.id ?? res.data?.id
                         if (newId) setMonthlyId(newId)
                     }
@@ -872,13 +1169,12 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 ...(skusPayload.length && { skus: skusPayload }),
                 ...(setup.enabler && {
                     enabler_fee_config: {
-                        model_type: { ret: 'RETAINER', kom: 'KOMISI', hyb: 'HYBRID' }[enablerConfig.model] || 'RETAINER',
                         retainer_amount: retainerVal,
                         store_operation_fee: sofVal,
                         platform_fee: swiftVal,
                         live_commerce_cost: liveVal,
-                        gudang_cost: gudangVal,
-                        komisi_gmv_rate: (parseFloat(enablerConfig.komisiRate) || 0) / 100,
+                        warehouse_cost: gudangVal,
+                        commission_gmv_rate: (parseFloat(enablerConfig.komisiRate) || 0) / 100,
                         fulfillment_per_order: fulfilRate,
                         custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
                         custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
@@ -919,7 +1215,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                 <IconArrowLeft size={16} />
                             </Button>
                         )}
-                        <H3 className="text-xl font-bold">{editId ? t('editTitle') : t('title')}</H3>
+                        <H3 className="text-xl font-bold">{brandOnly ? t('colBrand') : editId ? t('editTitle') : t('title')}</H3>
                     </div>
                 </div>
                 <div className="px-4 lg:px-6"><Separator /></div>
@@ -948,6 +1244,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                 onOpen={() => handleStepOpen(1)}
                                 onNext={() => {
                                     if (!setup.brand_name) return toast.error(t('errorBrandRequired'))
+                                    if (!setup.kategori) return toast.error(t('errorCategoryRequired'))
                                     if (channels.length === 0) return toast.error(t('errorChannelRequired'))
                                     doneSetupStep(1)
                                 }}
@@ -967,7 +1264,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                             type="text"
                                         />
                                         <div className="grid gap-1">
-                                            <Label>{t('productCategory')}</Label>
+                                            <Label>{t('productCategory')} <span className="text-red-500">*</span></Label>
                                             <Input
                                                 value={setup.kategori}
                                                 onChange={e => setS('kategori', e.target.value)}
@@ -1095,42 +1392,12 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
                                     <Separator />
 
-                                    {/* Enabler model */}
+                                    {/* Fixed Cost Enabler */}
                                     <div>
                                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                                            {t('enablerFeeModel')}{setup.enabler && <span className="font-normal text-primary normal-case tracking-normal ml-1">({setup.enabler})</span>}
+                                            {t('fixedCostEnabler')}{setup.enabler && <span className="font-normal text-primary normal-case tracking-normal ml-1">({setup.enabler})</span>}
                                         </p>
-                                        <div className="grid grid-cols-3 gap-2 mb-4">
-                                            {[['ret', '🔒', t('modelRetainerOnly')], ['kom', '📊', t('modelKomisiGmv')], ['hyb', '⚡', t('modelHybrid')]].map(([m, icon, label]) => (
-                                                <button
-                                                    key={m}
-                                                    type="button"
-                                                    onClick={() => setEC('model', m)}
-                                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs font-medium transition-colors
-                                                        ${enablerConfig.model === m ? 'border-primary bg-primary/5 text-primary' : 'border-border bg-card hover:bg-muted/50'}`}
-                                                >
-                                                    <span className="text-base">{icon}</span>
-                                                    <span className="text-center leading-tight">{label}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-
-                                        <div className="grid sm:grid-cols-2 gap-3">
-                                            {(enablerConfig.model === 'ret' || enablerConfig.model === 'hyb') && (
-                                                <FieldInput label={t('retainerMonthly')} value={enablerConfig.retainer} onChange={v => setEC('retainer', v)} prefix="Rp" />
-                                            )}
-                                            {(enablerConfig.model === 'kom' || enablerConfig.model === 'hyb') && (
-                                                <FieldInput label={t('komisiGmvRate')} subtitle={t('pctGrossGmv')} value={enablerConfig.komisiRate} onChange={v => setEC('komisiRate', v)} suffix="% GMV" />
-                                            )}
-                                            <FieldInput label={t('storeOperationFee')}   subtitle={t('storeOperationFeeSub')}   value={enablerConfig.sof}        onChange={v => setEC('sof', v)}        prefix="Rp" />
-                                            <FieldInput label={t('platformTechFee')}     subtitle={t('platformTechFeeSub')}     value={enablerConfig.swift}      onChange={v => setEC('swift', v)}      prefix="Rp" />
-                                            <FieldInput label={t('liveCommerceCost')}    subtitle={t('liveCommerceCostSub')}    value={enablerConfig.live}       onChange={v => setEC('live', v)}       prefix="Rp" />
-                                            <FieldInput label={t('warehouseCost')}       subtitle={t('warehouseCostSub')}       value={enablerConfig.gudang}     onChange={v => setEC('gudang', v)}     prefix="Rp" />
-                                            <FieldInput label={t('fulfillmentPerOrder')} subtitle={t('fulfillmentPerOrderSub')} value={enablerConfig.fulfilRate} onChange={v => setEC('fulfilRate', v)} prefix="Rp" />
-                                        </div>
-
-                                        {/* Custom fixed rows */}
-                                        <div className="mt-3 space-y-2">
+                                        <div className="space-y-2">
                                             {enablerConfig.customFixed.map(r => (
                                                 <div key={r.id} className="flex items-center gap-2">
                                                     <Input
@@ -1145,13 +1412,23 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                             ))}
                                             <button type="button" onClick={() => setEC('customFixed', [...enablerConfig.customFixed, { id: Date.now(), name: '', val: '' }])} className="text-xs text-primary hover:underline">{t('addFixedRow')}</button>
                                         </div>
+                                    </div>
 
-                                        {/* Custom variable rows */}
-                                        <div className="mt-3 space-y-2">
+                                    <Separator />
+
+                                    {/* Variable Cost Enabler */}
+                                    <div>
+                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+                                            {t('variableCostEnabler')}
+                                        </p>
+                                        <div className="grid sm:grid-cols-2 gap-3 mb-3">
+                                            <FieldInput label={t('komisiGmvRate')} subtitle={t('pctGrossGmv')} value={enablerConfig.komisiRate} onChange={v => setEC('komisiRate', v)} suffix="% GMV" disabled />
+                                        </div>
+                                        <div className="space-y-2">
                                             {enablerConfig.customVar.map(r => (
                                                 <div key={r.id} className="flex items-center gap-2">
                                                     <Input placeholder={t('customVarPlaceholder')} value={r.name} onChange={e => setEC('customVar', enablerConfig.customVar.map(x => x.id === r.id ? { ...x, name: e.target.value } : x))} className="flex-1 h-9 text-sm" />
-                                                    <FieldInput value={r.val} onChange={v => setEC('customVar', enablerConfig.customVar.map(x => x.id === r.id ? { ...x, val: v } : x))} prefix="Rp" label="" />
+                                                    <FieldInput value={r.val} onChange={() => { }} prefix="Rp" label="" disabled />
                                                     <button type="button" onClick={() => setEC('customVar', enablerConfig.customVar.filter(x => x.id !== r.id))} className="w-8 h-8 flex items-center justify-center rounded border text-muted-foreground hover:text-destructive text-sm">×</button>
                                                 </div>
                                             ))}
@@ -1283,49 +1560,158 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                 editLabel={t('editSetup')}
                             />
 
-                            {/* Month selector */}
+                            {/* Period selector */}
                             <div className="rounded-lg border bg-card p-4">
                                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">{t('periodeTitle')} <span className="text-red-500">*</span></p>
-                                <div className="flex flex-wrap gap-1.5 mb-3">
-                                    {MONTH_LABELS_CONST.map(m => (
-                                        <button
-                                            key={m}
-                                            type="button"
-                                            onClick={() => setActiveMo(m)}
-                                            className={`h-8 w-11 rounded text-xs font-medium border transition-colors ${activeMo === m ? 'bg-primary text-primary-foreground border-primary' : 'bg-card hover:bg-muted/50'}`}
-                                        >{m}</button>
-                                    ))}
+                                {/* Year dropdown — above months */}
+                                <div className="mb-3">
+                                    <Label className="text-xs mb-1 block">{t('yearLabel')}</Label>
+                                    <Select
+                                        value={activeYear}
+                                        onValueChange={val => setActiveYear(val)}
+                                    >
+                                        <SelectTrigger className="w-36">
+                                            <SelectValue placeholder={t('yearLabel')} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 30 }, (_, i) => {
+                                                const y = String(new Date().getFullYear() - i)
+                                                return <SelectItem key={y} value={y}>{y}</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                                <input
-                                    type="number"
-                                    min="2000"
-                                    max="2100"
-                                    value={activeYear}
-                                    onChange={e => setActiveYear(e.target.value)}
-                                    placeholder={t('yearPlaceholder')}
-                                    className="w-28 text-sm rounded-md border border-input bg-background px-3 py-1.5 outline-none focus:ring-1 focus:ring-ring"
-                                />
+                                {/* Month chips */}
+                                <div className="flex flex-wrap gap-1.5">
+                                    {isMonthsLoading
+                                        ? MONTH_LABELS_CONST.map(m => (
+                                            <Skeleton key={m} className="h-8 w-11 rounded" />
+                                        ))
+                                        : MONTH_LABELS_CONST.map((m, i) => {
+                                            const monthCode = String(i + 1).padStart(2, '0')
+                                            const isTaken = takenMonths.includes(monthCode)
+                                            return (
+                                                <button
+                                                    key={m}
+                                                    type="button"
+                                                    disabled={isTaken}
+                                                    onClick={() => !isTaken && setActiveMo(m)}
+                                                    className={`h-8 w-11 rounded text-xs font-medium border transition-colors
+                                                        ${activeMo === m ? 'bg-primary text-primary-foreground border-primary'
+                                                            : isTaken ? 'bg-muted text-muted-foreground border-muted cursor-not-allowed opacity-50'
+                                                                : 'bg-card hover:bg-muted/50'}`}
+                                                >{m}</button>
+                                            )
+                                        })
+                                    }
+                                </div>
                             </div>
 
-                            {/* SKU selector */}
+                            {/* Monthly Enabler Cost — fixed prefilled, variable required */}
+                            <SectionCard
+                                icon={<IconBuildingStore size={18} />}
+                                title={t('monthlyEnablerCostTitle')}
+                                subtitle={t('monthlyEnablerCostSubtitle')}
+                            >
+                                <div className="-mx-5 -mb-5 mt-5">
+                                    {/* Fixed Cost section */}
+                                    <PnLAccordion
+                                        title={t('enablerFixedTitle')}
+                                        subtitle={t('enablerFixedSubtitle')}
+                                        pillVariant="prefilled"
+                                        pillText={t('pillPrefilled')}
+                                        defaultOpen
+                                    >
+                                        <div className="divide-y">
+                                            {enablerConfig.customFixed.filter(r => parseFloat(r.val) > 0).map(r => (
+                                                <div key={r.id} className="flex items-center justify-between py-2.5">
+                                                    <p className="text-xs font-medium">{r.name || '—'}</p>
+                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{fmt(parseFloat(r.val))}</span>
+                                                </div>
+                                            ))}
+                                            {enablerFixedTotal > 0 ? (
+                                                <div className="flex justify-between py-2.5">
+                                                    <span className="text-xs text-muted-foreground">{t('subtotalFixed')}</span>
+                                                    <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(enablerFixedTotal)})</span>
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground py-2 text-center">{t('configureEnablerHint')}</p>
+                                            )}
+                                        </div>
+                                    </PnLAccordion>
+
+                                    {/* Variable Cost section — editable monthly values, names from brand */}
+                                    <PnLAccordion
+                                        title={t('enablerVarTitle')}
+                                        subtitle={t('enablerVarSubtitle')}
+                                        pillVariant={customVarTotal > 0 ? "filled" : "required"}
+                                        pillText={customVarTotal > 0 ? t('pillFilled') : t('pillRequired')}
+                                        defaultOpen
+                                    >
+                                        <div className="divide-y">
+                                            <div className="flex items-center justify-between py-2.5">
+                                                <div className="flex-1">
+                                                    <p className="text-xs font-medium">{t('komisiGmvLabel')}</p>
+                                                    <p className="text-[11px] text-muted-foreground">{t('pctGrossGmv')}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={monthlyKomisiRate}
+                                                        onChange={e => setMonthlyKomisiRate(e.target.value)}
+                                                        placeholder="0"
+                                                        className={`w-20 text-right text-xs px-2 py-1.5 rounded border outline-none ${(parseFloat(monthlyKomisiRate) || 0) > 0 ? 'border-green-300 bg-green-50 text-green-900' : 'border-orange-300 bg-orange-50'}`}
+                                                    />
+                                                    <span className="text-xs text-muted-foreground">% GMV</span>
+                                                </div>
+                                            </div>
+                                            {enablerConfig.customVar.filter(r => r.name).map(r => (
+                                                <div key={r.id} className="flex items-center justify-between py-2.5">
+                                                    <p className="text-xs font-medium">{r.name}</p>
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        <span className="text-xs text-muted-foreground">Rp</span>
+                                                        <ChInput
+                                                            currency
+                                                            value={varData[r.name] ?? ''}
+                                                            onChange={v => setVarData(prev => ({ ...prev, [r.name]: v }))}
+                                                            highlight={(parseFloat(varData[r.name]) || 0) > 0 ? 'filled' : 'warn'}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {enablerConfig.customVar.filter(r => r.name).length === 0 && (
+                                                <p className="text-xs text-muted-foreground py-2 text-center">{t('configureEnablerHint')}</p>
+                                            )}
+                                            {customVarTotal > 0 && (
+                                                <div className="flex justify-between py-2.5">
+                                                    <span className="text-xs text-muted-foreground">{t('subtotalVar')}</span>
+                                                    <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(customVarTotal)})</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </PnLAccordion>
+                                </div>
+                            </SectionCard>
+
+                            {/* SKU selector — chips */}
                             <div className="rounded-lg border bg-card p-4">
                                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{t('skuTitle')}</p>
-                                <Select value={selectedSku} onValueChange={setSelectedSku}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder={t('selectSkuDropdown')}>
-                                            {selectedSku
-                                                ? (products.find(p => p.id === selectedSku)?.name || t('selectSkuDropdown'))
-                                                : null}
-                                        </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {products.filter(p => p.name).map((p) => (
-                                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex flex-wrap gap-2">
+                                    {products.filter(p => p.name).map(p => (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => setSelectedSku(p.id)}
+                                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
+                                                ${selectedSku === p.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border hover:bg-muted/50'}`}
+                                        >
+                                            {p.name}
+                                        </button>
+                                    ))}
+                                </div>
                                 {selectedSku && activeSku.cogs && (
-                                    <p className="text-xs text-muted-foreground mt-1.5">COGS: {fmt(parseFloat(activeSku.cogs)||0)} · Packaging: {fmt(parseFloat(activeSku.pkg)||0)}</p>
+                                    <p className="text-xs text-muted-foreground mt-2">COGS: {fmt(parseFloat(activeSku.cogs) || 0)} · Packaging: {fmt(parseFloat(activeSku.pkg) || 0)}</p>
                                 )}
                             </div>
 
@@ -1336,7 +1722,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                     title={t('monthlyPnlTitle')}
                                     subtitle={t('monthlyPnlSubtitle')}
                                 >
-                                    <div className="-mx-5 -mb-5 border-t mt-5">
+                                    <div className="-mx-5 -mb-5 mt-5">
 
                                         {/* A. Info Dasar */}
                                         <PnLAccordion
@@ -1359,17 +1745,15 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                     <tbody>
                                                         {channels.map((ch, i) => {
                                                             const vol = parseFloat(infoData[ch]?.vol) || 0
-                                                            const hjVal = infoData[ch]?.hj
+                                                            const prefillHj = activeSku.hj?.[ch]?.harga ?? ''
                                                             return (
                                                                 <tr key={ch} className="border-t">
                                                                     <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
+                                                                    {/* Selling price — prefilled read-only */}
                                                                     <td className="py-2.5 px-2 text-right">
-                                                                        <ChInput
-                                                                            currency
-                                                                            value={hjVal ?? activeSku.hj?.[ch]?.harga ?? ''}
-                                                                            onChange={v => setInfoData(prev => ({ ...prev, [ch]: { ...prev[ch], hj: v } }))}
-                                                                            highlight={hjVal !== undefined ? 'filled' : undefined}
-                                                                        />
+                                                                        <span className="inline-flex items-center rounded border border-teal-300 bg-teal-50 px-2 py-1.5 text-xs font-medium text-teal-700 tabular-nums whitespace-nowrap">
+                                                                            {prefillHj ? fmtCurrency(prefillHj) : '—'}
+                                                                        </span>
                                                                     </td>
                                                                     <td className="py-2.5 px-2 text-right">
                                                                         <ChInput
@@ -1404,14 +1788,14 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                     <div>
                                                         <p className="text-xs font-medium">{t('cogsPerUnitRow')}</p>
                                                     </div>
-                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.cogs ? fmt(parseFloat(activeSku.cogs)||0) : '—'}</span>
+                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.cogs ? fmt(parseFloat(activeSku.cogs) || 0) : '—'}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center py-2.5">
                                                     <div>
                                                         <p className="text-xs font-medium">{t('packagingPerUnitRow')}</p>
                                                         <p className="text-[11px] text-muted-foreground">{t('packagingDesc')}</p>
                                                     </div>
-                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.pkg ? fmt(parseFloat(activeSku.pkg)||0) : '—'}</span>
+                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.pkg ? fmt(parseFloat(activeSku.pkg) || 0) : '—'}</span>
                                                 </div>
                                                 {/* COGS bundling per channel */}
                                                 <div className="pt-3">
@@ -1429,17 +1813,25 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                                 {channels.map(ch => (
                                                                     <tr key={ch} className="border-t">
                                                                         <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                        <td className="py-2.5 px-2 text-right"><ChInput value='' onChange={() => {}} /></td>
-                                                                        <td className="py-2.5 px-2 text-right"><ChInput value='' onChange={() => {}} placeholder="1" /></td>
+                                                                        <td className="py-2.5 px-2 text-right">
+                                                                            <ChInput
+                                                                                currency
+                                                                                value={bundlingData[ch]?.cogs ?? ''}
+                                                                                onChange={v => setBundlingData(prev => ({ ...prev, [ch]: { ...prev[ch], cogs: v } }))}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="py-2.5 px-2 text-right">
+                                                                            <ChInput
+                                                                                value={bundlingData[ch]?.units ?? ''}
+                                                                                onChange={v => setBundlingData(prev => ({ ...prev, [ch]: { ...prev[ch], units: v } }))}
+                                                                                placeholder="1"
+                                                                            />
+                                                                        </td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
                                                         </table>
                                                     </div>
-                                                </div>
-                                                <div className="flex justify-between items-center py-2.5">
-                                                    <p className="text-xs text-muted-foreground">{t('totalCogsRow', { units: totalVol.toLocaleString('id-ID') })}</p>
-                                                    <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(cogsTotal)})</span>
                                                 </div>
                                             </div>
                                         </PnLAccordion>
@@ -1679,136 +2071,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                             </table>
                                         </PnLAccordion>
 
-                                        {/* H. Fixed Cost Enabler (pre-filled) */}
-                                        {setup.enabler && (
-                                            <PnLAccordion
-                                                title={t('enablerFixedTitle')}
-                                                subtitle={t('enablerFixedSubtitle')}
-                                                pillVariant="prefilled"
-                                                pillText={t('pillPrefilled')}
-                                            >
-                                                <div className="divide-y mt-2">
-                                                    {[
-                                                        (enablerConfig.model === 'ret' || enablerConfig.model === 'hyb') && retainerVal > 0 && [t('retainerMonthly'), retainerVal, t('flatPerMonth')],
-                                                        sofVal > 0    && [t('storeOperationFee'),  sofVal,    t('flatPerMonth')],
-                                                        swiftVal > 0  && [t('platformTechFee'),    swiftVal,  t('platformAccessTools')],
-                                                        liveVal > 0   && [t('liveCommerceCost'),   liveVal,   t('flatPerMonth')],
-                                                        gudangVal > 0 && [t('warehouseCost'),      gudangVal, t('warehouseOps')],
-                                                    ].filter(Boolean).map(([label, val, sub]) => (
-                                                        <div key={label} className="flex items-center justify-between py-2.5">
-                                                            <div>
-                                                                <p className="text-xs font-medium">{label}</p>
-                                                                <p className="text-[11px] text-muted-foreground">{sub}</p>
-                                                            </div>
-                                                            <span className="text-xs font-semibold text-teal-700 tabular-nums">{fmt(val)}</span>
-                                                        </div>
-                                                    ))}
-                                                    {/* Custom fixed rows display */}
-                                                    {enablerConfig.customFixed.filter(r => parseFloat(r.val) > 0).map(r => (
-                                                        <div key={r.id} className="flex items-center justify-between py-2.5">
-                                                            <div>
-                                                                <p className="text-xs font-medium">{r.name || '—'}</p>
-                                                                <p className="text-[11px] text-muted-foreground">{t('flatPerMonth')}</p>
-                                                            </div>
-                                                            <span className="text-xs font-semibold text-teal-700 tabular-nums">{fmt(parseFloat(r.val))}</span>
-                                                        </div>
-                                                    ))}
-                                                    {enablerFixedTotal > 0 ? (
-                                                        <div className="flex justify-between py-2.5">
-                                                            <span className="text-xs text-muted-foreground">{t('subtotalFixed')}</span>
-                                                            <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(enablerFixedTotal)})</span>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs text-muted-foreground py-3 text-center">{t('configureEnablerHint')}</p>
-                                                    )}
-                                                </div>
-                                            </PnLAccordion>
-                                        )}
-
-                                        {/* I. Variable Cost Enabler */}
-                                        {setup.enabler && (
-                                            <PnLAccordion
-                                                title={t('enablerVarTitle')}
-                                                subtitle={t('enablerVarSubtitle')}
-                                                pillVariant={claimTotal > 0 ? "filled" : "required"}
-                                                pillText={claimTotal > 0 ? t('pillFilled') : t('pillRequired')}
-                                            >
-                                                <div className="divide-y mt-2">
-                                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest pb-2">{t('autoFromFormula')}</p>
-
-                                                    {(enablerConfig.model === 'kom' || enablerConfig.model === 'hyb') && (
-                                                        <div className="flex items-center justify-between py-2.5">
-                                                            <div>
-                                                                <p className="text-xs font-medium">{t('komisiGmvLabel')}</p>
-                                                                <p className="text-[11px] text-muted-foreground">{t('pctTimesGrossGmv', { rate: enablerConfig.komisiRate || '0' })}</p>
-                                                            </div>
-                                                            <span className="text-xs font-semibold text-teal-700 tabular-nums">{fmt(komisiVal)}</span>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex items-center justify-between py-2.5">
-                                                        <div className="flex-1">
-                                                            <p className="text-xs font-medium">{t('fulfillmentLabel')}</p>
-                                                            <p className="text-[11px] text-muted-foreground">{t('fulfillmentDesc', { rate: fmt(num(enablerConfig.fulfilRate)) })}</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                                            <input
-                                                                type="number"
-                                                                value={orders}
-                                                                onChange={e => setOrders(e.target.value)}
-                                                                placeholder="0"
-                                                                className="w-20 text-right text-xs px-2 py-1.5 rounded border border-teal-300 bg-teal-50 text-teal-800 outline-none"
-                                                            />
-                                                            <span className="text-xs text-muted-foreground">{t('orderUnit')}</span>
-                                                            <span className="text-xs font-semibold text-teal-700 tabular-nums min-w-[80px] text-right">{fmt(fulfilTotal)}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Custom var rows display */}
-                                                    {enablerConfig.customVar.filter(r => parseFloat(r.val) > 0).map(r => (
-                                                        <div key={r.id} className="flex items-center justify-between py-2.5">
-                                                            <div>
-                                                                <p className="text-xs font-medium">{r.name || '—'}</p>
-                                                            </div>
-                                                            <span className="text-xs font-semibold text-teal-700 tabular-nums">{fmt(parseFloat(r.val))}</span>
-                                                        </div>
-                                                    ))}
-
-                                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest pt-3 pb-2">{t('manualClaimInput')}</p>
-
-                                                    {[
-                                                        ['support',     t('claimSupport'),  t('claimSupportNote')],
-                                                        ['voucher',     t('claimVoucher'),  t('claimSupportNote')],
-                                                        ['mpFee',       t('claimMpFee'),    t('claimMpFeeNote')],
-                                                        ['mpAffiliate', t('mpAffiliate'),   t('mpAffiliateNote')],
-                                                        ['campaign',    t('campaignAds'),   t('campaignAdsNote')],
-                                                    ].map(([key, label, note]) => (
-                                                        <div key={key} className="flex items-center justify-between py-2.5">
-                                                            <div className="flex-1">
-                                                                <p className="text-xs font-medium">{label}</p>
-                                                                {note && <p className="text-[11px] text-muted-foreground">{note}</p>}
-                                                            </div>
-                                                            <div className="flex items-center gap-2 flex-shrink-0">
-                                                                <span className="text-xs text-muted-foreground">Rp</span>
-                                                                <ChInput
-                                                                    currency
-                                                                    value={claimData[key] ?? ''}
-                                                                    onChange={v => setClaimData(prev => ({ ...prev, [key]: v }))}
-                                                                    highlight={(parseFloat(claimData[key]) || 0) > 0 ? 'filled' : 'warn'}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    <div className="flex justify-between py-2.5">
-                                                        <span className="text-xs text-muted-foreground">{t('subtotalVar')}</span>
-                                                        <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(enablerVarTotal)})</span>
-                                                    </div>
-                                                </div>
-                                            </PnLAccordion>
-                                        )}
-
-                                        {/* J. Fixed Cost */}
+                                        {/* H. Fixed Cost */}
                                         <PnLAccordion
                                             title={t('fixedCostTitle')}
                                             subtitle={t('fixedCostSubtitle')}
@@ -1816,39 +2079,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                             pillText={secFilled.fixed ? t('pillFilled') : t('pillRequired')}
                                         >
                                             <div className="divide-y mt-2">
-                                                {(() => {
-                                                    let lastGroup = null
-                                                    return FC_FIELDS.map(f => {
-                                                        const showGroup = f.group && f.group !== lastGroup
-                                                        if (showGroup) lastGroup = f.group
-                                                        return (
-                                                            <div key={f.id}>
-                                                                {showGroup && (
-                                                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest pt-3 pb-1">{f.group}</p>
-                                                                )}
-                                                                <div className="flex items-center justify-between py-2.5">
-                                                                    <div>
-                                                                        <p className="text-xs font-medium">{f.label}</p>
-                                                                        <p className="text-[11px] text-muted-foreground">{f.sub}</p>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                                                        <span className="text-xs text-muted-foreground">Rp</span>
-                                                                        <ChInput
-                                                                            currency
-                                                                            value={fixedData[f.id] ?? ''}
-                                                                            onChange={v => {
-                                                                                setFixedData(prev => ({ ...prev, [f.id]: v }))
-                                                                                markFilled('fixed')
-                                                                            }}
-                                                                            highlight={(parseFloat(fixedData[f.id]) || 0) > 0 ? 'filled' : 'warn'}
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })
-                                                })()}
-
                                                 {customRows.map(r => (
                                                     <div key={r.id} className="flex items-center gap-2 py-2.5">
                                                         <Input
@@ -1875,17 +2105,16 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                     </div>
                                                 ))}
 
-                                                <div className="pt-3">
+                                                <div className="flex items-center justify-between py-2.5">
                                                     <button
                                                         type="button"
                                                         onClick={() => setCustomRows(prev => [...prev, { id: Date.now(), name: '', val: '' }])}
                                                         className="text-xs text-primary hover:underline flex items-center gap-1"
                                                     >{t('addCostItem')}</button>
-                                                </div>
-
-                                                <div className="flex justify-between py-2.5">
-                                                    <span className="text-xs text-muted-foreground">{t('totalFixedCost')}</span>
-                                                    <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(fixedTotal)})</span>
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="text-xs text-muted-foreground">{t('totalFixedCost')}</span>
+                                                        <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(fixedTotal)})</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </PnLAccordion>
@@ -1902,136 +2131,91 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                     title={t('hasilKalkulasiTitle')}
                                     subtitle={t('hasilKalkulasiSubtitle')}
                                 >
-                                    {/* GMV Summary Cards */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 mt-5">
-                                        <div className="rounded-lg border overflow-hidden">
-                                            <div className="px-4 py-3 border-b flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-sm bg-blue-500 flex-shrink-0" />
-                                                <span className="text-sm font-semibold">{t('grossGmvCardTitle')}</span>
-                                            </div>
-                                            <div className="p-4">
-                                                <p className="text-xl font-semibold tabular-nums mb-0.5">{fmt(grossTotal)}</p>
-                                                <p className="text-xs text-muted-foreground mb-3">{t('grossGmvCardDesc')}</p>
-                                                <div className="space-y-2 border-t pt-3">
-                                                    {channels.map((ch, i) => (
-                                                        <div key={ch} className="flex justify-between items-center">
-                                                            <ChBadge code={ch} label={ch} />
-                                                            <span className="text-xs tabular-nums">{fmt(grossByChannel[i])}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="rounded-lg border overflow-hidden">
-                                            <div className="px-4 py-3 border-b flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-sm bg-green-600 flex-shrink-0" />
-                                                <span className="text-sm font-semibold">{t('netGmvCardTitle')}</span>
-                                            </div>
-                                            <div className="p-4">
-                                                <p className="text-xl font-semibold tabular-nums mb-0.5">{fmt(netTotal)}</p>
-                                                <p className="text-xs text-muted-foreground mb-3">{t('netGmvCardDesc')}</p>
-                                                <div className="space-y-2 border-t pt-3">
-                                                    {channels.map((ch, i) => (
-                                                        <div key={ch} className="flex justify-between items-center">
-                                                            <ChBadge code={ch} label={ch} />
-                                                            <span className={`text-xs tabular-nums font-medium ${netByChannel[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                                                                {fmt(netByChannel[i])}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="rounded-lg border overflow-hidden">
-                                            <div className="px-4 py-3 border-b flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${blendedPct >= 30 ? 'bg-green-600' : blendedPct >= 15 ? 'bg-amber-500' : 'bg-red-500'}`} />
-                                                <span className="text-sm font-semibold">{t('blendedGrossMarginTitle')}</span>
-                                            </div>
-                                            <div className="p-4">
-                                                <p className={`text-xl font-semibold tabular-nums mb-0.5 ${marginColor}`}>{blendedPct.toFixed(1)}%</p>
-                                                <p className="text-xs text-muted-foreground mb-3">{t('blendedGrossMarginDesc')}</p>
-                                                <div className="space-y-1 border-t pt-3">
-                                                    {[
-                                                        [t('rowGrossGmv'),        fmt(grossTotal),                                   ''],
-                                                        [t('rowDeductDiskon'),    fmt(discByChannel.reduce((a, b) => a + b, 0)),     'd'],
-                                                        [t('rowDeductReturn'),    fmt(retByChannel.reduce((a, b) => a + b, 0)),      'd'],
-                                                        [t('rowDeductOngkir'),    fmt(shipByChannel.reduce((a, b) => a + b, 0)),     'd'],
-                                                        [t('rowNetGmv'),          fmt(netTotal),                                      'n'],
-                                                        [t('rowDeductCogs'),      fmt(cogsTotal),                                    'd'],
-                                                        [t('rowDeductChannelCost'), fmt(channelCost),                                'd'],
-                                                        [t('rowDeductEnablerCost'), fmt(enablerTotal),                               'd'],
-                                                    ].map(([label, val, type]) => (
-                                                        <div key={label} className="flex justify-between">
-                                                            <span className="text-xs text-muted-foreground">{label}</span>
-                                                            <span className={`text-xs tabular-nums ${type === 'd' ? 'text-red-600' : type === 'n' ? 'font-semibold' : ''}`}>{val}</span>
-                                                        </div>
-                                                    ))}
-                                                    <div className="flex justify-between border-t pt-2 mt-1">
-                                                        <span className="text-xs font-semibold">{t('rowGrossMarginRp')}</span>
-                                                        <span className={`text-xs font-bold tabular-nums ${marginColor}`}>{fmt(blendedAmt)}</span>
-                                                    </div>
-                                                    {fixedTotal > 0 && (<>
-                                                        <div className="flex justify-between mt-1">
-                                                            <span className="text-xs text-muted-foreground">{t('rowDeductFixedCost')}</span>
-                                                            <span className="text-xs tabular-nums text-red-600">{fmt(fixedTotal)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between border-t pt-2 mt-1">
-                                                            <span className="text-xs font-semibold">{t('rowNetPL')}</span>
-                                                            <span className={`text-xs font-bold tabular-nums ${netPlColor}`}>{fmt(netPlAmt)}</span>
-                                                        </div>
-                                                    </>)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Breakdown Table */}
-                                    <div className="rounded-lg border overflow-hidden">
+                                    {/* Per-SKU Summary Table */}
+                                    <div className="rounded-lg border overflow-hidden mt-5">
                                         <div className="px-4 py-3 border-b">
-                                            <p className="text-sm font-semibold">{t('breakdownTitle')}</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">{t('breakdownSubtitle')}</p>
+                                            <p className="text-sm font-semibold">{t('perSkuSummaryTitle')}</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5">{t('perSkuSummarySubtitle')}</p>
                                         </div>
                                         <div className="p-4 overflow-x-auto">
-                                            <table className="w-full border-collapse text-sm" style={{ minWidth: 500 }}>
+                                            <table className="w-full border-collapse" style={{ minWidth: 560 }}>
                                                 <thead>
                                                     <tr>
-                                                        <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">{t('colChannel')}</th>
+                                                        <th className="text-left pb-2 pl-4 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('colSku')}</th>
                                                         <ChTh>{t('colGrossGmv')}</ChTh>
-                                                        <ChTh>{t('colDiskon')}</ChTh>
-                                                        <ChTh>{t('colReturn')}</ChTh>
-                                                        <ChTh>{t('colOngkir')}</ChTh>
                                                         <ChTh>{t('colNetGmv')}</ChTh>
+                                                        <ChTh>{t('fixedCostTitle')}</ChTh>
+                                                        <ChTh className="pr-4">{t('colBlendedGM')}</ChTh>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {channels.map((ch, i) => (
-                                                        <tr key={ch} className="border-t">
-                                                            <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(grossByChannel[i])}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(discByChannel[i])}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(retByChannel[i])}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(shipByChannel[i])}</td>
-                                                            <td className={`py-2.5 px-2 text-right text-xs tabular-nums font-semibold ${netByChannel[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                                                                {fmt(netByChannel[i])}
+                                                    {allSkuMetrics.map(m => (
+                                                        <tr key={m.sku.id}
+                                                            className={`border-t cursor-pointer hover:bg-muted/30 transition-colors ${m.sku.id === selectedSku ? 'bg-primary/5' : ''}`}
+                                                            onClick={() => setDetailModalSku(m.sku)}
+                                                        >
+                                                            <td className="py-2.5 pl-4 text-xs font-medium">{m.sku.name}</td>
+                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(m.grossTotal)}</td>
+                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(m.netTotal)}</td>
+                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">
+                                                                {m.fixedCost > 0 ? `− ${fmt(m.fixedCost)}` : <span className="text-muted-foreground">—</span>}
+                                                            </td>
+                                                            <td className="py-2.5 px-2 pr-4 text-right text-xs tabular-nums font-semibold">
+                                                                <span className={m.operatingProfit < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(m.operatingProfit)}</span>
+                                                                <span className="text-[10px] font-normal text-muted-foreground ml-1">({m.operatingMarginPct.toFixed(1)}%)</span>
                                                             </td>
                                                         </tr>
                                                     ))}
-                                                    <tr className="border-t bg-muted/40">
-                                                        <td className="py-2.5 text-xs font-semibold">{t('totalRow')}</td>
-                                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(grossTotal)}</td>
-                                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(discByChannel.reduce((a, b) => a + b, 0))}</td>
-                                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(retByChannel.reduce((a, b) => a + b, 0))}</td>
-                                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(shipByChannel.reduce((a, b) => a + b, 0))}</td>
-                                                        <td className={`py-2.5 px-2 text-right text-xs font-bold tabular-nums ${netTotal < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                                                            {fmt(netTotal)}
-                                                        </td>
-                                                    </tr>
+                                                    {namedProducts.length > 1 && (
+                                                        <tr className="border-t bg-muted/40">
+                                                            <td className="py-2.5 pl-4 text-xs font-semibold">{t('totalRow')}</td>
+                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(allSkuGrossTotal)}</td>
+                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(allSkuNetTotal)}</td>
+                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">
+                                                                {allSkuFixedTotal > 0 ? `− ${fmt(allSkuFixedTotal)}` : <span className="text-muted-foreground">—</span>}
+                                                            </td>
+                                                            <td className={`py-2.5 px-2 pr-4 text-right text-xs font-bold tabular-nums ${allSkuOpProfit < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                                                                {fmt(allSkuOpProfit)}
+                                                            </td>
+                                                        </tr>
+                                                    )}
                                                 </tbody>
                                             </table>
                                         </div>
                                     </div>
+
+                                    {/* Monthly P&L Summary */}
+                                    <div className="rounded-lg border overflow-hidden mt-4">
+                                        <div className="px-4 py-3 border-b flex items-center gap-2">
+                                            <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${finalMonthlyPLPct >= 20 ? 'bg-green-600' : finalMonthlyPLPct >= 10 ? 'bg-amber-500' : 'bg-red-500'}`} />
+                                            <div>
+                                                <p className="text-sm font-semibold">{t('monthlyPlSummaryTitle')}</p>
+                                                <p className="text-xs text-muted-foreground">{t('monthlyPlSummarySubtitle')}</p>
+                                            </div>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="space-y-1.5">
+                                                {[
+                                                    [t('rowAllSkuOpProfit'), fmt(allSkuOpProfit), ''],
+                                                    [t('rowDeductEnablerFixed'), fmt(enablerFixedTotal), 'd'],
+                                                    [t('rowDeductEnablerVar'), fmt(enablerVarTotal), 'd'],
+                                                ].map(([label, val, type]) => (
+                                                    <div key={label} className="flex justify-between">
+                                                        <span className="text-xs text-muted-foreground">{label}</span>
+                                                        <span className={`text-xs tabular-nums ${type === 'd' ? 'text-red-600' : ''}`}>{val}</span>
+                                                    </div>
+                                                ))}
+                                                <div className="flex justify-between items-baseline border-t pt-2 mt-1">
+                                                    <span className="text-xs font-semibold">{t('rowFinalMonthlyPL')}</span>
+                                                    <div className="text-right">
+                                                        <span className={`text-base font-bold tabular-nums ${finalPlColor}`}>{fmt(finalMonthlyPL)}</span>
+                                                        <span className={`text-xs font-semibold ml-1.5 ${finalPlColor}`}>({finalMonthlyPLPct.toFixed(1)}%)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                 </SectionCard>
                             )}
                         </>
@@ -2053,6 +2237,170 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     </div>
                 </div>
             )}
+
+            {/* ── SKU Detail Modal ─────────────────────────────────────────── */}
+            <Dialog open={!!detailModalSku} onOpenChange={open => !open && setDetailModalSku(null)}>
+                <DialogContent className="w-full md:w-[90vw] md:max-w-5xl flex flex-col gap-0 p-0 overflow-hidden h-[92vh] md:h-auto md:max-h-[88vh]">
+                    <DialogHeader className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b flex-shrink-0">
+                        <DialogTitle>{detailModalSku?.name}</DialogTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t('skuDetailModalSubtitle')}</p>
+                    </DialogHeader>
+                    {skuDetailData && (
+                        <div className="overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-4">
+                            {/* 3 summary cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="rounded-lg border overflow-hidden">
+                                    <div className="px-4 py-3 border-b flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-sm bg-blue-500 flex-shrink-0" />
+                                        <span className="text-sm font-semibold">{t('grossGmvCardTitle')}</span>
+                                    </div>
+                                    <div className="p-4">
+                                        <p className="text-xl font-semibold tabular-nums mb-0.5">{fmt(skuDetailData.grossTotal)}</p>
+                                        <p className="text-xs text-muted-foreground mb-3">{t('grossGmvCardDesc')}</p>
+                                        <div className="space-y-2 border-t pt-3">
+                                            {channels.map((ch, i) => (
+                                                <div key={ch} className="flex justify-between items-center">
+                                                    <ChBadge code={ch} label={ch} />
+                                                    <span className="text-xs tabular-nums">{fmt(skuDetailData.grossByCh[i])}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg border overflow-hidden">
+                                    <div className="px-4 py-3 border-b flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-sm bg-green-600 flex-shrink-0" />
+                                        <span className="text-sm font-semibold">{t('netGmvCardTitle')}</span>
+                                    </div>
+                                    <div className="p-4">
+                                        <p className="text-xl font-semibold tabular-nums mb-0.5">{fmt(skuDetailData.netTotal)}</p>
+                                        <p className="text-xs text-muted-foreground mb-3">{t('netGmvCardDesc')}</p>
+                                        <div className="space-y-2 border-t pt-3">
+                                            {channels.map((ch, i) => (
+                                                <div key={ch} className="flex justify-between items-center">
+                                                    <ChBadge code={ch} label={ch} />
+                                                    <span className={`text-xs tabular-nums font-medium ${skuDetailData.netByCh[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                                                        {fmt(skuDetailData.netByCh[i])}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg border overflow-hidden">
+                                    <div className="px-4 py-3 border-b flex items-center gap-2">
+                                        <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${opColor === 'text-green-700' ? 'bg-green-600' : opColor === 'text-amber-600' ? 'bg-amber-500' : 'bg-red-500'}`} />
+                                        <span className="text-sm font-semibold">{t('plSummaryCardTitle')}</span>
+                                    </div>
+                                    <div className="p-4">
+                                        <p className={`text-xl font-semibold tabular-nums mb-0.5 ${opColor}`}>{d.operatingMarginPct.toFixed(1)}%</p>
+                                        <p className="text-xs text-muted-foreground mb-3">{t('plSummaryCardDesc')}</p>
+                                        <div className="space-y-1 border-t pt-3">
+                                            {/* Revenue waterfall */}
+                                            {[
+                                                [t('rowGrossGmv'), fmt(d.grossTotal), ''],
+                                                [t('rowDeductDiskon'), fmt(d.discByCh.reduce((a, b) => a + b, 0)), 'd'],
+                                                [t('rowDeductReturn'), fmt(d.retByCh.reduce((a, b) => a + b, 0)), 'd'],
+                                                [t('rowDeductOngkir'), fmt(d.shipByCh.reduce((a, b) => a + b, 0)), 'd'],
+                                            ].map(([label, val, type]) => (
+                                                <div key={label} className="flex justify-between">
+                                                    <span className="text-xs text-muted-foreground">{label}</span>
+                                                    <span className={`text-xs tabular-nums ${type === 'd' ? 'text-red-600' : ''}`}>{val}</span>
+                                                </div>
+                                            ))}
+                                            {/* Net Revenue */}
+                                            <div className="flex justify-between border-t pt-1.5 mt-0.5">
+                                                <span className="text-xs font-semibold">{t('rowNetRevenue')}</span>
+                                                <span className="text-xs font-semibold tabular-nums">{fmt(d.netTotal)}</span>
+                                            </div>
+                                            {/* COGS */}
+                                            <div className="flex justify-between">
+                                                <span className="text-xs text-muted-foreground">{t('rowDeductCogs')}</span>
+                                                <span className="text-xs tabular-nums text-red-600">{fmt(d.cogsTotal)}</span>
+                                            </div>
+                                            {/* Gross Profit */}
+                                            <div className="flex justify-between border-t pt-1.5 mt-0.5">
+                                                <span className="text-xs font-semibold">{t('rowGrossProfit')}</span>
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className={`text-[10px] tabular-nums ${gpColor}`}>({d.grossMarginPct.toFixed(1)}%)</span>
+                                                    <span className={`text-xs font-bold tabular-nums ${gpColor}`}>{fmt(d.grossProfit)}</span>
+                                                </div>
+                                            </div>
+                                            {/* Operating expenses */}
+                                            <div className="flex justify-between">
+                                                <span className="text-xs text-muted-foreground">{t('rowDeductChannelCost')}</span>
+                                                <span className="text-xs tabular-nums text-red-600">{fmt(d.channelCost)}</span>
+                                            </div>
+                                            {d.fixedCost > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-xs text-muted-foreground">{t('rowDeductFixedCost')}</span>
+                                                    <span className="text-xs tabular-nums text-red-600">{fmt(d.fixedCost)}</span>
+                                                </div>
+                                            )}
+                                            {/* Operating Profit */}
+                                            <div className="flex justify-between border-t pt-1.5 mt-0.5">
+                                                <span className="text-xs font-semibold">{t('rowOperatingProfit')}</span>
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className={`text-[10px] tabular-nums ${opColor}`}>({d.operatingMarginPct.toFixed(1)}%)</span>
+                                                    <span className={`text-xs font-bold tabular-nums ${opColor}`}>{fmt(d.operatingProfit)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Breakdown per Channel */}
+                            <div className="rounded-lg border overflow-hidden">
+                                <div className="px-4 py-3 border-b">
+                                    <p className="text-sm font-semibold">{t('breakdownTitle')}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{t('breakdownSubtitle')}</p>
+                                </div>
+                                <div className="p-4 overflow-x-auto">
+                                    <table className="w-full border-collapse text-sm" style={{ minWidth: 460 }}>
+                                        <thead>
+                                            <tr>
+                                                <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">{t('colChannel')}</th>
+                                                <ChTh>{t('colGrossGmv')}</ChTh>
+                                                <ChTh>{t('colDiskon')}</ChTh>
+                                                <ChTh>{t('colReturn')}</ChTh>
+                                                <ChTh>{t('colOngkir')}</ChTh>
+                                                <ChTh>{t('colNetGmv')}</ChTh>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {channels.map((ch, i) => (
+                                                <tr key={ch} className="border-t">
+                                                    <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
+                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(skuDetailData.grossByCh[i])}</td>
+                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.discByCh[i])}</td>
+                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.retByCh[i])}</td>
+                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.shipByCh[i])}</td>
+                                                    <td className={`py-2.5 px-2 text-right text-xs tabular-nums font-semibold ${skuDetailData.netByCh[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                                                        {fmt(skuDetailData.netByCh[i])}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            <tr className="border-t bg-muted/40">
+                                                <td className="py-2.5 text-xs font-semibold">{t('totalRow')}</td>
+                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(skuDetailData.grossTotal)}</td>
+                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.discByCh.reduce((a, b) => a + b, 0))}</td>
+                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.retByCh.reduce((a, b) => a + b, 0))}</td>
+                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.shipByCh.reduce((a, b) => a + b, 0))}</td>
+                                                <td className={`py-2.5 px-2 text-right text-xs font-bold tabular-nums ${skuDetailData.netTotal < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                                                    {fmt(skuDetailData.netTotal)}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* ── SKU Selection Modal ───────────────────────────────────────── */}
             <Dialog open={skuModalOpen} onOpenChange={setSkuModalOpen}>
