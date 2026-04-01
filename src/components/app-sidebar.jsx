@@ -82,22 +82,22 @@ export function AppSidebar({ ...props }) {
 
       <SidebarContent>
         {/* Category 1: Dashboard */}
-        <NavMain
+        {/* <NavMain
           items={data.navMain}
           setSelectedNav={setSelectedNav}
           selectedNav={selectedNav}
-        />
+        /> */}
 
         <Separator className="mx-2" />
 
         {/* Category 2: Data Analytics */}
-        <NavDatasets
+        {/* <NavDatasets
           dataSetsList={dataSetsList}
           setSelectedNav={setSelectedNav}
           selectedNav={selectedNav}
-        />
+        /> */}
 
-        <Separator className="mx-2" />
+        {/* <Separator className="mx-2" /> */}
 
         {/* Category 3: Pricing Calculator */}
         <NavPricingCalculator

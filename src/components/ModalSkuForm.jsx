@@ -147,10 +147,6 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
             toast(t('brandRequired'))
             return
         }
-        if (form.length === '' || form.width === '' || form.height === '' || form.weight === '') {
-            toast(t('dimensionsRequired'))
-            return
-        }
 
         const payload = {
             sku_code: form.sku_code,
@@ -302,7 +298,7 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
                     <Separator />
 
                     {/* Dimensions */}
-                    <p className="text-sm font-medium text-muted-foreground">{t('dimensions')} <span className="text-destructive">*</span></p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('dimensions')}</p>
                     <div className="grid grid-cols-4 gap-4">
                         {['length', 'width', 'height', 'weight'].map((field) => (
                             <div key={field} className="space-y-1">

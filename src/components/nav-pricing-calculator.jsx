@@ -7,15 +7,17 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { IconBuildingStore, IconCalculator, IconPresentationAnalytics, IconTag } from "@tabler/icons-react"
+import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
 
 export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
     const router = useRouter()
+    const t = useTranslations("nav")
 
     const items = [
         {
             id: "pricing-sku",
-            title: "SKU",
+            title: t("sku"),
             url: "/pricingCalculator/sku",
             icon: IconTag,
         },
@@ -27,13 +29,13 @@ export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
         // },
         {
             id: "pricing-brand",
-            title: "Brand",
+            title: t("brand"),
             url: "/pricingCalculator/brand",
             icon: IconBuildingStore,
         },
         {
             id: "pricing-pl",
-            title: "Profit & Loss",
+            title: t("profitLoss"),
             url: "/pricingCalculator/pl",
             icon: IconPresentationAnalytics,
         },
@@ -45,7 +47,7 @@ export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
     }
 
     return (
-        <SidebarCollapsibleGroup label="PRICING CALCULATOR">
+        <SidebarCollapsibleGroup label={t("pricingCalculator")}>
             <SidebarMenu>
                 {items.map((item) => (
                     <SidebarMenuItem

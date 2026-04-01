@@ -94,7 +94,8 @@ export default function LoginForm() {
                 credentials: "include",
             });
             if (res.status === 200) {
-                router.replace("/dashboard");
+                // router.replace("/dashboard");
+                router.replace("/pricingCalculator/sku");
             } else {
                 setIsLoading(false);
                 loginForm.setError("root", { message: t("invalidCredentials") });

@@ -3,6 +3,14 @@
 import ModalSkuForm from "@/components/ModalSkuForm"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import LoadingScreen from "@/components/ui/loadingScreen"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -50,6 +58,7 @@ export default function SkuList() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingSku, setEditingSku] = useState(null)
     const [isFetch, setIsFetch] = useState(false)
+    const [deletingSku, setDeletingSku] = useState(null)
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
 
     useEffect(() => {
@@ -78,9 +87,11 @@ export default function SkuList() {
         [subCategories]
     )
 
-    const handleDelete = async (skuId) => {
+    const confirmDelete = async () => {
+        if (!deletingSku) return
+        setDeletingSku(null)
         setIsMutating(true)
-        const res = await services.sku.deleteSku(skuId)
+        const res = await services.sku.deleteSku(deletingSku.id)
         if (res?.success) {
             toast(t('deleteSuccess'))
             setIsFetch((prev) => !prev)
@@ -153,7 +164,7 @@ export default function SkuList() {
                     <IconTrash
                         size={16}
                         className="cursor-pointer text-red-500 hover:text-red-700 transition-colors"
-                        onClick={() => handleDelete(row.original.id)}
+                        onClick={() => setDeletingSku(row.original)}
                     />
                 </div>
             ),
@@ -312,6 +323,25 @@ export default function SkuList() {
                 editingSku={editingSku}
                 onSuccess={() => { setIsModalOpen(false); setIsFetch((prev) => !prev) }}
             />
+
+            <Dialog open={!!deletingSku} onOpenChange={(open) => { if (!open) setDeletingSku(null) }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('deleteConfirmTitle')}</DialogTitle>
+                        <DialogDescription>
+                            {t('deleteConfirmDesc', { name: deletingSku?.product_name || deletingSku?.sku_code || '' })}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeletingSku(null)}>
+                            {t('deleteCancel')}
+                        </Button>
+                        <Button variant="destructive" onClick={confirmDelete}>
+                            {t('deleteConfirm')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     )
 }
