@@ -48,7 +48,17 @@ const fmtCurrency = (v) => {
 }
 const parseCurrency = (v) => String(v).replace(/\D/g, '')
 
-const DISCOUNT_KEYS = ["voucher", "subsidy", "flash", "coin", "affiliate", "bundling", "loyalty"]
+const DISCOUNT_COLS = [
+    { key: 'voucher', currency: true },
+    { key: 'subsidy', currency: false },
+    { key: 'flash', currency: true },
+    { key: 'affiliate', currency: false },
+    { key: 'bundling', currency: false },
+    { key: 'loyalty', currency: false },
+]
+const DISCOUNT_KEYS = DISCOUNT_COLS.map(c => c.key)
+const DISCOUNT_PCT_KEYS = DISCOUNT_COLS.filter(c => !c.currency).map(c => c.key)
+const DISCOUNT_AMT_KEYS = DISCOUNT_COLS.filter(c => c.currency).map(c => c.key)
 
 // ─── API value helpers (module-scope so effects and helpers can share them) ───
 const toAmt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v))) : ''
@@ -83,14 +93,12 @@ function mapMonthlyRecordToFormData(mr, chIdToName) {
             const ch = chIdToName[d.channel_id]
             if (!ch) return
             data.discountData[ch] = {
-                voucher: toRate(d.voucher_pct),
+                voucher: d.voucher_amount != null ? toAmt(d.voucher_amount) : '',
                 subsidy: toRate(d.subsidy_pct),
-                flash: toRate(d.flash_sale_pct),
-                coin: toRate(d.coin_pct),
+                flash: d.flash_sale_amount != null ? toAmt(d.flash_sale_amount) : '',
                 affiliate: toRate(d.affiliate_pct),
                 bundling: toRate(d.bundling_pct),
                 loyalty: toRate(d.loyalty_pct),
-                amount: d.discount_amount != null ? toAmt(d.discount_amount) : '',
             }
         })
     }
@@ -99,9 +107,7 @@ function mapMonthlyRecordToFormData(mr, chIdToName) {
             const ch = chIdToName[r.channel_id]
             if (!ch) return
             data.returnData[ch] = {
-                rate: toRate(r.return_rate_pct),
                 units: r.return_units != null ? String(r.return_units) : '',
-                est: r.estimated_return_value != null ? toAmt(r.estimated_return_value) : '',
                 actual: r.actual_refund_amount != null ? toAmt(r.actual_refund_amount) : '',
             }
         })
@@ -112,9 +118,7 @@ function mapMonthlyRecordToFormData(mr, chIdToName) {
             if (!ch) return
             data.shippingData[ch] = {
                 subsidy: o.shipping_subsidy != null ? toAmt(o.shipping_subsidy) : '',
-                actual: o.actual_shipping_cost != null ? toAmt(o.actual_shipping_cost) : '',
                 processing: o.processing_fee != null ? toAmt(o.processing_fee) : '',
-                weightDiff: o.weight_diff_kg != null ? String(o.weight_diff_kg) : '',
             }
         })
     }
@@ -150,6 +154,15 @@ function mapMonthlyRecordToFormData(mr, chIdToName) {
             }
         })
     }
+    // Derive secFilled from loaded data
+    const hasVal = (v) => v != null && v !== '' && v !== '0' && parseFloat(v) > 0
+    data.secFilled = {
+        info: Object.values(data.infoData).some(d => hasVal(d?.vol)),
+        discount: Object.values(data.discountData).some(d => DISCOUNT_KEYS.some(k => hasVal(d?.[k]))),
+        ret: false,  // optional — no tracking needed
+        ads: Object.values(data.adsData).some(d => hasVal(d?.rate)),
+        fixed: data.customRows.some(r => r.name && hasVal(r.val)),
+    }
     return data
 }
 
@@ -178,10 +191,10 @@ function ChBadge({ code, label }) {
 // ─── ChInput: compact number input for channel tables ─────────────────────────
 function ChInput({ value, onChange, placeholder = "0", step, highlight, currency = false }) {
     const cls = highlight === 'filled'
-        ? 'bg-green-50 border-green-300 text-green-900'
+        ? 'bg-emerald-50 border-emerald-400 focus:ring-emerald-400 focus:border-emerald-400'
         : highlight === 'warn'
-            ? 'bg-orange-50 border-orange-300'
-            : 'bg-background border-input'
+            ? 'bg-orange-50 border-orange-300 focus:ring-orange-300 focus:border-orange-300'
+            : 'bg-background border-input focus:ring-ring focus:border-ring'
     return (
         <input
             type={currency ? 'text' : 'number'}
@@ -189,7 +202,7 @@ function ChInput({ value, onChange, placeholder = "0", step, highlight, currency
             value={currency ? fmtCurrency(value) : value}
             onChange={e => onChange(currency ? parseCurrency(e.target.value) : e.target.value)}
             placeholder={placeholder}
-            className={`w-20 text-right text-xs px-2 py-1.5 rounded border outline-none transition-colors focus:ring-1 focus:ring-ring focus:border-ring ${cls}`}
+            className={`w-20 text-right text-xs px-2 py-1.5 rounded border outline-none transition-colors focus:ring-1 ${cls}`}
         />
     )
 }
@@ -458,7 +471,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const { open: sidebarOpen } = useSidebar()
 
     const DISKON_LABELS = [
-        t('diskonVoucher'), t('diskonSubsidi'), t('diskonFlash'), t('diskonCoin'),
+        t('diskonVoucher'), t('diskonSubsidi'), t('diskonFlash'),
         t('diskonAffiliate'), t('diskonBundling'), t('diskonLoyalty'),
     ]
 
@@ -644,6 +657,27 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 setClaimData(fd.claimData)
                 if (fd.orders) setOrders(fd.orders)
                 if (fd.customRows?.length) setCustomRows(fd.customRows)
+                setSecFilled(fd.secFilled)
+            }
+
+            // Pre-fetch and cache monthly data for ALL other SKUs in same period
+            if (monthlyRecord && d.skus?.length > 1) {
+                const periodMonth = monthlyRecord.period_month
+                const periodYear = monthlyRecord.period_year
+                const currentSkuId = monthlyRecord.sku_id ?? monthlyRecord.sku?.id
+                const otherSkus = d.skus.filter(s => s.id !== currentSkuId)
+                Promise.allSettled(
+                    otherSkus.map(s =>
+                        services.pl.getMonthlyByPeriod(d.id, s.id, periodMonth, periodYear)
+                            .then(res => {
+                                const mr = res?.data?.data ?? res?.data ?? null
+                                if (mr && mr.id) {
+                                    const fd = mapMonthlyRecordToFormData(mr, chIdToName)
+                                    skuDataCacheRef.current[s.id] = { data: fd, recordId: mr.id }
+                                }
+                            })
+                    )
+                ).then(() => setSkuCacheVer(v => v + 1))
             }
 
             setBrandData(d)
@@ -709,6 +743,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const [selectedSku, setSelectedSku] = useState('')
     const skuInitRef = useRef(false)
     const skuDataCacheRef = useRef({})   // { [skuId]: { data: formSnapshot, recordId: id|null } }
+    const [skuCacheVer, setSkuCacheVer] = useState(0) // bump to re-render when cache updates async
     const prevSkuRef = useRef(null)
     const formDataRef = useRef({})   // always-current form state snapshot
     const contextRef = useRef({})   // always-current context snapshot
@@ -730,11 +765,16 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const activeSku = products.find(prod => prod.id === selectedSku) || products[0] || {}
     const cogsUnit = (parseFloat(activeSku.cogs) || 0) + (parseFloat(activeSku.pkg) || 0)
 
-    // ── Keep refs always current (no deps — runs after every render) ───────────
-    // Must be declared BEFORE the SKU-change effect so they run first each cycle.
-    useEffect(() => {
-        formDataRef.current = { infoData, discountData, returnData, shippingData, adsData, claimData, varData, monthlyCommissionRate, customRows, bundlingData, orders, secFilled }
-    })
+    // ── Keep refs always current (synchronous — before effects and before allSkuMetrics) ──
+    const currentFormData = { infoData, discountData, returnData, shippingData, adsData, claimData, varData, monthlyCommissionRate, customRows, bundlingData, orders, secFilled }
+    formDataRef.current = currentFormData
+    // Keep cache in sync for the active SKU so allSkuMetrics always has fresh data
+    if (selectedSku) {
+        skuDataCacheRef.current[selectedSku] = {
+            ...skuDataCacheRef.current[selectedSku],
+            data: currentFormData,
+        }
+    }
     useEffect(() => {
         contextRef.current = { brandData, activeMo, activeYear, monthlyId }
     })
@@ -812,7 +852,9 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
     // ── P&L multi-channel calculations ───────────────────────────────────────
     const totalDiscountPct = (ch) =>
-        DISCOUNT_KEYS.reduce((s, k) => s + (parseFloat(discountData[ch]?.[k]) || 0), 0)
+        DISCOUNT_PCT_KEYS.reduce((s, k) => s + (parseFloat(discountData[ch]?.[k]) || 0), 0)
+    const totalDiscountAmt = (ch) =>
+        DISCOUNT_AMT_KEYS.reduce((s, k) => s + (parseFloat(discountData[ch]?.[k]) || 0), 0)
 
     const grossByChannel = channels.map(ch => {
         const vol = parseFloat(infoData[ch]?.vol) || 0
@@ -820,11 +862,13 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         return vol * sellingPrice
     })
     const grossTotal = grossByChannel.reduce((a, b) => a + b, 0)
-    const discByChannel = channels.map((ch, i) => grossByChannel[i] * totalDiscountPct(ch) / 100)
-    const retByChannel = channels.map((ch, i) => grossByChannel[i] * ((parseFloat(returnData[ch]?.rate) || 0) / 100))
-    const shipByChannel = channels.map(ch => parseFloat(shippingData[ch]?.subsidy) || 0)
-    const netByChannel = channels.map((_, i) => grossByChannel[i] - discByChannel[i] - retByChannel[i] - shipByChannel[i])
+    const discByChannel = channels.map((ch, i) => grossByChannel[i] * totalDiscountPct(ch) / 100 + totalDiscountAmt(ch))
+    const retByChannel = channels.map(ch => parseFloat(returnData[ch]?.actual) || 0)
+    const shipByChannel = channels.map(ch => (parseFloat(shippingData[ch]?.subsidy) || 0) + (parseFloat(shippingData[ch]?.processing) || 0))
+    const adsByChannel = channels.map((ch, i) => grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100))
+    const netByChannel = channels.map((_, i) => grossByChannel[i] - discByChannel[i] - retByChannel[i] - shipByChannel[i] - adsByChannel[i])
     const netTotal = netByChannel.reduce((a, b) => a + b, 0)
+    const adsCostTotal = adsByChannel.reduce((a, b) => a + b, 0)
 
     const totalVol = channels.reduce((s, ch) => s + (parseFloat(infoData[ch]?.vol) || 0), 0)
     const cogsTotal = channels.reduce((s, ch) => {
@@ -842,9 +886,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const pgwCost = channels.reduce((s, ch, i) =>
         s + grossByChannel[i] * (parseFloat(getChFee(ch, 'pgw')) / 100), 0)
 
-    const adsCostTotal = channels.reduce((s, ch, i) =>
-        s + grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100), 0)
-    const channelCost = commCost + mallCost + pgwCost + adsCostTotal
+    const channelCost = commCost + mallCost + pgwCost
 
     const retainerVal = parseFloat((enablerConfig.retainer || '').replace(/\./g, '')) || 0
     const sofVal = parseFloat((enablerConfig.sof || '').replace(/\./g, '')) || 0
@@ -869,23 +911,25 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const computeSkuMetrics = (formData, sku) => {
         const { infoData: fi = {}, discountData: fd = {}, returnData: fr = {},
             shippingData: fo = {}, adsData: fa = {}, customRows: fc = [], bundlingData: fb = {} } = formData
-        const cu = (parseFloat(sku.cogs) || 0) + (parseFloat(sku.pkg) || 0)
+        const skuCogsUnit = (parseFloat(sku.cogs) || 0) + (parseFloat(sku.pkg) || 0)
         const gByCh = channels.map(ch => (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(sku.prices?.[ch]?.price) || 0))
         const gTot = gByCh.reduce((a, b) => a + b, 0)
-        const dByCh = channels.map((ch, i) => gByCh[i] * DISCOUNT_KEYS.reduce((s, k) => s + (parseFloat(fd[ch]?.[k]) || 0), 0) / 100)
-        const rByCh = channels.map((ch, i) => gByCh[i] * ((parseFloat(fr[ch]?.rate) || 0) / 100))
-        const sByCh = channels.map(ch => parseFloat(fo[ch]?.subsidy) || 0)
-        const nByCh = channels.map((_, i) => gByCh[i] - dByCh[i] - rByCh[i] - sByCh[i])
+        const dByCh = channels.map((ch, i) =>
+            gByCh[i] * DISCOUNT_PCT_KEYS.reduce((s, k) => s + (parseFloat(fd[ch]?.[k]) || 0), 0) / 100
+            + DISCOUNT_AMT_KEYS.reduce((s, k) => s + (parseFloat(fd[ch]?.[k]) || 0), 0))
+        const rByCh = channels.map(ch => parseFloat(fr[ch]?.actual) || 0)
+        const sByCh = channels.map(ch => (parseFloat(fo[ch]?.subsidy) || 0) + (parseFloat(fo[ch]?.processing) || 0))
+        const aByCh = channels.map((ch, i) => gByCh[i] * ((parseFloat(fa[ch]?.rate) || 0) / 100))
+        const nByCh = channels.map((_, i) => gByCh[i] - dByCh[i] - rByCh[i] - sByCh[i] - aByCh[i])
         const nTot = nByCh.reduce((a, b) => a + b, 0)
         const cogsTot = channels.reduce((s, ch) => {
             const vol = parseFloat(fi[ch]?.vol) || 0
             const bundCogs = parseFloat(fb[ch]?.cogs) || 0
             const unitsPerBundle = parseFloat(fb[ch]?.units) || 1
-            return s + vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * cogsUnit)
+            return s + vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * skuCogsUnit)
         }, 0)
-        const chCost = channels.reduce((s, ch) => s + gTot * (
-            (parseFloat(getChFee(ch, 'comm')) + parseFloat(getChFee(ch, 'mall')) + parseFloat(getChFee(ch, 'pgw'))) / 100 +
-            (parseFloat(fa[ch]?.rate) || 0) / 100
+        const chCost = channels.reduce((s, ch, i) => s + gByCh[i] * (
+            (parseFloat(getChFee(ch, 'comm')) + parseFloat(getChFee(ch, 'mall')) + parseFloat(getChFee(ch, 'pgw'))) / 100
         ), 0)
         const fcTot = fc.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
         const gpTot = nTot - cogsTot                    // Gross Profit
@@ -895,12 +939,14 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             fixedCost: fcTot, grossProfit: gpTot, operatingProfit: opTot,
             grossMarginPct: nTot > 0 ? (gpTot / nTot) * 100 : 0,
             operatingMarginPct: nTot > 0 ? (opTot / nTot) * 100 : 0,
-            grossByCh: gByCh, discByCh: dByCh, retByCh: rByCh, shipByCh: sByCh, netByCh: nByCh
+            grossByCh: gByCh, discByCh: dByCh, retByCh: rByCh, shipByCh: sByCh, adsByCh: aByCh, netByCh: nByCh
         }
     }
 
     // ── All-SKU aggregated metrics ────────────────────────────────────────────
+    // (skuCacheVer referenced to ensure re-render when async cache loads complete)
     const namedProducts = products.filter(p => p.name)
+    void skuCacheVer
     const allSkuMetrics = namedProducts.map(p => {
         if (p.id === selectedSku) {
             const gp = netTotal - cogsTotal
@@ -911,7 +957,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 grossMarginPct: netTotal > 0 ? (gp / netTotal) * 100 : 0,
                 operatingMarginPct: netTotal > 0 ? (op / netTotal) * 100 : 0,
                 grossByCh: grossByChannel, discByCh: discByChannel, retByCh: retByChannel,
-                shipByCh: shipByChannel, netByCh: netByChannel
+                shipByCh: shipByChannel, adsByCh: adsByChannel, netByCh: netByChannel
             }
         }
         return { sku: p, ...computeSkuMetrics(skuDataCacheRef.current[p.id]?.data ?? {}, p) }
@@ -999,10 +1045,12 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             })),
             discounts: channels.map((ch, i) => ({
                 channel_id: chId(ch),
-                voucher_pct: (parseFloat(discountData[ch]?.voucher) || 0) / 100,
+                voucher_pct: 0,
+                voucher_amount: parseFloat(discountData[ch]?.voucher) || 0,
                 subsidy_pct: (parseFloat(discountData[ch]?.subsidy) || 0) / 100,
-                flash_sale_pct: (parseFloat(discountData[ch]?.flash) || 0) / 100,
-                coin_pct: (parseFloat(discountData[ch]?.coin) || 0) / 100,
+                flash_sale_pct: 0,
+                flash_sale_amount: parseFloat(discountData[ch]?.flash) || 0,
+                coin_pct: 0,
                 affiliate_pct: (parseFloat(discountData[ch]?.affiliate) || 0) / 100,
                 bundling_pct: (parseFloat(discountData[ch]?.bundling) || 0) / 100,
                 loyalty_pct: (parseFloat(discountData[ch]?.loyalty) || 0) / 100,
@@ -1011,17 +1059,17 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             })),
             returns: channels.map(ch => ({
                 channel_id: chId(ch),
-                return_rate_pct: (parseFloat(returnData[ch]?.rate) || 0) / 100,
+                return_rate_pct: 0,
                 return_units: parseFloat(returnData[ch]?.units) || 0,
-                estimated_return_value: parseFloat(returnData[ch]?.est) || 0,
+                estimated_return_value: 0,
                 actual_refund_amount: parseFloat(returnData[ch]?.actual) || 0,
             })),
             shippings: channels.map(ch => ({
                 channel_id: chId(ch),
                 shipping_subsidy: parseFloat(shippingData[ch]?.subsidy) || 0,
-                actual_shipping_cost: parseFloat(shippingData[ch]?.actual) || 0,
+                actual_shipping_cost: 0,
                 processing_fee: parseFloat(shippingData[ch]?.processing) || 0,
-                weight_diff_kg: parseFloat(shippingData[ch]?.weightDiff) || 0,
+                weight_diff_kg: 0,
             })),
             enabler_var: {
                 commission_gmv_rate: (parseFloat(monthlyCommissionRate) || 0) / 100,
@@ -1762,8 +1810,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                                     <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
                                                                     {/* Selling price — prefilled read-only */}
                                                                     <td className="py-2.5 px-2 text-right">
-                                                                        <span className="inline-flex items-center rounded border border-teal-300 bg-teal-50 px-2 py-1.5 text-xs font-medium text-teal-700 tabular-nums whitespace-nowrap">
-                                                                            {prefillPrice ? fmtCurrency(prefillPrice) : '—'}
+                                                                        <span className="text-xs font-semibold text-teal-700 tabular-nums">
+                                                                            {prefillPrice ? fmt(parseFloat(prefillPrice) || 0) : '—'}
                                                                         </span>
                                                                     </td>
                                                                     <td className="py-2.5 px-2 text-right">
@@ -1851,17 +1899,15 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                         <PnLAccordion
                                             title={t('returnRateTitle')}
                                             subtitle={t('returnRateSubtitle')}
-                                            pillVariant={secFilled.ret ? "filled" : "required"}
-                                            pillText={secFilled.ret ? t('pillFilled') : t('pillRequired')}
+                                            pillVariant="optional"
+                                            pillText={t('pillOptional')}
                                         >
                                             <div className="overflow-x-auto mt-2">
                                                 <table className="w-full border-collapse text-sm">
                                                     <thead>
                                                         <tr>
-                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">{t('colChannel')}</th>
-                                                            <ChTh>{t('colReturnRate')}</ChTh>
+                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-[40%] min-w-[120px]">{t('colChannel')}</th>
                                                             <ChTh>{t('colJmlUnitReturn')}</ChTh>
-                                                            <ChTh>{t('colReturnEst')}</ChTh>
                                                             <ChTh>{t('colRefundAktual')}</ChTh>
                                                         </tr>
                                                     </thead>
@@ -1871,26 +1917,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                                 <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
                                                                 <td className="py-2.5 px-2 text-right">
                                                                     <ChInput
-                                                                        value={returnData[ch]?.rate ?? ''}
-                                                                        onChange={v => {
-                                                                            setReturnData(prev => ({ ...prev, [ch]: { ...prev[ch], rate: v } }))
-                                                                            if (parseFloat(v) > 0) markFilled('ret')
-                                                                        }}
-                                                                        step="0.1"
-                                                                        highlight={(parseFloat(returnData[ch]?.rate) || 0) > 0 ? 'filled' : 'warn'}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
                                                                         value={returnData[ch]?.units ?? ''}
                                                                         onChange={v => setReturnData(prev => ({ ...prev, [ch]: { ...prev[ch], units: v } }))}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        currency
-                                                                        value={returnData[ch]?.est ?? ''}
-                                                                        onChange={v => setReturnData(prev => ({ ...prev, [ch]: { ...prev[ch], est: v } }))}
                                                                     />
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
@@ -1915,7 +1943,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                             pillText={secFilled.discount ? t('pillFilled') : t('pillRequired')}
                                         >
                                             <div className="overflow-x-auto mt-2">
-                                                <table className="w-full border-collapse text-sm" style={{ minWidth: 880 }}>
+                                                <table className="w-full border-collapse text-sm" style={{ minWidth: 780 }}>
                                                     <thead>
                                                         <tr>
                                                             <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">{t('colChannel')}</th>
@@ -1925,18 +1953,19 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {channels.map(ch => (
+                                                        {channels.map((ch, chIdx) => (
                                                             <tr key={ch} className="border-t">
                                                                 <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                {DISCOUNT_KEYS.map(k => (
+                                                                {DISCOUNT_COLS.map(({ key: k, currency: isCurrency }) => (
                                                                     <td key={k} className="py-2.5 px-1 text-right">
                                                                         <ChInput
+                                                                            currency={isCurrency}
                                                                             value={discountData[ch]?.[k] ?? ''}
                                                                             onChange={v => {
                                                                                 setDiscountData(prev => ({ ...prev, [ch]: { ...prev[ch], [k]: v } }))
                                                                                 if (parseFloat(v) > 0) markFilled('discount')
                                                                             }}
-                                                                            step="0.1"
+                                                                            step={isCurrency ? undefined : "0.1"}
                                                                             highlight={(parseFloat(discountData[ch]?.[k]) || 0) > 0 ? 'filled' : undefined}
                                                                         />
                                                                     </td>
@@ -1946,12 +1975,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                                         {totalDiscountPct(ch).toFixed(1)}%
                                                                     </span>
                                                                 </td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        currency
-                                                                        value={discountData[ch]?.amount ?? ''}
-                                                                        onChange={v => setDiscountData(prev => ({ ...prev, [ch]: { ...prev[ch], amount: v } }))}
-                                                                    />
+                                                                <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
+                                                                    {discByChannel[chIdx] > 0 ? fmt(discByChannel[chIdx]) : '—'}
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -1971,11 +1996,9 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                 <table className="w-full border-collapse text-sm">
                                                     <thead>
                                                         <tr>
-                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">{t('colChannel')}</th>
+                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-[40%] min-w-[120px]">{t('colChannel')}</th>
                                                             <ChTh>{t('colSubsidiOngkir')}</ChTh>
-                                                            <ChTh>{t('colOngkirAktual')}</ChTh>
                                                             <ChTh>{t('colBiayaPemrosesan')}</ChTh>
-                                                            <ChTh>{t('colSelisihBerat')}</ChTh>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -1991,17 +2014,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                                     />
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        currency
-                                                                        value={shippingData[ch]?.actual ?? ''}
-                                                                        onChange={v => setShippingData(prev => ({ ...prev, [ch]: { ...prev[ch], actual: v } }))}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right">
                                                                     <ChInput currency value={shippingData[ch]?.processing ?? ''} onChange={v => setShippingData(prev => ({ ...prev, [ch]: { ...prev[ch], processing: v } }))} />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput value={shippingData[ch]?.weightDiff ?? ''} onChange={v => setShippingData(prev => ({ ...prev, [ch]: { ...prev[ch], weightDiff: v } }))} step="0.01" />
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -2027,7 +2040,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {channels.map(ch => (
+                                                        {channels.map((ch, i) => (
                                                             <tr key={ch} className="border-t">
                                                                 <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
                                                                 <td className="py-2.5 px-2 text-right">
@@ -2042,9 +2055,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                                     />
                                                                 </td>
                                                                 <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
-                                                                    {(parseFloat(adsData[ch]?.rate) || 0) > 0
-                                                                        ? fmt(grossTotal * (parseFloat(adsData[ch].rate) / 100))
-                                                                        : '—'}
+                                                                    {adsByChannel[i] > 0 ? fmt(adsByChannel[i]) : '—'}
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -2315,6 +2326,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                 [t('rowDeductDiskon'), fmt(d.discByCh.reduce((a, b) => a + b, 0)), 'd'],
                                                 [t('rowDeductReturn'), fmt(d.retByCh.reduce((a, b) => a + b, 0)), 'd'],
                                                 [t('rowDeductOngkir'), fmt(d.shipByCh.reduce((a, b) => a + b, 0)), 'd'],
+                                                [t('rowDeductAds'), fmt(d.adsByCh.reduce((a, b) => a + b, 0)), 'd'],
                                             ].map(([label, val, type]) => (
                                                 <div key={label} className="flex justify-between">
                                                     <span className="text-xs text-muted-foreground">{label}</span>
@@ -2370,7 +2382,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                     <p className="text-xs text-muted-foreground mt-0.5">{t('breakdownSubtitle')}</p>
                                 </div>
                                 <div className="p-4 overflow-x-auto">
-                                    <table className="w-full border-collapse text-sm" style={{ minWidth: 460 }}>
+                                    <table className="w-full border-collapse text-sm" style={{ minWidth: 540 }}>
                                         <thead>
                                             <tr>
                                                 <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">{t('colChannel')}</th>
@@ -2378,6 +2390,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                 <ChTh>{t('colDiskon')}</ChTh>
                                                 <ChTh>{t('colReturn')}</ChTh>
                                                 <ChTh>{t('colOngkir')}</ChTh>
+                                                <ChTh>{t('colAds')}</ChTh>
                                                 <ChTh>{t('colNetGmv')}</ChTh>
                                             </tr>
                                         </thead>
@@ -2389,6 +2402,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                     <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.discByCh[i])}</td>
                                                     <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.retByCh[i])}</td>
                                                     <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.shipByCh[i])}</td>
+                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.adsByCh[i])}</td>
                                                     <td className={`py-2.5 px-2 text-right text-xs tabular-nums font-semibold ${skuDetailData.netByCh[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
                                                         {fmt(skuDetailData.netByCh[i])}
                                                     </td>
@@ -2400,6 +2414,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                                 <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.discByCh.reduce((a, b) => a + b, 0))}</td>
                                                 <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.retByCh.reduce((a, b) => a + b, 0))}</td>
                                                 <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.shipByCh.reduce((a, b) => a + b, 0))}</td>
+                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.adsByCh.reduce((a, b) => a + b, 0))}</td>
                                                 <td className={`py-2.5 px-2 text-right text-xs font-bold tabular-nums ${skuDetailData.netTotal < 0 ? 'text-red-600' : 'text-green-700'}`}>
                                                     {fmt(skuDetailData.netTotal)}
                                                 </td>

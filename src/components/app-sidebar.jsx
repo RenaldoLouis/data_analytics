@@ -9,6 +9,7 @@ import { NavPricingCalculator } from "@/components/nav-pricing-calculator"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -105,6 +106,14 @@ export function AppSidebar({ ...props }) {
           setSelectedNav={setSelectedNav}
         />
       </SidebarContent>
+      <SidebarFooter>
+        <div className="flex items-center gap-2 px-2 py-1">
+          <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300">
+            BETA
+          </span>
+          <span className="text-[11px] text-muted-foreground">v0.1.0</span>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   )
 }
