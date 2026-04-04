@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import LoadingScreen from "@/components/ui/loadingScreen"
 import { useSidebar } from "@/components/ui/sidebar"
 import { H3 } from "@/components/ui/typography"
 import services from "@/services"
@@ -655,37 +656,56 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 setReturnData(fd.returnData)
                 setShippingData(fd.shippingData)
                 setClaimData(fd.claimData)
+                setVarData(fd.varData ?? {})
+                setMonthlyCommissionRate(fd.monthlyCommissionRate ?? '')
+                setBundlingData(fd.bundlingData ?? {})
                 if (fd.orders) setOrders(fd.orders)
                 if (fd.customRows?.length) setCustomRows(fd.customRows)
                 setSecFilled(fd.secFilled)
-            }
-
-            // Pre-fetch and cache monthly data for ALL other SKUs in same period
-            if (monthlyRecord && d.skus?.length > 1) {
-                const periodMonth = monthlyRecord.period_month
-                const periodYear = monthlyRecord.period_year
-                const currentSkuId = monthlyRecord.sku_id ?? monthlyRecord.sku?.id
-                const otherSkus = d.skus.filter(s => s.id !== currentSkuId)
-                Promise.allSettled(
-                    otherSkus.map(s =>
-                        services.pl.getMonthlyByPeriod(d.id, s.id, periodMonth, periodYear)
-                            .then(res => {
-                                const mr = res?.data?.data ?? res?.data ?? null
-                                if (mr && mr.id) {
-                                    const fd = mapMonthlyRecordToFormData(mr, chIdToName)
-                                    skuDataCacheRef.current[s.id] = { data: fd, recordId: mr.id }
-                                }
-                            })
-                    )
-                ).then(() => setSkuCacheVer(v => v + 1))
             }
 
             setBrandData(d)
             setCompletedSetupSteps([1, 2, 3])
             setSetupStep(1)
             setSetupDone(startAtMonthly)
+
+            // ── Pre-fetch monthly data for ALL other SKUs in the same period ─
+            // Keep loading screen up until this completes so allSkuMetrics is correct on first paint.
+            if (monthlyRecord && d.skus?.length > 1) {
+                const periodMonth = String(parseInt(monthlyRecord.period_month)).padStart(2, '0')
+                const periodYear = Number(monthlyRecord.period_year)
+                const currentSkuId = monthlyRecord.sku_id ?? monthlyRecord.sku?.id
+                const otherSkuIds = d.skus.filter(s => s.id !== currentSkuId).map(s => s.id)
+
+                if (otherSkuIds.length) {
+                    try {
+                        const results = await Promise.allSettled(
+                            otherSkuIds.map(skuId =>
+                                services.pl.getMonthlyByPeriod(d.id, skuId, periodMonth, periodYear)
+                            )
+                        )
+                        const fetched = {}
+                        results.forEach((r, i) => {
+                            if (r.status !== 'fulfilled') return
+                            const raw = r.value
+                            const mr = raw?.data ?? raw ?? null
+                            if (!mr || !mr.id) return
+                            const fd = mapMonthlyRecordToFormData(mr, chIdToName)
+                            fetched[otherSkuIds[i]] = fd
+                            skuDataCacheRef.current[otherSkuIds[i]] = { data: fd, recordId: mr.id }
+                        })
+                        if (Object.keys(fetched).length) {
+                            setPrefetchedSkuData(prev => ({ ...prev, ...fetched }))
+                        }
+                    } catch (e) {
+                        // Pre-fetch is best-effort; don't block page load
+                    }
+                }
+            }
+
+            setIsPageLoading(false)
         }
-        load()
+        load().catch(() => setIsPageLoading(false))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editId, startAtMonthly])
 
@@ -743,7 +763,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const [selectedSku, setSelectedSku] = useState('')
     const skuInitRef = useRef(false)
     const skuDataCacheRef = useRef({})   // { [skuId]: { data: formSnapshot, recordId: id|null } }
-    const [skuCacheVer, setSkuCacheVer] = useState(0) // bump to re-render when cache updates async
+    const [prefetchedSkuData, setPrefetchedSkuData] = useState({}) // { [skuId]: formData } — state-based for reliable rendering
     const prevSkuRef = useRef(null)
     const formDataRef = useRef({})   // always-current form state snapshot
     const contextRef = useRef({})   // always-current context snapshot
@@ -780,19 +800,21 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     })
 
     // ── Restore all form fields from a cached snapshot ─────────────────────────
-    const restoreFromFormData = (d) => {
+    const restoreFromFormData = (d, { includeEnabler = true } = {}) => {
         setInfoData(d.infoData ?? {})
         setDiscountData(d.discountData ?? {})
         setReturnData(d.returnData ?? {})
         setShippingData(d.shippingData ?? {})
         setAdsData(d.adsData ?? {})
-        setClaimData(d.claimData ?? { support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' })
-        setVarData(d.varData ?? {})
-        setMonthlyCommissionRate(d.monthlyCommissionRate ?? '')
-        setCustomRows(d.customRows ?? [])
         setBundlingData(d.bundlingData ?? {})
-        setOrders(d.orders ?? '')
+        setCustomRows(d.customRows ?? [])
         setSecFilled(d.secFilled ?? { info: false, discount: false, ret: false, ads: false, fixed: false })
+        if (includeEnabler) {
+            setClaimData(d.claimData ?? { support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' })
+            setVarData(d.varData ?? {})
+            setMonthlyCommissionRate(d.monthlyCommissionRate ?? '')
+            setOrders(d.orders ?? '')
+        }
     }
 
     // ── SKU switch: save previous data, then restore/load for new SKU ──────────
@@ -809,16 +831,18 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
         // Save current data to cache for the SKU we are leaving
         if (prevSku) {
+            const prevData = { ...formDataRef.current }
             skuDataCacheRef.current[prevSku] = {
-                data: { ...formDataRef.current },
+                data: prevData,
                 recordId: contextRef.current.monthlyId ?? null,
             }
+            setPrefetchedSkuData(prev => ({ ...prev, [prevSku]: prevData }))
         }
 
         // If we already have cached data for the new SKU, restore it
         const cached = skuDataCacheRef.current[selectedSku]
         if (cached) {
-            restoreFromFormData(cached.data)
+            restoreFromFormData(cached.data, { includeEnabler: false })
             setMonthlyId(cached.recordId ?? null)
             return
         }
@@ -834,11 +858,12 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     if (mr && mr.id) {
                         const chIdToName = Object.fromEntries((bd.channels ?? []).map(ch => [ch.id, ch.name]))
                         const fd = mapMonthlyRecordToFormData(mr, chIdToName)
-                        restoreFromFormData(fd)
+                        restoreFromFormData(fd, { includeEnabler: false })
                         setMonthlyId(mr.id)
                         skuDataCacheRef.current[selectedSku] = { data: fd, recordId: mr.id }
+                        setPrefetchedSkuData(prev => ({ ...prev, [selectedSku]: fd }))
                     } else {
-                        restoreFromFormData({})
+                        restoreFromFormData({}, { includeEnabler: false })
                         setMonthlyId(null)
                     }
                 })
@@ -888,12 +913,21 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
     const channelCost = commCost + mallCost + pgwCost
 
+    // ── All-SKU gross total (needed for enabler commission on total GMV) ─────
+    const namedProducts = products.filter(p => p.name)
+    const allSkuGrossForComm = namedProducts.reduce((sum, p) => {
+        if (p.id === selectedSku) return sum + grossTotal
+        const fd = prefetchedSkuData[p.id] ?? skuDataCacheRef.current[p.id]?.data ?? {}
+        const fi = fd.infoData ?? {}
+        return sum + channels.reduce((s, ch) => s + (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(p.prices?.[ch]?.price) || 0), 0)
+    }, 0)
+
     const retainerVal = parseFloat((enablerConfig.retainer || '').replace(/\./g, '')) || 0
     const sofVal = parseFloat((enablerConfig.sof || '').replace(/\./g, '')) || 0
     const swiftVal = parseFloat((enablerConfig.swift || '').replace(/\./g, '')) || 0
     const liveVal = parseFloat((enablerConfig.live || '').replace(/\./g, '')) || 0
     const warehouseVal = parseFloat((enablerConfig.warehouse || '').replace(/\./g, '')) || 0
-    const commissionVal = grossTotal * ((parseFloat(monthlyCommissionRate) || 0) / 100)
+    const commissionVal = allSkuGrossForComm * ((parseFloat(monthlyCommissionRate) || 0) / 100)
     const fulfilRate = parseFloat((enablerConfig.fulfilRate || '').replace(/\./g, '').replace(',', '.')) || 12000
     const fulfilTotal = (parseFloat(orders) || 0) * fulfilRate
     const claimTotal = Object.values(claimData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
@@ -944,9 +978,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     }
 
     // ── All-SKU aggregated metrics ────────────────────────────────────────────
-    // (skuCacheVer referenced to ensure re-render when async cache loads complete)
-    const namedProducts = products.filter(p => p.name)
-    void skuCacheVer
     const allSkuMetrics = namedProducts.map(p => {
         if (p.id === selectedSku) {
             const gp = netTotal - cogsTotal
@@ -960,7 +991,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 shipByCh: shipByChannel, adsByCh: adsByChannel, netByCh: netByChannel
             }
         }
-        return { sku: p, ...computeSkuMetrics(skuDataCacheRef.current[p.id]?.data ?? {}, p) }
+        const cachedData = prefetchedSkuData[p.id] ?? skuDataCacheRef.current[p.id]?.data ?? {}
+        return { sku: p, ...computeSkuMetrics(cachedData, p) }
     })
     const allSkuGrossTotal = allSkuMetrics.reduce((s, m) => s + m.grossTotal, 0)
     const allSkuNetTotal = allSkuMetrics.reduce((s, m) => s + m.netTotal, 0)
@@ -982,6 +1014,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
     // ── Save / Calculate ──────────────────────────────────────────────────────
     const [isSaving, setIsSaving] = useState(false)
+    const [isPageLoading, setIsPageLoading] = useState(!!(editId || startAtMonthly))
     const [brandData, setBrandData] = useState(null)
 
     // ── Taken months loader ───────────────────────────────────────────────────
@@ -1025,76 +1058,95 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
     const MONTH_LABELS = MONTH_LABELS_CONST
 
-    const buildMonthlyPayload = (resolvedBrandId, resolvedChannels) => {
+    // Build a monthly payload from explicit form data + product for any SKU
+    const buildMonthlyPayloadFromData = (fd, product, skuId, resolvedBrandId, resolvedChannels) => {
         const chId = (ch) => resolvedChannels.find(c => c.name === ch)?.id ?? channelMap[ch]
         const periodMonth = String(MONTH_LABELS.indexOf(activeMo) + 1).padStart(2, '0')
         const periodYear = parseInt(activeYear)
-        const resolvedSkuId = selectedSku
+        const fi = fd.infoData ?? {}
+        const fdisc = fd.discountData ?? {}
+        const fr = fd.returnData ?? {}
+        const fo = fd.shippingData ?? {}
+        const fa = fd.adsData ?? {}
+        const fb = fd.bundlingData ?? {}
+        const fc = fd.customRows ?? []
+        const grossByCh = channels.map(ch =>
+            (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(product?.prices?.[ch]?.price) || 0))
+        const discPctFn = (ch) => DISCOUNT_PCT_KEYS.reduce((s, k) => s + (parseFloat(fdisc[ch]?.[k]) || 0), 0)
+        const discAmtFn = (ch) => DISCOUNT_AMT_KEYS.reduce((s, k) => s + (parseFloat(fdisc[ch]?.[k]) || 0), 0)
+        const discByCh = channels.map((ch, i) => grossByCh[i] * discPctFn(ch) / 100 + discAmtFn(ch))
         return {
             brand_id: resolvedBrandId,
-            sku_id: resolvedSkuId,
+            sku_id: skuId,
             period_month: periodMonth,
             period_year: periodYear,
             status: 'DRAFT',
             sales: channels.map((ch, i) => ({
                 channel_id: chId(ch),
-                units_sold: parseFloat(infoData[ch]?.vol) || 0,
-                actual_selling_price: parseFloat(activeSku.prices?.[ch]?.price) || 0,
-                ads_spend_rate: (parseFloat(adsData[ch]?.rate) || 0) / 100,
-                ads_spend_amount: grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100),
+                units_sold: parseFloat(fi[ch]?.vol) || 0,
+                actual_selling_price: parseFloat(product?.prices?.[ch]?.price) || 0,
+                ads_spend_rate: (parseFloat(fa[ch]?.rate) || 0) / 100,
+                ads_spend_amount: grossByCh[i] * ((parseFloat(fa[ch]?.rate) || 0) / 100),
             })),
             discounts: channels.map((ch, i) => ({
                 channel_id: chId(ch),
                 voucher_pct: 0,
-                voucher_amount: parseFloat(discountData[ch]?.voucher) || 0,
-                subsidy_pct: (parseFloat(discountData[ch]?.subsidy) || 0) / 100,
+                voucher_amount: parseFloat(fdisc[ch]?.voucher) || 0,
+                subsidy_pct: (parseFloat(fdisc[ch]?.subsidy) || 0) / 100,
                 flash_sale_pct: 0,
-                flash_sale_amount: parseFloat(discountData[ch]?.flash) || 0,
+                flash_sale_amount: parseFloat(fdisc[ch]?.flash) || 0,
                 coin_pct: 0,
-                affiliate_pct: (parseFloat(discountData[ch]?.affiliate) || 0) / 100,
-                bundling_pct: (parseFloat(discountData[ch]?.bundling) || 0) / 100,
-                loyalty_pct: (parseFloat(discountData[ch]?.loyalty) || 0) / 100,
-                total_discount_pct: totalDiscountPct(ch) / 100,
-                discount_amount: discByChannel[i],
+                affiliate_pct: (parseFloat(fdisc[ch]?.affiliate) || 0) / 100,
+                bundling_pct: (parseFloat(fdisc[ch]?.bundling) || 0) / 100,
+                loyalty_pct: (parseFloat(fdisc[ch]?.loyalty) || 0) / 100,
+                total_discount_pct: discPctFn(ch) / 100,
+                discount_amount: discByCh[i],
             })),
             returns: channels.map(ch => ({
                 channel_id: chId(ch),
                 return_rate_pct: 0,
-                return_units: parseFloat(returnData[ch]?.units) || 0,
+                return_units: parseFloat(fr[ch]?.units) || 0,
                 estimated_return_value: 0,
-                actual_refund_amount: parseFloat(returnData[ch]?.actual) || 0,
+                actual_refund_amount: parseFloat(fr[ch]?.actual) || 0,
             })),
             shippings: channels.map(ch => ({
                 channel_id: chId(ch),
-                shipping_subsidy: parseFloat(shippingData[ch]?.subsidy) || 0,
+                shipping_subsidy: parseFloat(fo[ch]?.subsidy) || 0,
                 actual_shipping_cost: 0,
-                processing_fee: parseFloat(shippingData[ch]?.processing) || 0,
+                processing_fee: parseFloat(fo[ch]?.processing) || 0,
                 weight_diff_kg: 0,
             })),
             enabler_var: {
-                commission_gmv_rate: (parseFloat(monthlyCommissionRate) || 0) / 100,
-                order_count: parseFloat(orders) || 0,
-                claim_support: parseFloat(claimData.support) || 0,
-                claim_voucher: parseFloat(claimData.voucher) || 0,
-                claim_mp_fee: parseFloat(claimData.mpFee) || 0,
-                mp_affiliate: parseFloat(claimData.mpAffiliate) || 0,
-                campaign_ads_fee: parseFloat(claimData.campaign) || 0,
+                commission_gmv_rate: (parseFloat(fd.monthlyCommissionRate ?? monthlyCommissionRate) || 0) / 100,
+                order_count: parseFloat(fd.orders ?? orders) || 0,
+                claim_support: parseFloat((fd.claimData ?? claimData).support) || 0,
+                claim_voucher: parseFloat((fd.claimData ?? claimData).voucher) || 0,
+                claim_mp_fee: parseFloat((fd.claimData ?? claimData).mpFee) || 0,
+                mp_affiliate: parseFloat((fd.claimData ?? claimData).mpAffiliate) || 0,
+                campaign_ads_fee: parseFloat((fd.claimData ?? claimData).campaign) || 0,
                 custom_var_items: Object.fromEntries(
-                    Object.entries(varData).map(([k, v]) => [k, parseFloat(v) || 0])
+                    Object.entries(fd.varData ?? varData).map(([k, v]) => [k, parseFloat(v) || 0])
                 ),
             },
-            fixed_costs: customRows
+            fixed_costs: fc
                 .filter(r => r.name && parseFloat(r.val) > 0)
                 .map(r => ({ item_name: r.name, amount: parseFloat(r.val) || 0 })),
             cogs_overrides: channels.map(ch => ({
                 channel_id: chId(ch),
                 cogs_override: null,
                 packaging_override: null,
-                cogs_bundling: parseFloat(bundlingData[ch]?.cogs) || null,
-                units_per_bundle: parseFloat(bundlingData[ch]?.units) || null,
+                cogs_bundling: parseFloat(fb[ch]?.cogs) || null,
+                units_per_bundle: parseFloat(fb[ch]?.units) || null,
             })),
         }
     }
+
+    // Active-SKU convenience wrapper (uses live form state)
+    const buildMonthlyPayload = (resolvedBrandId, resolvedChannels) =>
+        buildMonthlyPayloadFromData(
+            { infoData, discountData, returnData, shippingData, adsData, bundlingData, customRows, claimData, varData, monthlyCommissionRate, orders },
+            activeSku, selectedSku, resolvedBrandId, resolvedChannels
+        )
 
     const handleSaveChanges = async () => {
         if (!brandOnly) {
@@ -1162,36 +1214,64 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             }
 
             // ── Flow 2: startAtMonthly (Add New / Edit from list) ─────────────
-            // Brand already exists — skip brand save, only save monthly
+            // Brand already exists — save monthly for active SKU + any other SKUs with cached data.
             if (startAtMonthly) {
                 if (!brandData?.id) return toast.error(t('errorBrandRequired'))
-                const payload = buildMonthlyPayload(brandData.id, brandData.channels ?? [])
+                const bId = brandData.id
+                const bChs = brandData.channels ?? []
+                const periodMonth = String(MONTH_LABELS_CONST.indexOf(activeMo) + 1).padStart(2, '0')
+                const periodYear = parseInt(activeYear)
 
-                // Resolve monthlyId — if null, check if a record already exists for this
-                // brand+sku+period (guards against duplicate creates after SKU switching)
+                // ── Save active SKU ──────────────────────────────────────────────
+                const payload = buildMonthlyPayload(bId, bChs)
                 let resolvedMonthlyId = monthlyId
                 if (!resolvedMonthlyId) {
-                    const periodMonth = String(MONTH_LABELS_CONST.indexOf(activeMo) + 1).padStart(2, '0')
-                    const chk = await services.pl.getMonthlyByPeriod(brandData.id, selectedSku, periodMonth, parseInt(activeYear))
+                    const chk = await services.pl.getMonthlyByPeriod(bId, selectedSku, periodMonth, periodYear)
                     const existing = chk?.data?.data ?? chk?.data ?? null
                     if (existing?.id) {
                         resolvedMonthlyId = existing.id
                         setMonthlyId(existing.id)
                     }
                 }
-
                 const res = resolvedMonthlyId
                     ? await services.pl.updateMonthly(resolvedMonthlyId, payload)
                     : await services.pl.createMonthly(payload)
                 if (res?.success) {
-                    toast.success(t('saveSuccess'))
                     if (!resolvedMonthlyId) {
                         const newId = res.data?.data?.id ?? res.data?.id
                         if (newId) setMonthlyId(newId)
                     }
                 } else {
                     toast.error(errMsg(res?.message, t('saveError')))
+                    return
                 }
+
+                // ── Save other SKUs that have cached data with volume ────────────
+                const otherSkus = products.filter(p => p.id !== selectedSku && p.name)
+                const otherSaves = []
+                for (const p of otherSkus) {
+                    const cached = skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id]
+                    if (!cached) continue
+                    // Only save if the SKU has at least some volume entered
+                    const hasVol = Object.values(cached.infoData ?? {}).some(d => parseFloat(d?.vol) > 0)
+                    if (!hasVol) continue
+                    const otherPayload = buildMonthlyPayloadFromData(cached, p, p.id, bId, bChs)
+                    const cachedRecordId = skuDataCacheRef.current[p.id]?.recordId ?? null
+                    let otherId = cachedRecordId
+                    if (!otherId) {
+                        const chk = await services.pl.getMonthlyByPeriod(bId, p.id, periodMonth, periodYear)
+                        const existing = chk?.data?.data ?? chk?.data ?? null
+                        if (existing?.id) otherId = existing.id
+                    }
+                    otherSaves.push(
+                        otherId
+                            ? services.pl.updateMonthly(otherId, otherPayload)
+                            : services.pl.createMonthly(otherPayload)
+                    )
+                }
+                if (otherSaves.length) await Promise.allSettled(otherSaves)
+
+                toast.success(t('saveSuccess'))
                 return
             }
 
@@ -1250,6 +1330,21 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
             const payload = buildMonthlyPayload(saved.id, saved.channels ?? [])
             const monthlyRes = await services.pl.createMonthly(payload)
+
+            // Save other SKUs that have cached data with volume
+            const otherSkus = products.filter(p => p.id !== selectedSku && p.name)
+            const otherSaves = []
+            for (const p of otherSkus) {
+                const cached = skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id]
+                if (!cached) continue
+                const hasVol = Object.values(cached.infoData ?? {}).some(d => parseFloat(d?.vol) > 0)
+                if (!hasVol) continue
+                otherSaves.push(services.pl.createMonthly(
+                    buildMonthlyPayloadFromData(cached, p, p.id, saved.id, saved.channels ?? [])
+                ))
+            }
+            if (otherSaves.length) await Promise.allSettled(otherSaves)
+
             if (monthlyRes?.success) toast.success(t('saveSuccess'))
             else toast.error(errMsg(monthlyRes?.message, t('saveError')))
         } catch {
@@ -1263,6 +1358,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const step1 = getStepStatus(1)
     const step2 = getStepStatus(2)
     const step3 = getStepStatus(3)
+
+    if (isPageLoading) return <LoadingScreen />
 
     return (
         <>
