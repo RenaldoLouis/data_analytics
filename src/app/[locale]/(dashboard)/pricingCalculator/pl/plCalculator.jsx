@@ -1,535 +1,88 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
 import LoadingScreen from "@/components/ui/loadingScreen"
 import { useSidebar } from "@/components/ui/sidebar"
 import { H3 } from "@/components/ui/typography"
 import services from "@/services"
-import {
-    IconArrowLeft,
-    IconBuildingStore,
-    IconChevronDown,
-    IconChevronUp,
-    IconPresentationAnalytics,
-    IconSearch,
-    IconSettings,
-} from "@tabler/icons-react"
+import { IconArrowLeft } from "@tabler/icons-react"
 import { useTranslations } from "next-intl"
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
-const MONTH_LABELS_CONST = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
-const fmt = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
-const pct = (n) => (isFinite(n) ? n.toFixed(1) : '0.0') + '%'
-const num = (s) => parseFloat(String(s).replace(/[^\d.]/g, '')) || 0
+import {
+    MONTH_LABELS, DISCOUNT_PCT_KEYS, DISCOUNT_AMT_KEYS,
+    num, toAmt, toRate,
+    makeProduct, mapMonthlyRecordToFormData, buildMonthlyPayloadFromData, computeSkuMetrics,
+} from "./plLib"
+import SetupPhase from "./SetupPhase"
+import MonthlyInputSection from "./MonthlyInputSection"
+import ResultsSection from "./ResultsSection"
+import SkuDetailModal from "./SkuDetailModal"
+import SkuSelectionModal from "./SkuSelectionModal"
 
-// Currency input helpers — format raw integer string → "13.000", strip on change
-const fmtCurrency = (v) => {
-    if (v === '' || v == null) return ''
-    const n = parseInt(String(v).replace(/\D/g, ''), 10)
-    return isNaN(n) ? '' : n.toLocaleString('id-ID')
-}
-const parseCurrency = (v) => String(v).replace(/\D/g, '')
-
-const DISCOUNT_COLS = [
-    { key: 'voucher', currency: true },
-    { key: 'subsidy', currency: false },
-    { key: 'flash', currency: true },
-    { key: 'affiliate', currency: false },
-    { key: 'bundling', currency: false },
-    { key: 'loyalty', currency: false },
-]
-const DISCOUNT_KEYS = DISCOUNT_COLS.map(c => c.key)
-const DISCOUNT_PCT_KEYS = DISCOUNT_COLS.filter(c => !c.currency).map(c => c.key)
-const DISCOUNT_AMT_KEYS = DISCOUNT_COLS.filter(c => c.currency).map(c => c.key)
-
-// ─── API value helpers (module-scope so effects and helpers can share them) ───
-const toAmt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v))) : ''
-const toRate = (v, scale = 100) => v != null ? String(parseFloat((parseFloat(v) * scale).toFixed(4))) : '0'
-
-// ─── Map a monthly DB record to form-state shape ───────────────────────────────
-function mapMonthlyRecordToFormData(mr, chIdToName) {
-    const data = {
-        infoData: {},
-        discountData: {},
-        returnData: {},
-        shippingData: {},
-        adsData: {},
-        claimData: { support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' },
-        varData: {},
-        monthlyCommissionRate: '',
-        customRows: [],
-        bundlingData: {},
-        orders: '',
-        secFilled: { info: false, discount: false, ret: false, ads: false, fixed: false },
-    }
-    if (mr.sales?.length) {
-        mr.sales.forEach(s => {
-            const ch = chIdToName[s.channel_id]
-            if (!ch) return
-            data.infoData[ch] = { vol: s.units_sold != null ? String(s.units_sold) : '' }
-            data.adsData[ch] = { rate: s.ads_spend_rate != null ? toRate(s.ads_spend_rate) : '0' }
-        })
-    }
-    if (mr.discounts?.length) {
-        mr.discounts.forEach(d => {
-            const ch = chIdToName[d.channel_id]
-            if (!ch) return
-            data.discountData[ch] = {
-                voucher: d.voucher_amount != null ? toAmt(d.voucher_amount) : '',
-                subsidy: toRate(d.subsidy_pct),
-                flash: d.flash_sale_amount != null ? toAmt(d.flash_sale_amount) : '',
-                affiliate: toRate(d.affiliate_pct),
-                bundling: toRate(d.bundling_pct),
-                loyalty: toRate(d.loyalty_pct),
-            }
-        })
-    }
-    if (mr.returns?.length) {
-        mr.returns.forEach(r => {
-            const ch = chIdToName[r.channel_id]
-            if (!ch) return
-            data.returnData[ch] = {
-                units: r.return_units != null ? String(r.return_units) : '',
-                actual: r.actual_refund_amount != null ? toAmt(r.actual_refund_amount) : '',
-            }
-        })
-    }
-    if (mr.shippings?.length) {
-        mr.shippings.forEach(o => {
-            const ch = chIdToName[o.channel_id]
-            if (!ch) return
-            data.shippingData[ch] = {
-                subsidy: o.shipping_subsidy != null ? toAmt(o.shipping_subsidy) : '',
-                processing: o.processing_fee != null ? toAmt(o.processing_fee) : '',
-            }
-        })
-    }
-    if (mr.enabler_var) {
-        const ev = mr.enabler_var
-        data.claimData = {
-            support: ev.claim_support != null ? toAmt(ev.claim_support) : '',
-            voucher: ev.claim_voucher != null ? toAmt(ev.claim_voucher) : '',
-            mpFee: ev.claim_mp_fee != null ? toAmt(ev.claim_mp_fee) : '',
-            mpAffiliate: ev.mp_affiliate != null ? toAmt(ev.mp_affiliate) : '',
-            campaign: ev.campaign_ads_fee != null ? toAmt(ev.campaign_ads_fee) : '',
-        }
-        if (ev.order_count != null) data.orders = String(ev.order_count)
-        if (ev.commission_gmv_rate != null) data.monthlyCommissionRate = toRate(ev.commission_gmv_rate)
-        if (ev.custom_var_items && typeof ev.custom_var_items === 'object') {
-            data.varData = Object.fromEntries(
-                Object.entries(ev.custom_var_items).map(([k, v]) => [k, toAmt(v)])
-            )
-        }
-    }
-    if (mr.fixed_costs?.length) {
-        data.customRows = mr.fixed_costs
-            .filter(fc => fc.item_name)
-            .map((fc, i) => ({ id: i, name: fc.item_name, val: toAmt(fc.amount) }))
-    }
-    if (mr.cogs_overrides?.length) {
-        mr.cogs_overrides.forEach(co => {
-            const ch = chIdToName[co.channel_id]
-            if (!ch) return
-            data.bundlingData[ch] = {
-                cogs: co.cogs_bundling != null ? toAmt(co.cogs_bundling) : '',
-                units: co.units_per_bundle != null ? String(co.units_per_bundle) : '',
-            }
-        })
-    }
-    // Derive secFilled from loaded data
-    const hasVal = (v) => v != null && v !== '' && v !== '0' && parseFloat(v) > 0
-    data.secFilled = {
-        info: Object.values(data.infoData).some(d => hasVal(d?.vol)),
-        discount: Object.values(data.discountData).some(d => DISCOUNT_KEYS.some(k => hasVal(d?.[k]))),
-        ret: false,  // optional — no tracking needed
-        ads: Object.values(data.adsData).some(d => hasVal(d?.rate)),
-        fixed: data.customRows.some(r => r.name && hasVal(r.val)),
-    }
-    return data
-}
-
-function getChColor(code, label) {
-    const key = (label || code || "").toLowerCase()
-    if (key.includes("shopee")) return { bg: "#fff7f0", color: "#c83200" }
-    if (key.includes("tokopedia")) return { bg: "#f0fff4", color: "#1a6e42" }
-    if (key.includes("tiktok")) return { bg: "#f0f8ff", color: "#0a4a8c" }
-    if (key.includes("lazada")) return { bg: "#f5f0ff", color: "#4a1fcc" }
-    return { bg: "#f5f5f5", color: "#555" }
-}
-
-// ─── ChBadge ──────────────────────────────────────────────────────────────────
-function ChBadge({ code, label }) {
-    const { bg, color } = getChColor(code, label)
-    return (
-        <span
-            className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap"
-            style={{ background: bg, color }}
-        >
-            {label || code}
-        </span>
-    )
-}
-
-// ─── ChInput: compact number input for channel tables ─────────────────────────
-function ChInput({ value, onChange, placeholder = "0", step, highlight, currency = false }) {
-    const cls = highlight === 'filled'
-        ? 'bg-emerald-50 border-emerald-400 focus:ring-emerald-400 focus:border-emerald-400'
-        : highlight === 'warn'
-            ? 'bg-orange-50 border-orange-300 focus:ring-orange-300 focus:border-orange-300'
-            : 'bg-background border-input focus:ring-ring focus:border-ring'
-    return (
-        <input
-            type={currency ? 'text' : 'number'}
-            step={!currency ? step : undefined}
-            value={currency ? fmtCurrency(value) : value}
-            onChange={e => onChange(currency ? parseCurrency(e.target.value) : e.target.value)}
-            placeholder={placeholder}
-            className={`w-20 text-right text-xs px-2 py-1.5 rounded border outline-none transition-colors focus:ring-1 ${cls}`}
-        />
-    )
-}
-
-// ─── PnLAccordion ─────────────────────────────────────────────────────────────
-function PnLAccordion({ title, subtitle, pillText, pillVariant = "optional", defaultOpen = false, children }) {
-    const [open, setOpen] = useState(defaultOpen)
-    const pillClass = {
-        required: "bg-orange-50 text-orange-700 border border-orange-200",
-        prefilled: "bg-teal-50 text-teal-700 border border-teal-200",
-        filled: "bg-green-50 text-green-700 border border-green-300",
-        optional: "bg-muted text-muted-foreground border",
-    }[pillVariant] || "bg-muted text-muted-foreground border"
-    return (
-        <div className="border-b last:border-b-0">
-            <div
-                className="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none hover:bg-muted/20 transition-colors"
-                onClick={() => setOpen(o => !o)}
-            >
-                <div className="min-w-0">
-                    <p className="text-sm font-semibold">{title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${pillClass}`}>{pillText}</span>
-                    {open ? <IconChevronUp size={14} className="text-muted-foreground" /> : <IconChevronDown size={14} className="text-muted-foreground" />}
-                </div>
-            </div>
-            {open && <div className="px-5 pb-5 pt-1">{children}</div>}
-        </div>
-    )
-}
-
-// ─── SetupProgress ───────────────────────────────────────────────────────────
-function SetupProgress({ steps, currentStep, completedSteps, onStepClick }) {
-    return (
-        <div className="flex items-center w-full mb-2">
-            {steps.map((label, i) => {
-                const n = i + 1
-                const isDone = completedSteps.includes(n)
-                const isActive = currentStep === n
-                const isLocked = !completedSteps.includes(n) && currentStep < n
-                return (
-                    <Fragment key={i}>
-                        {i > 0 && (
-                            <div className={`flex-1 h-px mx-2 transition-colors ${completedSteps.includes(i) ? 'bg-green-300' : 'bg-border'}`} />
-                        )}
-                        <div
-                            className={`flex items-center gap-1.5 flex-shrink-0 ${isLocked ? 'cursor-not-allowed' : !isActive ? 'cursor-pointer' : ''}`}
-                            onClick={() => !isLocked && onStepClick?.(n)}
-                        >
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 transition-colors
-                                ${isDone ? 'bg-green-100 text-green-700' : isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                                {isDone ? '✓' : n}
-                            </div>
-                            <span className={`text-xs transition-colors hidden sm:block
-                                ${isDone ? 'text-green-700' : isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                                {label}
-                            </span>
-                        </div>
-                    </Fragment>
-                )
-            })}
-        </div>
-    )
-}
-
-// ─── SetupStepCard ────────────────────────────────────────────────────────────
-function SetupStepCard({ number, title, subtitle, isDone, isActive, isLocked, onOpen, onNext, nextLabel, finishLabel, donePillLabel, activePillLabel, pendingPillLabel, isLast = false, children }) {
-    const statusPill = isDone
-        ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">{donePillLabel}</span>
-        : isActive
-            ? <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activePillLabel}</span>
-            : <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">{pendingPillLabel}</span>
-
-    return (
-        <Card className={`gap-0 py-0 overflow-hidden transition-all ${isLocked ? 'opacity-40 pointer-events-none' : ''}`}>
-            <div
-                className={`flex items-center gap-4 px-5 py-4 select-none ${!isLocked ? 'cursor-pointer hover:bg-muted/20 transition-colors' : ''}`}
-                onClick={!isLocked ? onOpen : undefined}
-            >
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors
-                    ${isDone ? 'bg-green-100 text-green-700' : isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                    {isDone ? '✓' : number}
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold">{title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    {statusPill}
-                    {!isLocked && (
-                        isActive
-                            ? <IconChevronUp size={14} className="text-muted-foreground" />
-                            : <IconChevronDown size={14} className="text-muted-foreground" />
-                    )}
-                </div>
-            </div>
-            {isActive && (
-                <div className="border-t px-5 pt-4 pb-5">
-                    {children}
-                    <div className="mt-5 flex justify-end">
-                        <Button onClick={onNext}>
-                            {isLast ? finishLabel : nextLabel}
-                        </Button>
-                    </div>
-                </div>
-            )}
-        </Card>
-    )
-}
-
-// ─── SetupSummaryCard ─────────────────────────────────────────────────────────
-function SetupSummaryCard({ setup, activeChannels, onEditSetup, editLabel }) {
-    return (
-        <div className="rounded-lg border bg-card px-5 py-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
-                    {(setup.brand_name || 'B')[0].toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                    <p className="font-semibold text-sm">{setup.brand_name || 'Brand'}</p>
-                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                        {activeChannels.map(ch => <ChBadge key={ch.code} code={ch.code} label={ch.label} />)}
-                        {setup.enabler && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
-                                via {setup.enabler}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─── InnerCard ────────────────────────────────────────────────────────────────
-function InnerCard({ title, children, className = '' }) {
-    return (
-        <div className={`rounded-lg border bg-muted/40 p-4 flex-1 ${className}`}>
-            {title && (
-                <p className="text-xs font-semibold text-muted-foreground tracking-widest uppercase mb-3">{title}</p>
-            )}
-            {children}
-        </div>
-    )
-}
-
-// ─── FieldInput ───────────────────────────────────────────────────────────────
-function FieldInput({ label, subtitle, value, onChange, prefix, suffix, placeholder = '0', type = 'number', disabled = false }) {
-    const isCurrency = prefix === 'Rp'
-    return (
-        <div className="grid gap-1">
-            {label && <Label>{label}</Label>}
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-            <div className={`flex items-center border border-input rounded-md overflow-hidden shadow-xs transition-all ${disabled ? 'bg-muted/50 opacity-60' : 'bg-transparent focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:border-ring'}`}>
-                {prefix && (
-                    <span className="px-3 text-xs text-muted-foreground border-r border-input bg-muted/50 self-stretch flex items-center">Rp</span>
-                )}
-                <input
-                    type={isCurrency ? 'text' : type}
-                    value={isCurrency ? fmtCurrency(value) : value}
-                    onChange={(e) => !disabled && onChange(isCurrency ? parseCurrency(e.target.value) : e.target.value)}
-                    placeholder={placeholder}
-                    disabled={disabled}
-                    className="flex-1 px-3 h-9 text-sm text-foreground outline-none bg-transparent min-w-0 disabled:cursor-not-allowed"
-                />
-                {suffix && (
-                    <span className="px-3 text-xs text-muted-foreground border-l border-input bg-muted/50 self-stretch flex items-center whitespace-nowrap">{suffix}</span>
-                )}
-            </div>
-        </div>
-    )
-}
-
-// ─── AutoField ────────────────────────────────────────────────────────────────
-function AutoField({ label, value, autoLabel }) {
-    return (
-        <div className="grid gap-1">
-            <Label>{label} <span className="text-xs text-muted-foreground font-normal">({autoLabel})</span></Label>
-            <div className="rounded-md border border-teal-300 bg-teal-50 dark:bg-teal-950 px-3 py-2 h-9 flex items-center text-sm font-medium text-teal-700 dark:text-teal-300">
-                {value}
-            </div>
-        </div>
-    )
-}
-
-// ─── ProductTabs ─────────────────────────────────────────────────────────────
-function ProductTabs({ products, activeIndex, onSelect, onAdd, onRemove, addLabel }) {
-    return (
-        <div className="flex flex-wrap gap-2 mb-4">
-            {products.map((p, i) => (
-                <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => onSelect(i)}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors
-                        ${i === activeIndex ? 'bg-primary text-primary-foreground' : 'border bg-card hover:bg-muted'}`}
-                >
-                    {p.name || `SKU ${i + 1}`}
-                    {products.length > 1 && (
-                        <span
-                            className="ml-0.5 opacity-60 hover:opacity-100 leading-none"
-                            onClick={(e) => { e.stopPropagation(); onRemove(i) }}
-                        >×</span>
-                    )}
-                </button>
-            ))}
-            <button
-                type="button"
-                onClick={onAdd}
-                className="rounded-full border px-3 py-1 text-sm hover:bg-muted transition-colors"
-            >
-                {addLabel}
-            </button>
-        </div>
-    )
-}
-
-// ─── ChTh ─────────────────────────────────────────────────────────────────────
-function ChTh({ children, className = '' }) {
-    return (
-        <th className={`pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 text-right whitespace-nowrap ${className}`}>
-            {children}
-        </th>
-    )
-}
-
-// ─── SectionCard (for Monthly P&L phase) ─────────────────────────────────────
-function SectionCard({ icon, title, subtitle, children }) {
-    const [open, setOpen] = useState(true)
-    return (
-        <Card className="gap-0 py-0 overflow-hidden">
-            <div
-                className="flex items-start gap-3 px-5 pt-5 pb-5 cursor-pointer select-none hover:bg-muted/10 transition-colors"
-                onClick={() => setOpen(o => !o)}
-            >
-                <span className="mt-0.5 text-primary flex-shrink-0">{icon}</span>
-                <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-card-foreground text-sm">{title}</p>
-                    {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
-                </div>
-                <span className="text-muted-foreground mt-0.5">
-                    {open ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
-                </span>
-            </div>
-            {open && <div className="px-5 pb-5 border-t">{children}</div>}
-        </Card>
-    )
-}
-
-function makeProduct(index, label = 'Product') {
-    return {
-        id: Date.now() + index,
-        name: '',
-        sku: null,
-        cogs: '',
-        pkg: '',
-        prices: {},
-    }
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly = false, startAtMonthly = false }) {
     const t = useTranslations('plpage')
     const { open: sidebarOpen } = useSidebar()
 
-    const DISKON_LABELS = [
-        t('diskonVoucher'), t('diskonSubsidi'), t('diskonFlash'),
-        t('diskonAffiliate'), t('diskonBundling'), t('diskonLoyalty'),
+    const DISCOUNT_LABELS = [
+        t('discountVoucher'), t('discountSubsidy'), t('discountFlash'),
+        t('discountAffiliate'), t('discountBundling'), t('discountLoyalty'),
     ]
 
-
-    // ── Setup step state ──────────────────────────────────────────────────────
+    // ── Setup step state ─────────────────────────────────────────────────────
     const [setupStep, setSetupStep] = useState(1)
     const [completedSetupSteps, setCompletedSetupSteps] = useState([])
     const [setupDone, setSetupDone] = useState(startAtMonthly)
 
     const doneSetupStep = (n) => {
         setCompletedSetupSteps(prev => [...new Set([...prev, n])])
-        if (n < 3) {
-            setSetupStep(n + 1)
-        } else {
+        if (n < 3) setSetupStep(n + 1)
+        else {
+            if (!selectedSku && products.length > 0) setSelectedSku(products[0].id)
             setSetupDone(true)
         }
     }
-
     const getStepStatus = (n) => ({
         isDone: completedSetupSteps.includes(n),
         isActive: setupStep === n,
         isLocked: !completedSetupSteps.includes(n) && setupStep < n,
     })
-
     const handleStepOpen = (n) => {
-        const { isLocked } = getStepStatus(n)
-        if (!isLocked) setSetupStep(n)
+        if (!getStepStatus(n).isLocked) setSetupStep(n)
     }
 
-    // ── Setup state ───────────────────────────────────────────────────────────
+    // ── Setup state ──────────────────────────────────────────────────────────
     const [setup, setSetup] = useState({ brand_name: '', category: '', enabler: '' })
     const setS = (field, value) => setSetup(prev => ({ ...prev, [field]: value }))
 
-    // ── Channels: string array (tag input) ────────────────────────────────────
+    // ── Channels ─────────────────────────────────────────────────────────────
     const [channels, setChannels] = useState([])
     const [mallStatus, setMallStatus] = useState({})
+    const [channelActive, setChannelActive] = useState({})
     const [tagInput, setTagInput] = useState('')
-
     const addChannel = (val) => {
         val = val.trim().replace(',', '')
         if (!val || channels.includes(val)) return
         setChannels(prev => [...prev, val])
         setMallStatus(prev => ({ ...prev, [val]: false }))
+        setChannelActive(prev => ({ ...prev, [val]: true }))
     }
     const removeChannel = (ch) => {
         setChannels(prev => prev.filter(c => c !== ch))
         setMallStatus(prev => { const n = { ...prev }; delete n[ch]; return n })
+        setChannelActive(prev => { const n = { ...prev }; delete n[ch]; return n })
     }
 
-    // ── Channel fees ──────────────────────────────────────────────────────────
+    // ── Channel fees ─────────────────────────────────────────────────────────
     const [channelFees, setChannelFees] = useState({})
     const getChFee = (ch, key) =>
         channelFees[ch]?.[key] ?? ({ comm: '5', mall: '0', pgw: '1.5' }[key])
     const setChFee = (ch, key, value) =>
         setChannelFees(prev => ({ ...prev, [ch]: { ...prev[ch], [key]: value } }))
 
-    // ── Enabler config ────────────────────────────────────────────────────────
+    // ── Enabler config ───────────────────────────────────────────────────────
     const [enablerConfig, setEnablerConfig] = useState({
         retainer: '', commissionRate: '',
         sof: '', swift: '', live: '', warehouse: '',
@@ -539,18 +92,14 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     })
     const setEC = (field, value) => setEnablerConfig(prev => ({ ...prev, [field]: value }))
 
-    // ── Products ──────────────────────────────────────────────────────────────
-    const productLabel = t('productLabel')
-    const [products, setProducts] = useState(() => [makeProduct(0, productLabel)])
+    // ── Products ─────────────────────────────────────────────────────────────
+    const [products, setProducts] = useState(() => [makeProduct(0)])
     const [activeIdx, setActiveIdx] = useState(0)
-
     const p = products[activeIdx]
     const updateP = (field, value) =>
         setProducts(prev => prev.map((item, i) => i === activeIdx ? { ...item, [field]: value } : item))
-
     const addProduct = () => {
-        const next = makeProduct(products.length, productLabel)
-        setProducts(prev => [...prev, next])
+        setProducts(prev => [...prev, makeProduct(prev.length)])
         setActiveIdx(products.length)
     }
     const removeProduct = (index) => {
@@ -559,157 +108,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         setActiveIdx(prev => Math.max(0, prev >= index ? prev - 1 : prev))
     }
 
-    // ── Pre-fill state when editing ───────────────────────────────────────────
-    useEffect(() => {
-        if (!editId && !startAtMonthly) return
-        const load = async () => {
-            let brandId = null
-            let monthlyRecord = null
-
-            if (editId && brandOnly) {
-                // brandOnly: editId is a brand ID directly
-                brandId = editId
-            } else if (editId) {
-                // editId is a monthly record ID — fetch it first to get brand_id + period data
-                const monthlyRes = await services.pl.getMonthlyById(editId)
-                const m = monthlyRes?.data?.data ?? monthlyRes?.data
-                if (!m) return
-                monthlyRecord = m
-                setMonthlyId(m.id ?? editId)
-                const skuId = m.sku_id ?? m.sku?.id
-                if (skuId) setSelectedSku(skuId)
-                if (m.period_month && m.period_year) {
-                    const yr = String(m.period_year)
-                    const mo = MONTH_LABELS_CONST[parseInt(m.period_month) - 1] ?? ''
-                    setActiveYear(yr)
-                    setMoByYear(prev => ({ ...prev, [yr]: mo }))
-                }
-                brandId = m.brand_id ?? m.brand?.id
-            } else if (startAtMonthly) {
-                // Add New flow — fetch first available brand
-                const listRes = await services.pl.getBrands()
-                const raw = listRes?.data?.data ?? listRes?.data ?? null
-                const brands = Array.isArray(raw) ? raw : (raw ? [raw] : [])
-                if (!brands.length) return
-                brandId = brands[0].id
-            }
-
-            if (!brandId) return
-            const res = await services.pl.getBrands()
-            const raw = res?.data?.data ?? res?.data ?? null
-            const brandList = Array.isArray(raw) ? raw : (raw ? [raw] : [])
-            const d = brandList.find(b => b.id === brandId) ?? brandList[0]
-            if (!d) return
-
-            setSetup({ brand_name: d.name || '', category: d.category || '', enabler: d.enabler_name || '' })
-
-            const chs = [...(d.channels || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-            const chIdToName = Object.fromEntries(chs.map(ch => [ch.id, ch.name]))
-            setChannels(chs.map(ch => ch.name))
-            setMallStatus(Object.fromEntries(chs.map(ch => [ch.name, ch.is_mall || false])))
-            setChannelFees(Object.fromEntries(chs.map(ch => [ch.name, {
-                comm: toRate(ch.fee_config?.commission_rate),
-                mall: toRate(ch.fee_config?.mall_fee_rate),
-                pgw: toRate(ch.fee_config?.pgw_rate),
-            }])))
-
-            const ec = d.enabler_fee_config
-            if (ec) {
-                setEnablerConfig({
-                    retainer: toAmt(ec.retainer_amount),
-                    commissionRate: toRate(ec.commission_gmv_rate),
-                    sof: toAmt(ec.store_operation_fee),
-                    swift: toAmt(ec.platform_fee),
-                    live: toAmt(ec.live_commerce_cost),
-                    warehouse: toAmt(ec.warehouse_cost),
-                    fulfilRate: toAmt(ec.fulfillment_per_order) || '12000',
-                    customFixed: (ec.custom_fixed_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
-                    customVar: (ec.custom_var_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
-                })
-            }
-
-            if (d.skus?.length) {
-                setProducts(d.skus.map((sku, i) => ({
-                    id: sku.id || i,
-                    name: sku.name || '',
-                    sku,
-                    cogs: toAmt(sku.cogs_per_unit),
-                    pkg: toAmt(sku.packaging_cost),
-                    prices: Object.fromEntries(
-                        (sku.channel_prices || [])
-                            .map(cp => {
-                                const chName = cp.channel_name || chIdToName[cp.channel_id] || ''
-                                return [chName, { price: toAmt(cp.selling_price), discount: toRate(cp.default_discount_pct) }]
-                            })
-                            .filter(([k]) => k)
-                    ),
-                })))
-                setActiveIdx(0)
-            }
-
-            // Pre-fill monthly form fields from saved record
-            if (monthlyRecord) {
-                const fd = mapMonthlyRecordToFormData(monthlyRecord, chIdToName)
-                setInfoData(fd.infoData)
-                setAdsData(fd.adsData)
-                setDiscountData(fd.discountData)
-                setReturnData(fd.returnData)
-                setShippingData(fd.shippingData)
-                setClaimData(fd.claimData)
-                setVarData(fd.varData ?? {})
-                setMonthlyCommissionRate(fd.monthlyCommissionRate ?? '')
-                setBundlingData(fd.bundlingData ?? {})
-                if (fd.orders) setOrders(fd.orders)
-                if (fd.customRows?.length) setCustomRows(fd.customRows)
-                setSecFilled(fd.secFilled)
-            }
-
-            setBrandData(d)
-            setCompletedSetupSteps([1, 2, 3])
-            setSetupStep(1)
-            setSetupDone(startAtMonthly)
-
-            // ── Pre-fetch monthly data for ALL other SKUs in the same period ─
-            // Keep loading screen up until this completes so allSkuMetrics is correct on first paint.
-            if (monthlyRecord && d.skus?.length > 1) {
-                const periodMonth = String(parseInt(monthlyRecord.period_month)).padStart(2, '0')
-                const periodYear = Number(monthlyRecord.period_year)
-                const currentSkuId = monthlyRecord.sku_id ?? monthlyRecord.sku?.id
-                const otherSkuIds = d.skus.filter(s => s.id !== currentSkuId).map(s => s.id)
-
-                if (otherSkuIds.length) {
-                    try {
-                        const results = await Promise.allSettled(
-                            otherSkuIds.map(skuId =>
-                                services.pl.getMonthlyByPeriod(d.id, skuId, periodMonth, periodYear)
-                            )
-                        )
-                        const fetched = {}
-                        results.forEach((r, i) => {
-                            if (r.status !== 'fulfilled') return
-                            const raw = r.value
-                            const mr = raw?.data ?? raw ?? null
-                            if (!mr || !mr.id) return
-                            const fd = mapMonthlyRecordToFormData(mr, chIdToName)
-                            fetched[otherSkuIds[i]] = fd
-                            skuDataCacheRef.current[otherSkuIds[i]] = { data: fd, recordId: mr.id }
-                        })
-                        if (Object.keys(fetched).length) {
-                            setPrefetchedSkuData(prev => ({ ...prev, ...fetched }))
-                        }
-                    } catch (e) {
-                        // Pre-fetch is best-effort; don't block page load
-                    }
-                }
-            }
-
-            setIsPageLoading(false)
-        }
-        load().catch(() => setIsPageLoading(false))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [editId, startAtMonthly])
-
-    // ── SKU modal ─────────────────────────────────────────────────────────────
+    // ── SKU modal ────────────────────────────────────────────────────────────
     const [skuModalOpen, setSkuModalOpen] = useState(false)
     const [detailModalSku, setDetailModalSku] = useState(null)
     const [skuList, setSkuList] = useState([])
@@ -741,7 +140,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 .filter(k => k !== currentSku?.id && k !== currentSku?.sku_code && k !== currentSku?.name)
         )
     }, [products, activeIdx])
-
     const filteredSkus = useMemo(() =>
         skuList.filter(s =>
             !usedSkuKeys.has(s.id) &&
@@ -752,7 +150,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 s.sku_code?.toLowerCase().includes(skuSearch.toLowerCase()))
         ), [skuList, skuSearch, usedSkuKeys])
 
-    // ── Monthly P&L state ─────────────────────────────────────────────────────
+    // ── Monthly P&L state ────────────────────────────────────────────────────
     const [monthlyId, setMonthlyId] = useState(null)
     const [activeYear, setActiveYear] = useState(String(new Date().getFullYear()))
     const [takenMonths, setTakenMonths] = useState([])
@@ -762,11 +160,11 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const setActiveMo = (m) => setMoByYear(prev => ({ ...prev, [activeYear]: m }))
     const [selectedSku, setSelectedSku] = useState('')
     const skuInitRef = useRef(false)
-    const skuDataCacheRef = useRef({})   // { [skuId]: { data: formSnapshot, recordId: id|null } }
-    const [prefetchedSkuData, setPrefetchedSkuData] = useState({}) // { [skuId]: formData } — state-based for reliable rendering
+    const skuDataCacheRef = useRef({})
+    const [prefetchedSkuData, setPrefetchedSkuData] = useState({})
     const prevSkuRef = useRef(null)
-    const formDataRef = useRef({})   // always-current form state snapshot
-    const contextRef = useRef({})   // always-current context snapshot
+    const formDataRef = useRef({})
+    const contextRef = useRef({})
     const [infoData, setInfoData] = useState({})
     const [discountData, setDiscountData] = useState({})
     const [returnData, setReturnData] = useState({})
@@ -781,25 +179,26 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const [secFilled, setSecFilled] = useState({ info: false, discount: false, ret: false, ads: false, fixed: false })
     const markFilled = (sec) => setSecFilled(prev => ({ ...prev, [sec]: true }))
 
-    // ── Active SKU for monthly ─────────────────────────────────────────────────
+    // ── Active SKU for monthly ───────────────────────────────────────────────
     const activeSku = products.find(prod => prod.id === selectedSku) || products[0] || {}
     const cogsUnit = (parseFloat(activeSku.cogs) || 0) + (parseFloat(activeSku.pkg) || 0)
 
-    // ── Keep refs always current (synchronous — before effects and before allSkuMetrics) ──
+    // ── Keep refs always current ─────────────────────────────────────────────
     const currentFormData = { infoData, discountData, returnData, shippingData, adsData, claimData, varData, monthlyCommissionRate, customRows, bundlingData, orders, secFilled }
     formDataRef.current = currentFormData
-    // Keep cache in sync for the active SKU so allSkuMetrics always has fresh data
-    if (selectedSku) {
-        skuDataCacheRef.current[selectedSku] = {
-            ...skuDataCacheRef.current[selectedSku],
-            data: currentFormData,
+    useEffect(() => {
+        if (selectedSku && selectedSku === prevSkuRef.current) {
+            skuDataCacheRef.current[selectedSku] = {
+                ...skuDataCacheRef.current[selectedSku],
+                data: currentFormData,
+            }
         }
-    }
+    })
     useEffect(() => {
         contextRef.current = { brandData, activeMo, activeYear, monthlyId }
     })
 
-    // ── Restore all form fields from a cached snapshot ─────────────────────────
+    // ── Restore form fields from cached snapshot ─────────────────────────────
     const restoreFromFormData = (d, { includeEnabler = true } = {}) => {
         setInfoData(d.infoData ?? {})
         setDiscountData(d.discountData ?? {})
@@ -817,7 +216,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         }
     }
 
-    // ── SKU switch: save previous data, then restore/load for new SKU ──────────
+    // ── SKU switch effect ────────────────────────────────────────────────────
     useEffect(() => {
         if (!selectedSku) return
         if (!skuInitRef.current) {
@@ -825,11 +224,9 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             prevSkuRef.current = selectedSku
             return
         }
-
         const prevSku = prevSkuRef.current
         prevSkuRef.current = selectedSku
 
-        // Save current data to cache for the SKU we are leaving
         if (prevSku) {
             const prevData = { ...formDataRef.current }
             skuDataCacheRef.current[prevSku] = {
@@ -839,7 +236,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             setPrefetchedSkuData(prev => ({ ...prev, [prevSku]: prevData }))
         }
 
-        // If we already have cached data for the new SKU, restore it
         const cached = skuDataCacheRef.current[selectedSku]
         if (cached) {
             restoreFromFormData(cached.data, { includeEnabler: false })
@@ -847,10 +243,9 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             return
         }
 
-        // Otherwise try to load from DB for current period
         const { brandData: bd, activeMo: mo, activeYear: yr } = contextRef.current
         if (bd?.id && mo && yr) {
-            const periodMonth = String(MONTH_LABELS_CONST.indexOf(mo) + 1).padStart(2, '0')
+            const periodMonth = String(MONTH_LABELS.indexOf(mo) + 1).padStart(2, '0')
             const periodYear = parseInt(yr)
             services.pl.getMonthlyByPeriod(bd.id, selectedSku, periodMonth, periodYear)
                 .then(res => {
@@ -875,53 +270,57 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedSku])
 
-    // ── P&L multi-channel calculations ───────────────────────────────────────
+    // ── Active channels for monthly phase ─────────────────────────────────────
+    // Existing P/L: show all channels that have data (even inactive). New P/L: only active channels.
+    const plChannels = useMemo(() => {
+        if (monthlyId) {
+            // existing record — keep channels that have any data entered, plus all active ones
+            return channels.filter(ch =>
+                channelActive[ch] !== false || parseFloat(infoData[ch]?.vol) > 0
+            )
+        }
+        return channels.filter(ch => channelActive[ch] !== false)
+    }, [channels, channelActive, monthlyId, infoData])
+
+    // ── P&L calculations ─────────────────────────────────────────────────────
     const totalDiscountPct = (ch) =>
         DISCOUNT_PCT_KEYS.reduce((s, k) => s + (parseFloat(discountData[ch]?.[k]) || 0), 0)
     const totalDiscountAmt = (ch) =>
         DISCOUNT_AMT_KEYS.reduce((s, k) => s + (parseFloat(discountData[ch]?.[k]) || 0), 0)
 
-    const grossByChannel = channels.map(ch => {
+    const grossByChannel = plChannels.map(ch => {
         const vol = parseFloat(infoData[ch]?.vol) || 0
-        const sellingPrice = parseFloat(activeSku.prices?.[ch]?.price) || 0
-        return vol * sellingPrice
+        return vol * (parseFloat(activeSku.prices?.[ch]?.price) || 0)
     })
     const grossTotal = grossByChannel.reduce((a, b) => a + b, 0)
-    const discByChannel = channels.map((ch, i) => grossByChannel[i] * totalDiscountPct(ch) / 100 + totalDiscountAmt(ch))
-    const retByChannel = channels.map(ch => parseFloat(returnData[ch]?.actual) || 0)
-    const shipByChannel = channels.map(ch => (parseFloat(shippingData[ch]?.subsidy) || 0) + (parseFloat(shippingData[ch]?.processing) || 0))
-    const adsByChannel = channels.map((ch, i) => grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100))
-    const netByChannel = channels.map((_, i) => grossByChannel[i] - discByChannel[i] - retByChannel[i] - shipByChannel[i] - adsByChannel[i])
+    const discByChannel = plChannels.map((ch, i) => grossByChannel[i] * totalDiscountPct(ch) / 100 + totalDiscountAmt(ch))
+    const retByChannel = plChannels.map(ch => parseFloat(returnData[ch]?.actual) || 0)
+    const shipByChannel = plChannels.map(ch => (parseFloat(shippingData[ch]?.subsidy) || 0) + (parseFloat(shippingData[ch]?.processing) || 0))
+    const adsByChannel = plChannels.map((ch, i) => grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100))
+    const netByChannel = plChannels.map((_, i) => grossByChannel[i] - discByChannel[i] - retByChannel[i] - shipByChannel[i] - adsByChannel[i])
     const netTotal = netByChannel.reduce((a, b) => a + b, 0)
-    const adsCostTotal = adsByChannel.reduce((a, b) => a + b, 0)
 
-    const totalVol = channels.reduce((s, ch) => s + (parseFloat(infoData[ch]?.vol) || 0), 0)
-    const cogsTotal = channels.reduce((s, ch) => {
+    const cogsTotal = plChannels.reduce((s, ch) => {
         const vol = parseFloat(infoData[ch]?.vol) || 0
         const bundCogs = parseFloat(bundlingData[ch]?.cogs) || 0
         const unitsPerBundle = parseFloat(bundlingData[ch]?.units) || 1
         return s + vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * cogsUnit)
     }, 0)
-    const commCost = channels.reduce((s, ch, i) =>
-        s + grossByChannel[i] * (parseFloat(getChFee(ch, 'comm')) / 100), 0)
-
-    const mallCost = channels.reduce((s, ch, i) =>
-        s + grossByChannel[i] * (parseFloat(getChFee(ch, 'mall')) / 100), 0)
-
-    const pgwCost = channels.reduce((s, ch, i) =>
-        s + grossByChannel[i] * (parseFloat(getChFee(ch, 'pgw')) / 100), 0)
-
+    const commCost = plChannels.reduce((s, ch, i) => s + grossByChannel[i] * (parseFloat(getChFee(ch, 'comm')) / 100), 0)
+    const mallCost = plChannels.reduce((s, ch, i) => s + grossByChannel[i] * (parseFloat(getChFee(ch, 'mall')) / 100), 0)
+    const pgwCost = plChannels.reduce((s, ch, i) => s + grossByChannel[i] * (parseFloat(getChFee(ch, 'pgw')) / 100), 0)
     const channelCost = commCost + mallCost + pgwCost
 
-    // ── All-SKU gross total (needed for enabler commission on total GMV) ─────
+    // ── All-SKU gross (enabler commission on total GMV) ──────────────────────
     const namedProducts = products.filter(p => p.name)
     const allSkuGrossForComm = namedProducts.reduce((sum, p) => {
         if (p.id === selectedSku) return sum + grossTotal
         const fd = prefetchedSkuData[p.id] ?? skuDataCacheRef.current[p.id]?.data ?? {}
         const fi = fd.infoData ?? {}
-        return sum + channels.reduce((s, ch) => s + (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(p.prices?.[ch]?.price) || 0), 0)
+        return sum + plChannels.reduce((s, ch) => s + (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(p.prices?.[ch]?.price) || 0), 0)
     }, 0)
 
+    // ── Enabler cost totals ──────────────────────────────────────────────────
     const retainerVal = parseFloat((enablerConfig.retainer || '').replace(/\./g, '')) || 0
     const sofVal = parseFloat((enablerConfig.sof || '').replace(/\./g, '')) || 0
     const swiftVal = parseFloat((enablerConfig.swift || '').replace(/\./g, '')) || 0
@@ -931,53 +330,14 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const fulfilRate = parseFloat((enablerConfig.fulfilRate || '').replace(/\./g, '').replace(',', '.')) || 12000
     const fulfilTotal = (parseFloat(orders) || 0) * fulfilRate
     const claimTotal = Object.values(claimData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
-
     const customFixedTotal = enablerConfig.customFixed.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
     const enablerFixedTotal = retainerVal + sofVal + swiftVal + liveVal + warehouseVal + customFixedTotal
-
     const customVarTotal = Object.values(varData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
     const enablerVarTotal = commissionVal + fulfilTotal + claimTotal + customVarTotal
     const enablerTotal = enablerFixedTotal + enablerVarTotal
-
     const fixedTotal = customRows.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
 
-    // ── Per-SKU metrics helper ────────────────────────────────────────────────
-    const computeSkuMetrics = (formData, sku) => {
-        const { infoData: fi = {}, discountData: fd = {}, returnData: fr = {},
-            shippingData: fo = {}, adsData: fa = {}, customRows: fc = [], bundlingData: fb = {} } = formData
-        const skuCogsUnit = (parseFloat(sku.cogs) || 0) + (parseFloat(sku.pkg) || 0)
-        const gByCh = channels.map(ch => (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(sku.prices?.[ch]?.price) || 0))
-        const gTot = gByCh.reduce((a, b) => a + b, 0)
-        const dByCh = channels.map((ch, i) =>
-            gByCh[i] * DISCOUNT_PCT_KEYS.reduce((s, k) => s + (parseFloat(fd[ch]?.[k]) || 0), 0) / 100
-            + DISCOUNT_AMT_KEYS.reduce((s, k) => s + (parseFloat(fd[ch]?.[k]) || 0), 0))
-        const rByCh = channels.map(ch => parseFloat(fr[ch]?.actual) || 0)
-        const sByCh = channels.map(ch => (parseFloat(fo[ch]?.subsidy) || 0) + (parseFloat(fo[ch]?.processing) || 0))
-        const aByCh = channels.map((ch, i) => gByCh[i] * ((parseFloat(fa[ch]?.rate) || 0) / 100))
-        const nByCh = channels.map((_, i) => gByCh[i] - dByCh[i] - rByCh[i] - sByCh[i] - aByCh[i])
-        const nTot = nByCh.reduce((a, b) => a + b, 0)
-        const cogsTot = channels.reduce((s, ch) => {
-            const vol = parseFloat(fi[ch]?.vol) || 0
-            const bundCogs = parseFloat(fb[ch]?.cogs) || 0
-            const unitsPerBundle = parseFloat(fb[ch]?.units) || 1
-            return s + vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * skuCogsUnit)
-        }, 0)
-        const chCost = channels.reduce((s, ch, i) => s + gByCh[i] * (
-            (parseFloat(getChFee(ch, 'comm')) + parseFloat(getChFee(ch, 'mall')) + parseFloat(getChFee(ch, 'pgw'))) / 100
-        ), 0)
-        const fcTot = fc.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
-        const gpTot = nTot - cogsTot                    // Gross Profit
-        const opTot = gpTot - chCost - fcTot             // Operating Profit
-        return {
-            grossTotal: gTot, netTotal: nTot, cogsTotal: cogsTot, channelCost: chCost,
-            fixedCost: fcTot, grossProfit: gpTot, operatingProfit: opTot,
-            grossMarginPct: nTot > 0 ? (gpTot / nTot) * 100 : 0,
-            operatingMarginPct: nTot > 0 ? (opTot / nTot) * 100 : 0,
-            grossByCh: gByCh, discByCh: dByCh, retByCh: rByCh, shipByCh: sByCh, adsByCh: aByCh, netByCh: nByCh
-        }
-    }
-
-    // ── All-SKU aggregated metrics ────────────────────────────────────────────
+    // ── All-SKU aggregated metrics ───────────────────────────────────────────
     const allSkuMetrics = namedProducts.map(p => {
         if (p.id === selectedSku) {
             const gp = netTotal - cogsTotal
@@ -992,32 +352,190 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             }
         }
         const cachedData = prefetchedSkuData[p.id] ?? skuDataCacheRef.current[p.id]?.data ?? {}
-        return { sku: p, ...computeSkuMetrics(cachedData, p) }
+        return { sku: p, ...computeSkuMetrics(cachedData, p, plChannels, getChFee) }
     })
     const allSkuGrossTotal = allSkuMetrics.reduce((s, m) => s + m.grossTotal, 0)
     const allSkuNetTotal = allSkuMetrics.reduce((s, m) => s + m.netTotal, 0)
+    const allSkuGrossProfit = allSkuMetrics.reduce((s, m) => s + m.grossProfit, 0)
     const allSkuFixedTotal = allSkuMetrics.reduce((s, m) => s + m.fixedCost, 0)
     const allSkuOpProfit = allSkuMetrics.reduce((s, m) => s + m.operatingProfit, 0)
     const finalMonthlyPL = allSkuOpProfit - enablerTotal
     const finalMonthlyPLPct = allSkuNetTotal > 0 ? (finalMonthlyPL / allSkuNetTotal) * 100 : 0
-    const finalPlColor = finalMonthlyPLPct >= 20 ? 'text-green-700' : finalMonthlyPLPct >= 10 ? 'text-amber-600' : 'text-red-600'
+    const finalPlColor = finalMonthlyPL < 0 ? 'text-red-600' : 'text-green-700'
 
-    // ── Detail modal data ─────────────────────────────────────────────────────
+    // ── Detail modal data ────────────────────────────────────────────────────
     const skuDetailData = detailModalSku
         ? allSkuMetrics.find(m => m.sku.id === detailModalSku.id) ?? null
         : null
-    const d = skuDetailData
-    const gpColor = (d?.grossMarginPct ?? 0) >= 30 ? 'text-green-700' : (d?.grossMarginPct ?? 0) >= 15 ? 'text-amber-600' : 'text-red-600'
-    const opColor = (d?.operatingMarginPct ?? 0) >= 20 ? 'text-green-700' : (d?.operatingMarginPct ?? 0) >= 10 ? 'text-amber-600' : 'text-red-600'
 
-    const hasVolInput = channels.some(ch => parseFloat(infoData[ch]?.vol) > 0)
-
-    // ── Save / Calculate ──────────────────────────────────────────────────────
+    // ── Save / loading state ─────────────────────────────────────────────────
     const [isSaving, setIsSaving] = useState(false)
     const [isPageLoading, setIsPageLoading] = useState(!!(editId || startAtMonthly))
     const [brandData, setBrandData] = useState(null)
 
-    // ── Taken months loader ───────────────────────────────────────────────────
+    const channelMap = useMemo(() => Object.fromEntries((brandData?.channels ?? []).map(ch => [ch.name, ch.id])), [brandData])
+
+    const errMsg = (msg, fallback) =>
+        typeof msg === 'string' ? msg : msg ? JSON.stringify(msg) : fallback
+
+    // ── Payload builders ─────────────────────────────────────────────────────
+    const payloadCtx = { channels: plChannels, channelMap, activeMo, activeYear, claimData, varData, monthlyCommissionRate, orders }
+
+    const buildMonthlyPayload = (resolvedBrandId, resolvedChannels) =>
+        buildMonthlyPayloadFromData(
+            { infoData, discountData, returnData, shippingData, adsData, bundlingData, customRows, claimData, varData, monthlyCommissionRate, orders },
+            activeSku, selectedSku, resolvedBrandId, resolvedChannels, payloadCtx
+        )
+
+    // ── Pre-fill on edit ─────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!editId && !startAtMonthly) return
+        const load = async () => {
+            let brandId = null
+            let monthlyRecord = null
+
+            if (editId && brandOnly) {
+                brandId = editId
+            } else if (editId) {
+                const monthlyRes = await services.pl.getMonthlyById(editId)
+                const m = monthlyRes?.data?.data ?? monthlyRes?.data
+                if (!m) return
+                monthlyRecord = m
+                setMonthlyId(m.id ?? editId)
+                const skuId = m.sku_id ?? m.sku?.id
+                if (skuId) setSelectedSku(skuId)
+                if (m.period_month && m.period_year) {
+                    const yr = String(m.period_year)
+                    const mo = MONTH_LABELS[parseInt(m.period_month) - 1] ?? ''
+                    setActiveYear(yr)
+                    setMoByYear(prev => ({ ...prev, [yr]: mo }))
+                }
+                brandId = m.brand_id ?? m.brand?.id
+            } else if (startAtMonthly) {
+                const listRes = await services.pl.getBrands()
+                const raw = listRes?.data?.data ?? listRes?.data ?? null
+                const brands = Array.isArray(raw) ? raw : (raw ? [raw] : [])
+                if (!brands.length) return
+                brandId = brands[0].id
+            }
+
+            if (!brandId) return
+            const res = await services.pl.getBrands()
+            const raw = res?.data?.data ?? res?.data ?? null
+            const brandList = Array.isArray(raw) ? raw : (raw ? [raw] : [])
+            const d = brandList.find(b => b.id === brandId) ?? brandList[0]
+            if (!d) return
+
+            setSetup({ brand_name: d.name || '', category: d.category || '', enabler: d.enabler_name || '' })
+
+            const chs = [...(d.channels || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+            const chIdToName = Object.fromEntries(chs.map(ch => [ch.id, ch.name]))
+            setChannels(chs.map(ch => ch.name))
+            setMallStatus(Object.fromEntries(chs.map(ch => [ch.name, ch.is_mall || false])))
+            setChannelActive(Object.fromEntries(chs.map(ch => [ch.name, ch.is_active !== false])))
+            setChannelFees(Object.fromEntries(chs.map(ch => [ch.name, {
+                comm: toRate(ch.fee_config?.commission_rate),
+                mall: toRate(ch.fee_config?.mall_fee_rate),
+                pgw: toRate(ch.fee_config?.pgw_rate),
+            }])))
+
+            const ec = d.enabler_fee_config
+            if (ec) {
+                setEnablerConfig({
+                    retainer: toAmt(ec.retainer_amount),
+                    commissionRate: toRate(ec.commission_gmv_rate),
+                    sof: toAmt(ec.store_operation_fee),
+                    swift: toAmt(ec.platform_fee),
+                    live: toAmt(ec.live_commerce_cost),
+                    warehouse: toAmt(ec.warehouse_cost),
+                    fulfilRate: toAmt(ec.fulfillment_per_order) || '12000',
+                    customFixed: (ec.custom_fixed_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
+                    customVar: (ec.custom_var_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
+                })
+            }
+
+            if (d.skus?.length) {
+                const mappedSkus = d.skus.map((sku, i) => ({
+                    id: sku.id || i,
+                    name: sku.name || '',
+                    sku,
+                    cogs: toAmt(sku.cogs_per_unit),
+                    pkg: toAmt(sku.packaging_cost),
+                    prices: Object.fromEntries(
+                        (sku.channel_prices || [])
+                            .map(cp => {
+                                const chName = cp.channel_name || chIdToName[cp.channel_id] || ''
+                                return [chName, { price: toAmt(cp.selling_price), discount: toRate(cp.default_discount_pct) }]
+                            })
+                            .filter(([k]) => k)
+                    ),
+                }))
+                setProducts(mappedSkus)
+                setActiveIdx(0)
+                if (startAtMonthly && !monthlyRecord && mappedSkus[0]?.id) {
+                    setSelectedSku(mappedSkus[0].id)
+                }
+            }
+
+            if (monthlyRecord) {
+                const fd = mapMonthlyRecordToFormData(monthlyRecord, chIdToName)
+                setInfoData(fd.infoData)
+                setAdsData(fd.adsData)
+                setDiscountData(fd.discountData)
+                setReturnData(fd.returnData)
+                setShippingData(fd.shippingData)
+                setClaimData(fd.claimData)
+                setVarData(fd.varData ?? {})
+                setMonthlyCommissionRate(fd.monthlyCommissionRate ?? '')
+                setBundlingData(fd.bundlingData ?? {})
+                if (fd.orders) setOrders(fd.orders)
+                if (fd.customRows?.length) setCustomRows(fd.customRows)
+                setSecFilled(fd.secFilled)
+            }
+
+            setBrandData(d)
+            setCompletedSetupSteps([1, 2, 3])
+            setSetupStep(1)
+            setSetupDone(startAtMonthly)
+
+            // Pre-fetch monthly data for other SKUs
+            if (monthlyRecord && d.skus?.length > 1) {
+                const periodMonth = String(parseInt(monthlyRecord.period_month)).padStart(2, '0')
+                const periodYear = Number(monthlyRecord.period_year)
+                const currentSkuId = monthlyRecord.sku_id ?? monthlyRecord.sku?.id
+                const otherSkuIds = d.skus.filter(s => s.id !== currentSkuId).map(s => s.id)
+
+                if (otherSkuIds.length) {
+                    try {
+                        const results = await Promise.allSettled(
+                            otherSkuIds.map(skuId =>
+                                services.pl.getMonthlyByPeriod(d.id, skuId, periodMonth, periodYear)
+                            )
+                        )
+                        const fetched = {}
+                        results.forEach((r, i) => {
+                            if (r.status !== 'fulfilled') return
+                            const raw = r.value
+                            const mr = raw?.data ?? raw ?? null
+                            if (!mr || !mr.id) return
+                            const fd = mapMonthlyRecordToFormData(mr, chIdToName)
+                            fetched[otherSkuIds[i]] = fd
+                            skuDataCacheRef.current[otherSkuIds[i]] = { data: fd, recordId: mr.id }
+                        })
+                        if (Object.keys(fetched).length) {
+                            setPrefetchedSkuData(prev => ({ ...prev, ...fetched }))
+                        }
+                    } catch (e) { /* best-effort */ }
+                }
+            }
+
+            setIsPageLoading(false)
+        }
+        load().catch(() => setIsPageLoading(false))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editId, startAtMonthly])
+
+    // ── Taken months loader ──────────────────────────────────────────────────
     useEffect(() => {
         if (!startAtMonthly || !brandData?.id || !activeYear) return
         const load = async () => {
@@ -1025,12 +543,10 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             try {
                 const res = await services.pl.getTakenMonths(brandData.id, activeYear)
                 const rows = res?.data?.data ?? res?.data ?? []
-                // Use contextRef to get the latest monthlyId at the time the API
-                // response arrives, avoiding stale-closure from the dep array.
                 const currentMonthlyId = contextRef.current.monthlyId
                 const { activeMo } = contextRef.current
                 const editingMonthCode = currentMonthlyId && activeMo
-                    ? String(MONTH_LABELS_CONST.indexOf(activeMo) + 1).padStart(2, '0')
+                    ? String(MONTH_LABELS.indexOf(activeMo) + 1).padStart(2, '0')
                     : null
                 const taken = rows.filter(r =>
                     editingMonthCode ? r.period_month !== editingMonthCode : r.id !== currentMonthlyId
@@ -1039,7 +555,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 setMoByYear(prev => {
                     const cur = prev[activeYear] ?? ''
                     if (!cur) return prev
-                    const moCode = String(MONTH_LABELS_CONST.indexOf(cur) + 1).padStart(2, '0')
+                    const moCode = String(MONTH_LABELS.indexOf(cur) + 1).padStart(2, '0')
                     return taken.includes(moCode) ? { ...prev, [activeYear]: '' } : prev
                 })
             } finally {
@@ -1050,104 +566,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeYear, brandData?.id, startAtMonthly])
 
-    const channelMap = useMemo(() => Object.fromEntries((brandData?.channels ?? []).map(ch => [ch.name, ch.id])), [brandData])
-    const skuMap = useMemo(() => Object.fromEntries((brandData?.skus ?? []).map(s => [s.name, s.id])), [brandData])
-
-    const errMsg = (msg, fallback) =>
-        typeof msg === 'string' ? msg : msg ? JSON.stringify(msg) : fallback
-
-    const MONTH_LABELS = MONTH_LABELS_CONST
-
-    // Build a monthly payload from explicit form data + product for any SKU
-    const buildMonthlyPayloadFromData = (fd, product, skuId, resolvedBrandId, resolvedChannels) => {
-        const chId = (ch) => resolvedChannels.find(c => c.name === ch)?.id ?? channelMap[ch]
-        const periodMonth = String(MONTH_LABELS.indexOf(activeMo) + 1).padStart(2, '0')
-        const periodYear = parseInt(activeYear)
-        const fi = fd.infoData ?? {}
-        const fdisc = fd.discountData ?? {}
-        const fr = fd.returnData ?? {}
-        const fo = fd.shippingData ?? {}
-        const fa = fd.adsData ?? {}
-        const fb = fd.bundlingData ?? {}
-        const fc = fd.customRows ?? []
-        const grossByCh = channels.map(ch =>
-            (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(product?.prices?.[ch]?.price) || 0))
-        const discPctFn = (ch) => DISCOUNT_PCT_KEYS.reduce((s, k) => s + (parseFloat(fdisc[ch]?.[k]) || 0), 0)
-        const discAmtFn = (ch) => DISCOUNT_AMT_KEYS.reduce((s, k) => s + (parseFloat(fdisc[ch]?.[k]) || 0), 0)
-        const discByCh = channels.map((ch, i) => grossByCh[i] * discPctFn(ch) / 100 + discAmtFn(ch))
-        return {
-            brand_id: resolvedBrandId,
-            sku_id: skuId,
-            period_month: periodMonth,
-            period_year: periodYear,
-            status: 'DRAFT',
-            sales: channels.map((ch, i) => ({
-                channel_id: chId(ch),
-                units_sold: parseFloat(fi[ch]?.vol) || 0,
-                actual_selling_price: parseFloat(product?.prices?.[ch]?.price) || 0,
-                ads_spend_rate: (parseFloat(fa[ch]?.rate) || 0) / 100,
-                ads_spend_amount: grossByCh[i] * ((parseFloat(fa[ch]?.rate) || 0) / 100),
-            })),
-            discounts: channels.map((ch, i) => ({
-                channel_id: chId(ch),
-                voucher_pct: 0,
-                voucher_amount: parseFloat(fdisc[ch]?.voucher) || 0,
-                subsidy_pct: (parseFloat(fdisc[ch]?.subsidy) || 0) / 100,
-                flash_sale_pct: 0,
-                flash_sale_amount: parseFloat(fdisc[ch]?.flash) || 0,
-                coin_pct: 0,
-                affiliate_pct: (parseFloat(fdisc[ch]?.affiliate) || 0) / 100,
-                bundling_pct: (parseFloat(fdisc[ch]?.bundling) || 0) / 100,
-                loyalty_pct: (parseFloat(fdisc[ch]?.loyalty) || 0) / 100,
-                total_discount_pct: discPctFn(ch) / 100,
-                discount_amount: discByCh[i],
-            })),
-            returns: channels.map(ch => ({
-                channel_id: chId(ch),
-                return_rate_pct: 0,
-                return_units: parseFloat(fr[ch]?.units) || 0,
-                estimated_return_value: 0,
-                actual_refund_amount: parseFloat(fr[ch]?.actual) || 0,
-            })),
-            shippings: channels.map(ch => ({
-                channel_id: chId(ch),
-                shipping_subsidy: parseFloat(fo[ch]?.subsidy) || 0,
-                actual_shipping_cost: 0,
-                processing_fee: parseFloat(fo[ch]?.processing) || 0,
-                weight_diff_kg: 0,
-            })),
-            enabler_var: {
-                commission_gmv_rate: (parseFloat(fd.monthlyCommissionRate ?? monthlyCommissionRate) || 0) / 100,
-                order_count: parseFloat(fd.orders ?? orders) || 0,
-                claim_support: parseFloat((fd.claimData ?? claimData).support) || 0,
-                claim_voucher: parseFloat((fd.claimData ?? claimData).voucher) || 0,
-                claim_mp_fee: parseFloat((fd.claimData ?? claimData).mpFee) || 0,
-                mp_affiliate: parseFloat((fd.claimData ?? claimData).mpAffiliate) || 0,
-                campaign_ads_fee: parseFloat((fd.claimData ?? claimData).campaign) || 0,
-                custom_var_items: Object.fromEntries(
-                    Object.entries(fd.varData ?? varData).map(([k, v]) => [k, parseFloat(v) || 0])
-                ),
-            },
-            fixed_costs: fc
-                .filter(r => r.name && parseFloat(r.val) > 0)
-                .map(r => ({ item_name: r.name, amount: parseFloat(r.val) || 0 })),
-            cogs_overrides: channels.map(ch => ({
-                channel_id: chId(ch),
-                cogs_override: null,
-                packaging_override: null,
-                cogs_bundling: parseFloat(fb[ch]?.cogs) || null,
-                units_per_bundle: parseFloat(fb[ch]?.units) || null,
-            })),
-        }
-    }
-
-    // Active-SKU convenience wrapper (uses live form state)
-    const buildMonthlyPayload = (resolvedBrandId, resolvedChannels) =>
-        buildMonthlyPayloadFromData(
-            { infoData, discountData, returnData, shippingData, adsData, bundlingData, customRows, claimData, varData, monthlyCommissionRate, orders },
-            activeSku, selectedSku, resolvedBrandId, resolvedChannels
-        )
-
+    // ── Save handler ─────────────────────────────────────────────────────────
     const handleSaveChanges = async () => {
         if (!brandOnly) {
             if (!activeMo) return toast.error(t('selectMonthFirst'))
@@ -1157,7 +576,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
         setIsSaving(true)
         try {
-            // ── Flow 1: brandOnly (Brand tab) ─────────────────────────────────
+            // ── Flow 1: brandOnly ────────────────────────────────────────────
             if (brandOnly) {
                 const skusPayload = products.filter(p => p.name).map(p => ({
                     name: p.name,
@@ -1171,17 +590,11 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     })),
                 }))
                 const brandPayload = {
-                    name: setup.brand_name,
-                    category: setup.category,
+                    name: setup.brand_name, category: setup.category,
                     ...(setup.enabler && { enabler_name: setup.enabler }),
-                    via_enabler: !!setup.enabler,
-                    ecom_model: 'MARKETPLACE',
-                    status: 'active',
+                    via_enabler: !!setup.enabler, ecom_model: 'MARKETPLACE', status: 'active',
                     channels: channels.map((ch, i) => ({
-                        name: ch,
-                        is_mall: mallStatus[ch] ?? false,
-                        is_active: true,
-                        sort_order: i + 1,
+                        name: ch, is_mall: mallStatus[ch] ?? false, is_active: channelActive[ch] !== false, sort_order: i + 1,
                         fee_config: {
                             commission_rate: parseFloat(getChFee(ch, 'comm')) / 100,
                             mall_fee_rate: parseFloat(getChFee(ch, 'mall')) / 100,
@@ -1190,48 +603,40 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     })),
                     ...(skusPayload.length && { skus: skusPayload }),
                     enabler_fee_config: {
-                        retainer_amount: retainerVal,
-                        store_operation_fee: sofVal,
-                        platform_fee: swiftVal,
-                        live_commerce_cost: liveVal,
-                        warehouse_cost: warehouseVal,
+                        retainer_amount: retainerVal, store_operation_fee: sofVal,
+                        platform_fee: swiftVal, live_commerce_cost: liveVal, warehouse_cost: warehouseVal,
                         commission_gmv_rate: (parseFloat(enablerConfig.commissionRate) || 0) / 100,
                         fulfillment_per_order: fulfilRate,
                         custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
                         custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
                     },
                 }
-                const brandId = brandData?.id ?? editId
-                const res = brandId
-                    ? await services.pl.updatePl(brandId, brandPayload)
+                const bId = brandData?.id ?? editId
+                const res = bId
+                    ? await services.pl.updatePl(bId, brandPayload)
                     : await services.pl.createPl(brandPayload)
                 if (!res?.success) return toast.error(errMsg(res?.message, t('saveBrandError')))
                 const saved = res.data?.data ?? res.data ?? null
                 setBrandData(saved)
                 toast.success(t('saveBrandSuccess'))
-                if (onSaveComplete) onSaveComplete(saved?.id ?? brandId)
+                if (onSaveComplete) onSaveComplete(saved?.id ?? bId)
                 return
             }
 
-            // ── Flow 2: startAtMonthly (Add New / Edit from list) ─────────────
-            // Brand already exists — save monthly for active SKU + any other SKUs with cached data.
+            // ── Flow 2: startAtMonthly ───────────────────────────────────────
             if (startAtMonthly) {
                 if (!brandData?.id) return toast.error(t('errorBrandRequired'))
                 const bId = brandData.id
                 const bChs = brandData.channels ?? []
-                const periodMonth = String(MONTH_LABELS_CONST.indexOf(activeMo) + 1).padStart(2, '0')
+                const periodMonth = String(MONTH_LABELS.indexOf(activeMo) + 1).padStart(2, '0')
                 const periodYear = parseInt(activeYear)
 
-                // ── Save active SKU ──────────────────────────────────────────────
                 const payload = buildMonthlyPayload(bId, bChs)
                 let resolvedMonthlyId = monthlyId
                 if (!resolvedMonthlyId) {
                     const chk = await services.pl.getMonthlyByPeriod(bId, selectedSku, periodMonth, periodYear)
                     const existing = chk?.data?.data ?? chk?.data ?? null
-                    if (existing?.id) {
-                        resolvedMonthlyId = existing.id
-                        setMonthlyId(existing.id)
-                    }
+                    if (existing?.id) { resolvedMonthlyId = existing.id; setMonthlyId(existing.id) }
                 }
                 const res = resolvedMonthlyId
                     ? await services.pl.updateMonthly(resolvedMonthlyId, payload)
@@ -1246,41 +651,34 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     return
                 }
 
-                // ── Save other SKUs that have cached data with volume ────────────
+                // Save other SKUs with cached data
                 const otherSkus = products.filter(p => p.id !== selectedSku && p.name)
                 const otherSaves = []
-                for (const p of otherSkus) {
-                    const cached = skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id]
+                for (const op of otherSkus) {
+                    const cached = skuDataCacheRef.current[op.id]?.data ?? prefetchedSkuData[op.id]
                     if (!cached) continue
-                    // Only save if the SKU has at least some volume entered
                     const hasVol = Object.values(cached.infoData ?? {}).some(d => parseFloat(d?.vol) > 0)
                     if (!hasVol) continue
-                    const otherPayload = buildMonthlyPayloadFromData(cached, p, p.id, bId, bChs)
-                    const cachedRecordId = skuDataCacheRef.current[p.id]?.recordId ?? null
+                    const otherPayload = buildMonthlyPayloadFromData(cached, op, op.id, bId, bChs, payloadCtx)
+                    const cachedRecordId = skuDataCacheRef.current[op.id]?.recordId ?? null
                     let otherId = cachedRecordId
                     if (!otherId) {
-                        const chk = await services.pl.getMonthlyByPeriod(bId, p.id, periodMonth, periodYear)
+                        const chk = await services.pl.getMonthlyByPeriod(bId, op.id, periodMonth, periodYear)
                         const existing = chk?.data?.data ?? chk?.data ?? null
                         if (existing?.id) otherId = existing.id
                     }
-                    otherSaves.push(
-                        otherId
-                            ? services.pl.updateMonthly(otherId, otherPayload)
-                            : services.pl.createMonthly(otherPayload)
-                    )
+                    otherSaves.push(otherId
+                        ? services.pl.updateMonthly(otherId, otherPayload)
+                        : services.pl.createMonthly(otherPayload))
                 }
                 if (otherSaves.length) await Promise.allSettled(otherSaves)
-
                 toast.success(t('saveSuccess'))
                 return
             }
 
-            // ── Flow 3: Full setup (new brand + monthly) ──────────────────────
+            // ── Flow 3: Full setup (new brand + monthly) ─────────────────────
             const skusPayload = products.filter(p => p.name).map(p => ({
-                name: p.name,
-                cogs_per_unit: num(p.cogs),
-                packaging_cost: num(p.pkg),
-                is_active: true,
+                name: p.name, cogs_per_unit: num(p.cogs), packaging_cost: num(p.pkg), is_active: true,
                 channel_prices: channels.map(ch => ({
                     channel_name: ch,
                     selling_price: parseFloat(p.prices?.[ch]?.price) || 0,
@@ -1288,17 +686,11 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 })),
             }))
             const brandPayload = {
-                name: setup.brand_name,
-                category: setup.category,
+                name: setup.brand_name, category: setup.category,
                 ...(setup.enabler && { enabler_name: setup.enabler }),
-                via_enabler: !!setup.enabler,
-                ecom_model: 'MARKETPLACE',
-                status: 'active',
+                via_enabler: !!setup.enabler, ecom_model: 'MARKETPLACE', status: 'active',
                 channels: channels.map((ch, i) => ({
-                    name: ch,
-                    is_mall: mallStatus[ch] ?? false,
-                    is_active: true,
-                    sort_order: i + 1,
+                    name: ch, is_mall: mallStatus[ch] ?? false, is_active: channelActive[ch] !== false, sort_order: i + 1,
                     fee_config: {
                         commission_rate: parseFloat(getChFee(ch, 'comm')) / 100,
                         mall_fee_rate: parseFloat(getChFee(ch, 'mall')) / 100,
@@ -1308,11 +700,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 ...(skusPayload.length && { skus: skusPayload }),
                 ...(setup.enabler && {
                     enabler_fee_config: {
-                        retainer_amount: retainerVal,
-                        store_operation_fee: sofVal,
-                        platform_fee: swiftVal,
-                        live_commerce_cost: liveVal,
-                        warehouse_cost: warehouseVal,
+                        retainer_amount: retainerVal, store_operation_fee: sofVal,
+                        platform_fee: swiftVal, live_commerce_cost: liveVal, warehouse_cost: warehouseVal,
                         commission_gmv_rate: (parseFloat(enablerConfig.commissionRate) || 0) / 100,
                         fulfillment_per_order: fulfilRate,
                         custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
@@ -1320,9 +709,9 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     },
                 }),
             }
-            const brandId = brandData?.id ?? editId
-            const brandRes = brandId
-                ? await services.pl.updatePl(brandId, brandPayload)
+            const bIdFull = brandData?.id ?? editId
+            const brandRes = bIdFull
+                ? await services.pl.updatePl(bIdFull, brandPayload)
                 : await services.pl.createPl(brandPayload)
             if (!brandRes?.success) return toast.error(errMsg(brandRes?.message, t('saveError')))
             const saved = brandRes.data?.data ?? brandRes.data ?? null
@@ -1331,16 +720,15 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             const payload = buildMonthlyPayload(saved.id, saved.channels ?? [])
             const monthlyRes = await services.pl.createMonthly(payload)
 
-            // Save other SKUs that have cached data with volume
             const otherSkus = products.filter(p => p.id !== selectedSku && p.name)
             const otherSaves = []
-            for (const p of otherSkus) {
-                const cached = skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id]
+            for (const op of otherSkus) {
+                const cached = skuDataCacheRef.current[op.id]?.data ?? prefetchedSkuData[op.id]
                 if (!cached) continue
                 const hasVol = Object.values(cached.infoData ?? {}).some(d => parseFloat(d?.vol) > 0)
                 if (!hasVol) continue
                 otherSaves.push(services.pl.createMonthly(
-                    buildMonthlyPayloadFromData(cached, p, p.id, saved.id, saved.channels ?? [])
+                    buildMonthlyPayloadFromData(cached, op, op.id, saved.id, saved.channels ?? [], payloadCtx)
                 ))
             }
             if (otherSaves.length) await Promise.allSettled(otherSaves)
@@ -1355,10 +743,6 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
-    const step1 = getStepStatus(1)
-    const step2 = getStepStatus(2)
-    const step3 = getStepStatus(3)
-
     if (isPageLoading) return <LoadingScreen />
 
     return (
@@ -1378,972 +762,70 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
 
                 <div className="px-4 lg:px-6 py-4 pb-20 space-y-4">
 
-                    {/* ═══════════════════════════════════════════════════════
-                        SETUP PHASE
-                    ═══════════════════════════════════════════════════════ */}
+                    {/* SETUP PHASE */}
                     {!setupDone && (
-                        <>
-                            {/* Progress bar */}
-                            <SetupProgress
-                                steps={[t('setupStep1Progress'), t('setupStep2Progress'), t('setupStep3Progress')]}
-                                currentStep={setupStep}
-                                completedSteps={completedSetupSteps}
-                                onStepClick={handleStepOpen}
-                            />
-
-                            {/* ── Step 1: Brand & Channel ─────────────────── */}
-                            <SetupStepCard
-                                number={1}
-                                title={t('step1Title')}
-                                subtitle={t('step1Subtitle')}
-                                {...step1}
-                                onOpen={() => handleStepOpen(1)}
-                                onNext={() => {
-                                    if (!setup.brand_name) return toast.error(t('errorBrandRequired'))
-                                    if (!setup.category) return toast.error(t('errorCategoryRequired'))
-                                    if (channels.length === 0) return toast.error(t('errorChannelRequired'))
-                                    doneSetupStep(1)
-                                }}
-                                nextLabel={t('nextStep')}
-                                finishLabel={t('finishSetup')}
-                                donePillLabel={t('stepStatusDone')}
-                                activePillLabel={t('stepStatusActive')}
-                                pendingPillLabel={t('stepStatusPending')}
-                            >
-                                <div className="space-y-4">
-                                    <div className="grid sm:grid-cols-2 gap-3">
-                                        <FieldInput
-                                            label={t('brandName')}
-                                            value={setup.brand_name}
-                                            onChange={v => setS('brand_name', v)}
-                                            placeholder={t('brandNamePlaceholder')}
-                                            type="text"
-                                        />
-                                        <div className="grid gap-1">
-                                            <Label>{t('productCategory')} <span className="text-red-500">*</span></Label>
-                                            <Input
-                                                value={setup.category}
-                                                onChange={e => setS('category', e.target.value)}
-                                                placeholder={t('selectCategory')}
-                                            />
-                                        </div>
-                                    </div>
-                                    <Separator />
-                                    <div className="grid gap-1">
-                                        <Label>{t('ecommerceEnabler')}</Label>
-                                        <p className="text-xs text-muted-foreground">{t('enablerSubtitle')}</p>
-                                        <Input
-                                            value={setup.enabler}
-                                            onChange={e => setS('enabler', e.target.value)}
-                                            placeholder={t('enablerNamePlaceholder')}
-                                        />
-                                    </div>
-                                    <Separator />
-                                    <div className="grid gap-2">
-                                        <Label>{t('targetPlatform')}</Label>
-                                        <p className="text-xs text-muted-foreground">{t('platformSubtitle')}</p>
-                                        {/* Tag input */}
-                                        <div
-                                            className="flex flex-wrap gap-1.5 min-h-10 rounded-md border border-input px-3 py-2 cursor-text"
-                                            onClick={() => document.getElementById('ch-tag-inp').focus()}
-                                        >
-                                            {channels.map(ch => (
-                                                <span key={ch} className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium bg-muted border">
-                                                    {ch}
-                                                    <span className="cursor-pointer opacity-50 hover:opacity-100 leading-none" onClick={e => { e.stopPropagation(); removeChannel(ch) }}>×</span>
-                                                </span>
-                                            ))}
-                                            <input
-                                                id="ch-tag-inp"
-                                                className="flex-1 min-w-24 text-sm bg-transparent outline-none"
-                                                value={tagInput}
-                                                onChange={e => setTagInput(e.target.value)}
-                                                onKeyDown={e => {
-                                                    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addChannel(tagInput); setTagInput('') }
-                                                    else if (e.key === 'Backspace' && !tagInput && channels.length > 0) removeChannel(channels[channels.length - 1])
-                                                }}
-                                                placeholder={channels.length === 0 ? t('addChannelPlaceholder') : ''}
-                                            />
-                                        </div>
-                                    </div>
-                                    {/* Mall toggle section */}
-                                    {channels.length > 0 && (
-                                        <div className="grid gap-2">
-                                            <Label>{t('mallToggleTitle')}</Label>
-                                            {channels.map(ch => (
-                                                <div key={ch} className="flex items-center justify-between rounded-md border px-4 py-3">
-                                                    <div>
-                                                        <p className="text-sm font-medium">{ch}</p>
-                                                        <p className="text-xs text-muted-foreground">{ch} Official Store / Mall</p>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        role="switch"
-                                                        aria-checked={!!mallStatus[ch]}
-                                                        onClick={() => setMallStatus(prev => ({ ...prev, [ch]: !prev[ch] }))}
-                                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${mallStatus[ch] ? 'bg-primary' : 'bg-input'}`}
-                                                    >
-                                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${mallStatus[ch] ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </SetupStepCard>
-
-                            {/* ── Step 2: Biaya & Enabler ─────────────────── */}
-                            <SetupStepCard
-                                number={2}
-                                title={t('step2Title')}
-                                subtitle={t('step2Subtitle')}
-                                {...step2}
-                                onOpen={() => handleStepOpen(2)}
-                                onNext={() => doneSetupStep(2)}
-                                nextLabel={t('nextStep')}
-                                finishLabel={t('finishSetup')}
-                                donePillLabel={t('stepStatusDone')}
-                                activePillLabel={t('stepStatusActive')}
-                                pendingPillLabel={t('stepStatusPending')}
-                            >
-                                <div className="space-y-5">
-                                    {/* Channel fees */}
-                                    {channels.length > 0 && (
-                                        <div>
-                                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                                                {t('channelFeeTableHeader')}
-                                            </p>
-                                            <div className="overflow-x-auto rounded-lg border">
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead>
-                                                        <tr className="border-b bg-muted/40">
-                                                            <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[130px]">{t('colChannel')}</th>
-                                                            <ChTh>{t('commissionPct')}</ChTh>
-                                                            <ChTh>{t('mallFeePct')}</ChTh>
-                                                            <ChTh>{t('pgwRatePct')}</ChTh>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {channels.map(ch => (
-                                                            <tr key={ch} className="border-t">
-                                                                <td className="px-4 py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                {['comm', 'mall', 'pgw'].map(key => (
-                                                                    <td key={key} className="py-2.5 px-2 text-right">
-                                                                        <input
-                                                                            type="number"
-                                                                            step="0.1"
-                                                                            value={getChFee(ch, key)}
-                                                                            onChange={e => setChFee(ch, key, e.target.value)}
-                                                                            className="w-20 text-right text-xs px-2 py-1.5 rounded border border-input bg-background outline-none focus:ring-1 focus:ring-ring"
-                                                                        />
-                                                                    </td>
-                                                                ))}
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <Separator />
-
-                                    {/* Fixed Cost Enabler */}
-                                    <div>
-                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                                            {t('fixedCostEnabler')}{setup.enabler && <span className="font-normal text-primary normal-case tracking-normal ml-1">({setup.enabler})</span>}
-                                        </p>
-                                        <div className="space-y-2">
-                                            {enablerConfig.customFixed.map(r => (
-                                                <div key={r.id} className="flex items-center gap-2">
-                                                    <Input
-                                                        placeholder={t('customFixedPlaceholder')}
-                                                        value={r.name}
-                                                        onChange={e => setEC('customFixed', enablerConfig.customFixed.map(x => x.id === r.id ? { ...x, name: e.target.value } : x))}
-                                                        className="flex-1 h-9 text-sm"
-                                                    />
-                                                    <FieldInput value={r.val} onChange={v => setEC('customFixed', enablerConfig.customFixed.map(x => x.id === r.id ? { ...x, val: v } : x))} prefix="Rp" label="" />
-                                                    <button type="button" onClick={() => setEC('customFixed', enablerConfig.customFixed.filter(x => x.id !== r.id))} className="w-8 h-8 flex items-center justify-center rounded border text-muted-foreground hover:text-destructive text-sm">×</button>
-                                                </div>
-                                            ))}
-                                            <button type="button" onClick={() => setEC('customFixed', [...enablerConfig.customFixed, { id: Date.now(), name: '', val: '' }])} className="text-xs text-primary hover:underline">{t('addFixedRow')}</button>
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-
-                                    {/* Variable Cost Enabler */}
-                                    <div>
-                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                                            {t('variableCostEnabler')}
-                                        </p>
-                                        <div className="grid sm:grid-cols-2 gap-3 mb-3">
-                                            <FieldInput label={t('komisiGmvRate')} subtitle={t('pctGrossGmv')} value={enablerConfig.commissionRate} onChange={v => setEC('commissionRate', v)} suffix="% GMV" disabled />
-                                        </div>
-                                        <div className="space-y-2">
-                                            {enablerConfig.customVar.map(r => (
-                                                <div key={r.id} className="flex items-center gap-2">
-                                                    <Input placeholder={t('customVarPlaceholder')} value={r.name} onChange={e => setEC('customVar', enablerConfig.customVar.map(x => x.id === r.id ? { ...x, name: e.target.value } : x))} className="flex-1 h-9 text-sm" />
-                                                    <FieldInput value={r.val} onChange={() => { }} prefix="Rp" label="" disabled />
-                                                    <button type="button" onClick={() => setEC('customVar', enablerConfig.customVar.filter(x => x.id !== r.id))} className="w-8 h-8 flex items-center justify-center rounded border text-muted-foreground hover:text-destructive text-sm">×</button>
-                                                </div>
-                                            ))}
-                                            <button type="button" onClick={() => setEC('customVar', [...enablerConfig.customVar, { id: Date.now(), name: '', val: '' }])} className="text-xs text-primary hover:underline">{t('addVarRow')}</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </SetupStepCard>
-
-                            {/* ── Step 3: Produk & COGS ───────────────────── */}
-                            <SetupStepCard
-                                number={3}
-                                title={t('step3Title')}
-                                subtitle={t('step3Subtitle')}
-                                {...step3}
-                                onOpen={() => handleStepOpen(3)}
-                                onNext={() => {
-                                    const named = products.filter(p => p.name)
-                                    if (named.length === 0) return toast.error(t('errorSkuRequired'))
-                                    const missingPrice = named.some(p =>
-                                        channels.some(ch => !(parseFloat(p.prices?.[ch]?.price) > 0))
-                                    )
-                                    if (missingPrice) return toast.error(t('errorSkuPriceRequired'))
-                                    if (brandOnly) handleSaveChanges()
-                                    else doneSetupStep(3)
-                                }}
-                                nextLabel={t('nextStep')}
-                                finishLabel={brandOnly ? t('saveBrand') : t('finishSetup')}
-                                donePillLabel={t('stepStatusDone')}
-                                activePillLabel={t('stepStatusActive')}
-                                pendingPillLabel={t('stepStatusPending')}
-                                isLast
-                            >
-                                <div className="space-y-4">
-                                    <ProductTabs
-                                        products={products}
-                                        activeIndex={activeIdx}
-                                        onSelect={setActiveIdx}
-                                        onAdd={addProduct}
-                                        onRemove={removeProduct}
-                                        addLabel={t('addProduct')}
-                                    />
-
-                                    {/* SKU chooser */}
-                                    <InnerCard title={t('chooseSku')}>
-                                        {p.sku ? (
-                                            <div className="space-y-2">
-                                                <div className="rounded-md border bg-card p-3 space-y-0.5">
-                                                    <p className="text-sm font-semibold">{p.sku.product_name || p.sku.name || '—'}</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {p.sku.sku_code}
-                                                        {p.sku.variant && ` · ${p.sku.variant}`}
-                                                    </p>
-                                                </div>
-                                                <Button variant="outline" size="sm" className="w-full" onClick={openSkuModal}>
-                                                    {t('changeSku')}
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={openSkuModal}
-                                                className="w-full rounded-md border border-dashed p-4 text-sm text-muted-foreground hover:bg-muted/50 transition-colors text-center"
-                                            >
-                                                {t('noSkuSelected')}
-                                            </button>
-                                        )}
-                                    </InnerCard>
-
-                                    {/* COGS + Packaging */}
-                                    <div className="grid sm:grid-cols-2 gap-3">
-                                        <FieldInput label={t('cogsPerUnit')} value={p.cogs} onChange={v => updateP('cogs', v)} prefix="Rp" />
-                                        <FieldInput label={t('packagingPerUnit')} value={p.pkg} onChange={v => updateP('pkg', v)} prefix="Rp" />
-                                    </div>
-
-                                    {/* Harga jual per channel */}
-                                    {channels.length > 0 && (
-                                        <div>
-                                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{t('hjPerChannel')}</p>
-                                            <div className="overflow-x-auto rounded-lg border">
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead>
-                                                        <tr className="border-b bg-muted/40">
-                                                            <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('colChannel')}</th>
-                                                            <ChTh>{t('colHargaJualRp')}</ChTh>
-                                                            <ChTh>{t('colDiskonDefaultPct')}</ChTh>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {channels.map(ch => (
-                                                            <tr key={ch} className="border-t">
-                                                                <td className="px-4 py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        currency
-                                                                        value={p.prices[ch]?.price ?? ''}
-                                                                        onChange={v => updateP('prices', { ...p.prices, [ch]: { ...p.prices[ch], price: v } })}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        value={p.prices[ch]?.discount ?? ''}
-                                                                        onChange={v => updateP('prices', { ...p.prices, [ch]: { ...p.prices[ch], discount: v } })}
-                                                                        step="0.1"
-                                                                    />
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </SetupStepCard>
-                        </>
+                        <SetupPhase
+                            setupStep={setupStep} completedSetupSteps={completedSetupSteps}
+                            handleStepOpen={handleStepOpen} doneSetupStep={doneSetupStep} getStepStatus={getStepStatus}
+                            setup={setup} setS={setS}
+                            channels={channels} tagInput={tagInput} setTagInput={setTagInput}
+                            addChannel={addChannel} removeChannel={removeChannel}
+                            channelActive={channelActive} setChannelActive={setChannelActive}
+                            getChFee={getChFee} setChFee={setChFee}
+                            enablerConfig={enablerConfig} setEC={setEC}
+                            products={products} activeIdx={activeIdx} setActiveIdx={setActiveIdx}
+                            addProduct={addProduct} removeProduct={removeProduct} updateP={updateP} p={p}
+                            openSkuModal={openSkuModal}
+                            handleSaveChanges={handleSaveChanges} brandOnly={brandOnly}
+                            t={t}
+                        />
                     )}
 
-                    {/* ═══════════════════════════════════════════════════════
-                        MONTHLY P&L PHASE
-                    ═══════════════════════════════════════════════════════ */}
+                    {/* MONTHLY P&L PHASE */}
                     {setupDone && !brandOnly && (
                         <>
-                            {/* Setup summary */}
-                            <SetupSummaryCard
-                                setup={setup}
-                                activeChannels={channels.map(ch => ({ code: ch, label: ch }))}
-                                onEditSetup={() => setSetupDone(false)}
-                                editLabel={t('editSetup')}
+                            <MonthlyInputSection
+                                t={t}
+                                setup={setup} channels={plChannels} setSetupDone={setSetupDone}
+                                activeYear={activeYear} setActiveYear={setActiveYear}
+                                activeMo={activeMo} setActiveMo={setActiveMo}
+                                isMonthsLoading={isMonthsLoading} takenMonths={takenMonths}
+                                enablerConfig={enablerConfig} enablerFixedTotal={enablerFixedTotal}
+                                monthlyCommissionRate={monthlyCommissionRate} setMonthlyCommissionRate={setMonthlyCommissionRate}
+                                varData={varData} setVarData={setVarData} customVarTotal={customVarTotal}
+                                products={products} selectedSku={selectedSku} setSelectedSku={setSelectedSku} activeSku={activeSku}
+                                infoData={infoData} setInfoData={setInfoData}
+                                discountData={discountData} setDiscountData={setDiscountData}
+                                returnData={returnData} setReturnData={setReturnData}
+                                shippingData={shippingData} setShippingData={setShippingData}
+                                adsData={adsData} setAdsData={setAdsData}
+                                bundlingData={bundlingData} setBundlingData={setBundlingData}
+                                customRows={customRows} setCustomRows={setCustomRows}
+                                secFilled={secFilled} markFilled={markFilled}
+                                grossByChannel={grossByChannel} discByChannel={discByChannel}
+                                retByChannel={retByChannel} adsByChannel={adsByChannel}
+                                totalDiscountPct={totalDiscountPct} fixedTotal={fixedTotal}
+                                getChFee={getChFee}
+                                DISCOUNT_LABELS={DISCOUNT_LABELS}
                             />
 
-                            {/* Period selector */}
-                            <div className="rounded-lg border bg-card p-4">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">{t('periodeTitle')} <span className="text-red-500">*</span></p>
-                                {/* Year dropdown — above months */}
-                                <div className="mb-3">
-                                    <Label className="text-xs mb-1 block">{t('yearLabel')}</Label>
-                                    <Select
-                                        value={activeYear}
-                                        onValueChange={val => setActiveYear(val)}
-                                    >
-                                        <SelectTrigger className="w-36">
-                                            <SelectValue placeholder={t('yearLabel')} />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Array.from({ length: 30 }, (_, i) => {
-                                                const y = String(new Date().getFullYear() - i)
-                                                return <SelectItem key={y} value={y}>{y}</SelectItem>
-                                            })}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                {/* Month chips */}
-                                <div className="flex flex-wrap gap-1.5">
-                                    {isMonthsLoading
-                                        ? MONTH_LABELS_CONST.map(m => (
-                                            <Skeleton key={m} className="h-8 w-11 rounded" />
-                                        ))
-                                        : MONTH_LABELS_CONST.map((m, i) => {
-                                            const monthCode = String(i + 1).padStart(2, '0')
-                                            const isTaken = takenMonths.includes(monthCode)
-                                            return (
-                                                <button
-                                                    key={m}
-                                                    type="button"
-                                                    disabled={isTaken}
-                                                    onClick={() => !isTaken && setActiveMo(m)}
-                                                    className={`h-8 w-11 rounded text-xs font-medium border transition-colors
-                                                        ${activeMo === m ? 'bg-primary text-primary-foreground border-primary'
-                                                            : isTaken ? 'bg-muted text-muted-foreground border-muted cursor-not-allowed opacity-50'
-                                                                : 'bg-card hover:bg-muted/50'}`}
-                                                >{m}</button>
-                                            )
-                                        })
-                                    }
-                                </div>
-                            </div>
-
-                            {/* Monthly Enabler Cost — fixed prefilled, variable required */}
-                            <SectionCard
-                                icon={<IconBuildingStore size={18} />}
-                                title={t('monthlyEnablerCostTitle')}
-                                subtitle={t('monthlyEnablerCostSubtitle')}
-                            >
-                                <div className="-mx-5 -mb-5 mt-5">
-                                    {/* Fixed Cost section */}
-                                    <PnLAccordion
-                                        title={t('enablerFixedTitle')}
-                                        subtitle={t('enablerFixedSubtitle')}
-                                        pillVariant="prefilled"
-                                        pillText={t('pillPrefilled')}
-                                        defaultOpen
-                                    >
-                                        <div className="divide-y">
-                                            {enablerConfig.customFixed.filter(r => parseFloat(r.val) > 0).map(r => (
-                                                <div key={r.id} className="flex items-center justify-between py-2.5">
-                                                    <p className="text-xs font-medium">{r.name || '—'}</p>
-                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{fmt(parseFloat(r.val))}</span>
-                                                </div>
-                                            ))}
-                                            {enablerFixedTotal > 0 ? (
-                                                <div className="flex justify-between py-2.5">
-                                                    <span className="text-xs text-muted-foreground">{t('subtotalFixed')}</span>
-                                                    <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(enablerFixedTotal)})</span>
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground py-2 text-center">{t('configureEnablerHint')}</p>
-                                            )}
-                                        </div>
-                                    </PnLAccordion>
-
-                                    {/* Variable Cost section — editable monthly values, names from brand */}
-                                    <PnLAccordion
-                                        title={t('enablerVarTitle')}
-                                        subtitle={t('enablerVarSubtitle')}
-                                        pillVariant={customVarTotal > 0 ? "filled" : "required"}
-                                        pillText={customVarTotal > 0 ? t('pillFilled') : t('pillRequired')}
-                                        defaultOpen
-                                    >
-                                        <div className="divide-y">
-                                            <div className="flex items-center justify-between py-2.5">
-                                                <div className="flex-1">
-                                                    <p className="text-xs font-medium">{t('komisiGmvLabel')}</p>
-                                                    <p className="text-[11px] text-muted-foreground">{t('pctGrossGmv')}</p>
-                                                </div>
-                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={monthlyCommissionRate}
-                                                        onChange={e => setMonthlyCommissionRate(e.target.value)}
-                                                        placeholder="0"
-                                                        className={`w-20 text-right text-xs px-2 py-1.5 rounded border outline-none ${(parseFloat(monthlyCommissionRate) || 0) > 0 ? 'border-green-300 bg-green-50 text-green-900' : 'border-orange-300 bg-orange-50'}`}
-                                                    />
-                                                    <span className="text-xs text-muted-foreground">% GMV</span>
-                                                </div>
-                                            </div>
-                                            {enablerConfig.customVar.filter(r => r.name).map(r => (
-                                                <div key={r.id} className="flex items-center justify-between py-2.5">
-                                                    <p className="text-xs font-medium">{r.name}</p>
-                                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                                        <span className="text-xs text-muted-foreground">Rp</span>
-                                                        <ChInput
-                                                            currency
-                                                            value={varData[r.name] ?? ''}
-                                                            onChange={v => setVarData(prev => ({ ...prev, [r.name]: v }))}
-                                                            highlight={(parseFloat(varData[r.name]) || 0) > 0 ? 'filled' : 'warn'}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {enablerConfig.customVar.filter(r => r.name).length === 0 && (
-                                                <p className="text-xs text-muted-foreground py-2 text-center">{t('configureEnablerHint')}</p>
-                                            )}
-                                            {customVarTotal > 0 && (
-                                                <div className="flex justify-between py-2.5">
-                                                    <span className="text-xs text-muted-foreground">{t('subtotalVar')}</span>
-                                                    <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(customVarTotal)})</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </PnLAccordion>
-                                </div>
-                            </SectionCard>
-
-                            {/* SKU selector — chips */}
-                            <div className="rounded-lg border bg-card p-4">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{t('skuTitle')}</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {products.filter(p => p.name).map(p => (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            onClick={() => setSelectedSku(p.id)}
-                                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
-                                                ${selectedSku === p.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border hover:bg-muted/50'}`}
-                                        >
-                                            {p.name}
-                                        </button>
-                                    ))}
-                                </div>
-                                {selectedSku && activeSku.cogs && (
-                                    <p className="text-xs text-muted-foreground mt-2">COGS: {fmt(parseFloat(activeSku.cogs) || 0)} · Packaging: {fmt(parseFloat(activeSku.pkg) || 0)}</p>
-                                )}
-                            </div>
-
-                            {/* Monthly P&L accordion card */}
-                            {channels.length > 0 && (
-                                <SectionCard
-                                    icon={<IconPresentationAnalytics size={18} />}
-                                    title={t('monthlyPnlTitle')}
-                                    subtitle={t('monthlyPnlSubtitle')}
-                                >
-                                    <div className="-mx-5 -mb-5 mt-5">
-
-                                        {/* A. Info Dasar */}
-                                        <PnLAccordion
-                                            title={t('infoDasarTitle')}
-                                            subtitle={t('infoDasarSubtitle')}
-                                            pillVariant={secFilled.info ? "filled" : "required"}
-                                            pillText={secFilled.info ? t('pillFilled') : t('pillRequired')}
-                                            defaultOpen
-                                        >
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">{t('colChannel')}</th>
-                                                            <ChTh>{t('colHargaJual')}</ChTh>
-                                                            <ChTh>{t('colVolumeTerjual')}</ChTh>
-                                                            <ChTh>{t('colGrossGmv')}</ChTh>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {channels.map((ch, i) => {
-                                                            const vol = parseFloat(infoData[ch]?.vol) || 0
-                                                            const prefillPrice = activeSku.prices?.[ch]?.price ?? ''
-                                                            return (
-                                                                <tr key={ch} className="border-t">
-                                                                    <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                    {/* Selling price — prefilled read-only */}
-                                                                    <td className="py-2.5 px-2 text-right">
-                                                                        <span className="text-xs font-semibold text-teal-700 tabular-nums">
-                                                                            {prefillPrice ? fmt(parseFloat(prefillPrice) || 0) : '—'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="py-2.5 px-2 text-right">
-                                                                        <ChInput
-                                                                            value={infoData[ch]?.vol ?? ''}
-                                                                            onChange={v => {
-                                                                                setInfoData(prev => ({ ...prev, [ch]: { ...prev[ch], vol: v } }))
-                                                                                if (parseFloat(v) > 0) markFilled('info')
-                                                                            }}
-                                                                            highlight={vol > 0 ? 'filled' : 'warn'}
-                                                                        />
-                                                                    </td>
-                                                                    <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
-                                                                        {grossByChannel[i] > 0 ? fmt(grossByChannel[i]) : '—'}
-                                                                    </td>
-                                                                </tr>
-                                                            )
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </PnLAccordion>
-
-                                        {/* B. COGS */}
-                                        <PnLAccordion
-                                            title={t('cogsAccordionTitle')}
-                                            subtitle={t('cogsAccordionSubtitle')}
-                                            pillVariant="prefilled"
-                                            pillText={t('pillPrefilled')}
-                                        >
-                                            <div className="divide-y mt-2">
-                                                <div className="flex justify-between items-center py-2.5">
-                                                    <div>
-                                                        <p className="text-xs font-medium">{t('cogsPerUnitRow')}</p>
-                                                    </div>
-                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.cogs ? fmt(parseFloat(activeSku.cogs) || 0) : '—'}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center py-2.5">
-                                                    <div>
-                                                        <p className="text-xs font-medium">{t('packagingPerUnitRow')}</p>
-                                                        <p className="text-[11px] text-muted-foreground">{t('packagingDesc')}</p>
-                                                    </div>
-                                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.pkg ? fmt(parseFloat(activeSku.pkg) || 0) : '—'}</span>
-                                                </div>
-                                                {/* COGS bundling per channel */}
-                                                <div className="pt-3">
-                                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{t('cogsBundlingTitle')}</p>
-                                                    <div className="overflow-x-auto">
-                                                        <table className="w-full border-collapse text-sm">
-                                                            <thead>
-                                                                <tr>
-                                                                    <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('colChannel')}</th>
-                                                                    <ChTh>{t('colCogsBundling')}</ChTh>
-                                                                    <ChTh>{t('colIsiBundling')}</ChTh>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {channels.map(ch => (
-                                                                    <tr key={ch} className="border-t">
-                                                                        <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                        <td className="py-2.5 px-2 text-right">
-                                                                            <ChInput
-                                                                                currency
-                                                                                value={bundlingData[ch]?.cogs ?? ''}
-                                                                                onChange={v => setBundlingData(prev => ({ ...prev, [ch]: { ...prev[ch], cogs: v } }))}
-                                                                            />
-                                                                        </td>
-                                                                        <td className="py-2.5 px-2 text-right">
-                                                                            <ChInput
-                                                                                value={bundlingData[ch]?.units ?? ''}
-                                                                                onChange={v => setBundlingData(prev => ({ ...prev, [ch]: { ...prev[ch], units: v } }))}
-                                                                                placeholder="1"
-                                                                            />
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </PnLAccordion>
-
-                                        {/* C. Return Rate */}
-                                        <PnLAccordion
-                                            title={t('returnRateTitle')}
-                                            subtitle={t('returnRateSubtitle')}
-                                            pillVariant="optional"
-                                            pillText={t('pillOptional')}
-                                        >
-                                            <div className="overflow-x-auto mt-2">
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-[40%] min-w-[120px]">{t('colChannel')}</th>
-                                                            <ChTh>{t('colJmlUnitReturn')}</ChTh>
-                                                            <ChTh>{t('colRefundAktual')}</ChTh>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {channels.map(ch => (
-                                                            <tr key={ch} className="border-t">
-                                                                <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        value={returnData[ch]?.units ?? ''}
-                                                                        onChange={v => setReturnData(prev => ({ ...prev, [ch]: { ...prev[ch], units: v } }))}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        currency
-                                                                        value={returnData[ch]?.actual ?? ''}
-                                                                        onChange={v => setReturnData(prev => ({ ...prev, [ch]: { ...prev[ch], actual: v } }))}
-                                                                    />
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </PnLAccordion>
-
-                                        {/* D. Diskon Seller */}
-                                        <PnLAccordion
-                                            title={t('diskonSellerTitle')}
-                                            subtitle={t('diskonSellerSubtitle')}
-                                            pillVariant={secFilled.discount ? "filled" : "required"}
-                                            pillText={secFilled.discount ? t('pillFilled') : t('pillRequired')}
-                                        >
-                                            <div className="overflow-x-auto mt-2">
-                                                <table className="w-full border-collapse text-sm" style={{ minWidth: 780 }}>
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">{t('colChannel')}</th>
-                                                            {DISKON_LABELS.map(h => <ChTh key={h}>{h}</ChTh>)}
-                                                            <ChTh>{t('colTotalPct')}</ChTh>
-                                                            <ChTh>{t('colNilai')}</ChTh>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {channels.map((ch, chIdx) => (
-                                                            <tr key={ch} className="border-t">
-                                                                <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                {DISCOUNT_COLS.map(({ key: k, currency: isCurrency }) => (
-                                                                    <td key={k} className="py-2.5 px-1 text-right">
-                                                                        <ChInput
-                                                                            currency={isCurrency}
-                                                                            value={discountData[ch]?.[k] ?? ''}
-                                                                            onChange={v => {
-                                                                                setDiscountData(prev => ({ ...prev, [ch]: { ...prev[ch], [k]: v } }))
-                                                                                if (parseFloat(v) > 0) markFilled('discount')
-                                                                            }}
-                                                                            step={isCurrency ? undefined : "0.1"}
-                                                                            highlight={(parseFloat(discountData[ch]?.[k]) || 0) > 0 ? 'filled' : undefined}
-                                                                        />
-                                                                    </td>
-                                                                ))}
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <span className="text-xs font-semibold tabular-nums bg-muted px-2 py-1 rounded whitespace-nowrap">
-                                                                        {totalDiscountPct(ch).toFixed(1)}%
-                                                                    </span>
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
-                                                                    {discByChannel[chIdx] > 0 ? fmt(discByChannel[chIdx]) : '—'}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </PnLAccordion>
-
-                                        {/* E. Ongkir */}
-                                        <PnLAccordion
-                                            title={t('ongkirTitle')}
-                                            subtitle={t('ongkirSubtitle')}
-                                            pillVariant="optional"
-                                            pillText={t('pillOptional')}
-                                        >
-                                            <div className="overflow-x-auto mt-2">
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-[40%] min-w-[120px]">{t('colChannel')}</th>
-                                                            <ChTh>{t('colSubsidiOngkir')}</ChTh>
-                                                            <ChTh>{t('colBiayaPemrosesan')}</ChTh>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {channels.map(ch => (
-                                                            <tr key={ch} className="border-t">
-                                                                <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        currency
-                                                                        value={shippingData[ch]?.subsidy ?? ''}
-                                                                        onChange={v => setShippingData(prev => ({ ...prev, [ch]: { ...prev[ch], subsidy: v } }))}
-                                                                        highlight={(parseFloat(shippingData[ch]?.subsidy) || 0) > 0 ? 'filled' : undefined}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput currency value={shippingData[ch]?.processing ?? ''} onChange={v => setShippingData(prev => ({ ...prev, [ch]: { ...prev[ch], processing: v } }))} />
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </PnLAccordion>
-
-                                        {/* F. Ads Spend */}
-                                        <PnLAccordion
-                                            title={t('adsSpendTitle')}
-                                            subtitle={t('adsSpendSubtitle')}
-                                            pillVariant={secFilled.ads ? "filled" : "required"}
-                                            pillText={secFilled.ads ? t('pillFilled') : t('pillRequired')}
-                                        >
-                                            <div className="overflow-x-auto mt-2">
-                                                <table className="w-full border-collapse text-sm">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[120px]">{t('colChannel')}</th>
-                                                            <ChTh>{t('colRateGmv')}</ChTh>
-                                                            <ChTh>{t('colNilaiRp')}</ChTh>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {channels.map((ch, i) => (
-                                                            <tr key={ch} className="border-t">
-                                                                <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                                <td className="py-2.5 px-2 text-right">
-                                                                    <ChInput
-                                                                        value={adsData[ch]?.rate ?? ''}
-                                                                        onChange={v => {
-                                                                            setAdsData(prev => ({ ...prev, [ch]: { ...prev[ch], rate: v } }))
-                                                                            markFilled('ads')
-                                                                        }}
-                                                                        step="0.1"
-                                                                        highlight={(parseFloat(adsData[ch]?.rate) || 0) > 0 ? 'filled' : 'warn'}
-                                                                    />
-                                                                </td>
-                                                                <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
-                                                                    {adsByChannel[i] > 0 ? fmt(adsByChannel[i]) : '—'}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </PnLAccordion>
-
-                                        {/* G. Biaya Channel (pre-filled) */}
-                                        <PnLAccordion
-                                            title={t('biayaChannelTitle')}
-                                            subtitle={t('biayaChannelSubtitle')}
-                                            pillVariant="prefilled"
-                                            pillText={t('pillPrefilled')}
-                                        >
-                                            <table className="w-full border-collapse text-sm mt-2">
-                                                <thead>
-                                                    <tr>
-                                                        <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('colChannel')}</th>
-                                                        <ChTh>{t('colCommission')}</ChTh>
-                                                        <ChTh>{t('colMallFee')}</ChTh>
-                                                        <ChTh>{t('colPgw')}</ChTh>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {channels.map(ch => (
-                                                        <tr key={ch} className="border-t">
-                                                            <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold text-teal-700">{getChFee(ch, 'comm')}%</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold text-teal-700">{getChFee(ch, 'mall')}%</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold text-teal-700">{getChFee(ch, 'pgw')}%</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </PnLAccordion>
-
-                                        {/* H. Fixed Cost */}
-                                        <PnLAccordion
-                                            title={t('fixedCostTitle')}
-                                            subtitle={t('fixedCostSubtitle')}
-                                            pillVariant={secFilled.fixed ? "filled" : "required"}
-                                            pillText={secFilled.fixed ? t('pillFilled') : t('pillRequired')}
-                                        >
-                                            <div className="divide-y mt-2">
-                                                {customRows.map(r => (
-                                                    <div key={r.id} className="flex items-center gap-2 py-2.5">
-                                                        <Input
-                                                            placeholder={t('costNamePlaceholder')}
-                                                            value={r.name}
-                                                            onChange={e => setCustomRows(prev => prev.map(x => x.id === r.id ? { ...x, name: e.target.value } : x))}
-                                                            className="flex-1 h-8 text-xs"
-                                                        />
-                                                        <span className="text-xs text-muted-foreground flex-shrink-0">Rp</span>
-                                                        <ChInput
-                                                            currency
-                                                            value={r.val}
-                                                            onChange={v => {
-                                                                setCustomRows(prev => prev.map(x => x.id === r.id ? { ...x, val: v } : x))
-                                                                markFilled('fixed')
-                                                            }}
-                                                            highlight={(parseFloat(r.val) || 0) > 0 ? 'filled' : 'warn'}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setCustomRows(prev => prev.filter(x => x.id !== r.id))}
-                                                            className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded border text-muted-foreground hover:text-destructive hover:border-destructive transition-colors text-sm"
-                                                        >×</button>
-                                                    </div>
-                                                ))}
-
-                                                <div className="flex items-center justify-between py-2.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setCustomRows(prev => [...prev, { id: Date.now(), name: '', val: '' }])}
-                                                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                                                    >{t('addCostItem')}</button>
-                                                    <div className="flex items-center gap-4">
-                                                        <span className="text-xs text-muted-foreground">{t('totalFixedCost')}</span>
-                                                        <span className="text-xs font-semibold text-red-600 tabular-nums">({fmt(fixedTotal)})</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </PnLAccordion>
-
-                                    </div>
-
-                                </SectionCard>
-                            )}
-
-                            {/* Hasil Kalkulasi */}
-                            {channels.length > 0 && (
-                                <SectionCard
-                                    icon={<IconPresentationAnalytics size={18} />}
-                                    title={t('hasilKalkulasiTitle')}
-                                    subtitle={t('hasilKalkulasiSubtitle')}
-                                >
-                                    {/* Per-SKU Summary Table */}
-                                    <div className="rounded-lg border overflow-hidden mt-5">
-                                        <div className="px-4 py-3 border-b">
-                                            <p className="text-sm font-semibold">{t('perSkuSummaryTitle')}</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">{t('perSkuSummarySubtitle')}</p>
-                                        </div>
-                                        <div className="p-4 overflow-x-auto">
-                                            <table className="w-full border-collapse" style={{ minWidth: 560 }}>
-                                                <thead>
-                                                    <tr>
-                                                        <th className="text-left pb-2 pl-4 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('colSku')}</th>
-                                                        <ChTh>{t('colGrossGmv')}</ChTh>
-                                                        <ChTh>{t('colNetGmv')}</ChTh>
-                                                        <ChTh>{t('fixedCostTitle')}</ChTh>
-                                                        <ChTh className="pr-4">{t('colBlendedGM')}</ChTh>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {allSkuMetrics.map(m => (
-                                                        <tr key={m.sku.id}
-                                                            className={`border-t cursor-pointer hover:bg-muted/30 transition-colors ${m.sku.id === selectedSku ? 'bg-primary/5' : ''}`}
-                                                            onClick={() => setDetailModalSku(m.sku)}
-                                                        >
-                                                            <td className="py-2.5 pl-4 text-xs font-medium">{m.sku.name}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(m.grossTotal)}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(m.netTotal)}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">
-                                                                {m.fixedCost > 0 ? `− ${fmt(m.fixedCost)}` : <span className="text-muted-foreground">—</span>}
-                                                            </td>
-                                                            <td className="py-2.5 px-2 pr-4 text-right text-xs tabular-nums font-semibold">
-                                                                <span className={m.operatingProfit < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(m.operatingProfit)}</span>
-                                                                <span className="text-[10px] font-normal text-muted-foreground ml-1">({m.operatingMarginPct.toFixed(1)}%)</span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                    {namedProducts.length > 1 && (
-                                                        <tr className="border-t bg-muted/40">
-                                                            <td className="py-2.5 pl-4 text-xs font-semibold">{t('totalRow')}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(allSkuGrossTotal)}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(allSkuNetTotal)}</td>
-                                                            <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">
-                                                                {allSkuFixedTotal > 0 ? `− ${fmt(allSkuFixedTotal)}` : <span className="text-muted-foreground">—</span>}
-                                                            </td>
-                                                            <td className={`py-2.5 px-2 pr-4 text-right text-xs font-bold tabular-nums ${allSkuOpProfit < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                                                                {fmt(allSkuOpProfit)}
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    {/* Monthly P&L Summary */}
-                                    <div className="rounded-lg border overflow-hidden mt-4">
-                                        <div className="px-4 py-3 border-b flex items-center gap-2">
-                                            <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${finalMonthlyPLPct >= 20 ? 'bg-green-600' : finalMonthlyPLPct >= 10 ? 'bg-amber-500' : 'bg-red-500'}`} />
-                                            <div>
-                                                <p className="text-sm font-semibold">{t('monthlyPlSummaryTitle')}</p>
-                                                <p className="text-xs text-muted-foreground">{t('monthlyPlSummarySubtitle')}</p>
-                                            </div>
-                                        </div>
-                                        <div className="p-4">
-                                            <div className="space-y-1.5">
-                                                {[
-                                                    [t('rowAllSkuOpProfit'), fmt(allSkuOpProfit), ''],
-                                                    [t('rowDeductEnablerFixed'), fmt(enablerFixedTotal), 'd'],
-                                                    [t('rowDeductEnablerVar'), fmt(enablerVarTotal), 'd'],
-                                                ].map(([label, val, type]) => (
-                                                    <div key={label} className="flex justify-between">
-                                                        <span className="text-xs text-muted-foreground">{label}</span>
-                                                        <span className={`text-xs tabular-nums ${type === 'd' ? 'text-red-600' : ''}`}>{val}</span>
-                                                    </div>
-                                                ))}
-                                                <div className="flex justify-between items-baseline border-t pt-2 mt-1">
-                                                    <span className="text-xs font-semibold">{t('rowFinalMonthlyPL')}</span>
-                                                    <div className="text-right">
-                                                        <span className={`text-base font-bold tabular-nums ${finalPlColor}`}>{fmt(finalMonthlyPL)}</span>
-                                                        <span className={`text-xs font-semibold ml-1.5 ${finalPlColor}`}>({finalMonthlyPLPct.toFixed(1)}%)</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                </SectionCard>
-                            )}
+                            <ResultsSection
+                                t={t} channels={plChannels}
+                                allSkuMetrics={allSkuMetrics} namedProducts={namedProducts} selectedSku={selectedSku}
+                                allSkuGrossTotal={allSkuGrossTotal} allSkuNetTotal={allSkuNetTotal}
+                                allSkuGrossProfit={allSkuGrossProfit} allSkuFixedTotal={allSkuFixedTotal} allSkuOpProfit={allSkuOpProfit}
+                                enablerFixedTotal={enablerFixedTotal} enablerVarTotal={enablerVarTotal}
+                                finalMonthlyPL={finalMonthlyPL} finalMonthlyPLPct={finalMonthlyPLPct}
+                                finalPlColor={finalPlColor}
+                                setDetailModalSku={setDetailModalSku}
+                            />
                         </>
                     )}
 
                 </div>
             </div>
 
-            {/* ── Fixed Footer (only in Monthly P&L phase) ──────────────────── */}
+            {/* Fixed Footer */}
             {setupDone && !brandOnly && (
                 <div
                     className="fixed bottom-0 right-0 z-10 border-t bg-background transition-[left] duration-200 ease-linear"
@@ -2357,221 +839,19 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 </div>
             )}
 
-            {/* ── SKU Detail Modal ─────────────────────────────────────────── */}
-            <Dialog open={!!detailModalSku} onOpenChange={open => !open && setDetailModalSku(null)}>
-                <DialogContent className="w-full md:w-[90vw] md:max-w-5xl flex flex-col gap-0 p-0 overflow-hidden h-[92vh] md:h-auto md:max-h-[88vh]">
-                    <DialogHeader className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b flex-shrink-0">
-                        <DialogTitle>{detailModalSku?.name}</DialogTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">{t('skuDetailModalSubtitle')}</p>
-                    </DialogHeader>
-                    {skuDetailData && (
-                        <div className="overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-4">
-                            {/* 3 summary cards */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div className="rounded-lg border overflow-hidden">
-                                    <div className="px-4 py-3 border-b flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-sm bg-blue-500 flex-shrink-0" />
-                                        <span className="text-sm font-semibold">{t('grossGmvCardTitle')}</span>
-                                    </div>
-                                    <div className="p-4">
-                                        <p className="text-xl font-semibold tabular-nums mb-0.5">{fmt(skuDetailData.grossTotal)}</p>
-                                        <p className="text-xs text-muted-foreground mb-3">{t('grossGmvCardDesc')}</p>
-                                        <div className="space-y-2 border-t pt-3">
-                                            {channels.map((ch, i) => (
-                                                <div key={ch} className="flex justify-between items-center">
-                                                    <ChBadge code={ch} label={ch} />
-                                                    <span className="text-xs tabular-nums">{fmt(skuDetailData.grossByCh[i])}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="rounded-lg border overflow-hidden">
-                                    <div className="px-4 py-3 border-b flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-sm bg-green-600 flex-shrink-0" />
-                                        <span className="text-sm font-semibold">{t('netGmvCardTitle')}</span>
-                                    </div>
-                                    <div className="p-4">
-                                        <p className="text-xl font-semibold tabular-nums mb-0.5">{fmt(skuDetailData.netTotal)}</p>
-                                        <p className="text-xs text-muted-foreground mb-3">{t('netGmvCardDesc')}</p>
-                                        <div className="space-y-2 border-t pt-3">
-                                            {channels.map((ch, i) => (
-                                                <div key={ch} className="flex justify-between items-center">
-                                                    <ChBadge code={ch} label={ch} />
-                                                    <span className={`text-xs tabular-nums font-medium ${skuDetailData.netByCh[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                                                        {fmt(skuDetailData.netByCh[i])}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="rounded-lg border overflow-hidden">
-                                    <div className="px-4 py-3 border-b flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-sm flex-shrink-0 ${opColor === 'text-green-700' ? 'bg-green-600' : opColor === 'text-amber-600' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                                        <span className="text-sm font-semibold">{t('plSummaryCardTitle')}</span>
-                                    </div>
-                                    <div className="p-4">
-                                        <p className={`text-xl font-semibold tabular-nums mb-0.5 ${opColor}`}>{d.operatingMarginPct.toFixed(1)}%</p>
-                                        <p className="text-xs text-muted-foreground mb-3">{t('plSummaryCardDesc')}</p>
-                                        <div className="space-y-1 border-t pt-3">
-                                            {/* Revenue waterfall */}
-                                            {[
-                                                [t('rowGrossGmv'), fmt(d.grossTotal), ''],
-                                                [t('rowDeductDiskon'), fmt(d.discByCh.reduce((a, b) => a + b, 0)), 'd'],
-                                                [t('rowDeductReturn'), fmt(d.retByCh.reduce((a, b) => a + b, 0)), 'd'],
-                                                [t('rowDeductOngkir'), fmt(d.shipByCh.reduce((a, b) => a + b, 0)), 'd'],
-                                                [t('rowDeductAds'), fmt(d.adsByCh.reduce((a, b) => a + b, 0)), 'd'],
-                                            ].map(([label, val, type]) => (
-                                                <div key={label} className="flex justify-between">
-                                                    <span className="text-xs text-muted-foreground">{label}</span>
-                                                    <span className={`text-xs tabular-nums ${type === 'd' ? 'text-red-600' : ''}`}>{val}</span>
-                                                </div>
-                                            ))}
-                                            {/* Net Revenue */}
-                                            <div className="flex justify-between border-t pt-1.5 mt-0.5">
-                                                <span className="text-xs font-semibold">{t('rowNetRevenue')}</span>
-                                                <span className="text-xs font-semibold tabular-nums">{fmt(d.netTotal)}</span>
-                                            </div>
-                                            {/* COGS */}
-                                            <div className="flex justify-between">
-                                                <span className="text-xs text-muted-foreground">{t('rowDeductCogs')}</span>
-                                                <span className="text-xs tabular-nums text-red-600">{fmt(d.cogsTotal)}</span>
-                                            </div>
-                                            {/* Gross Profit */}
-                                            <div className="flex justify-between border-t pt-1.5 mt-0.5">
-                                                <span className="text-xs font-semibold">{t('rowGrossProfit')}</span>
-                                                <div className="flex items-baseline gap-1.5">
-                                                    <span className={`text-[10px] tabular-nums ${gpColor}`}>({d.grossMarginPct.toFixed(1)}%)</span>
-                                                    <span className={`text-xs font-bold tabular-nums ${gpColor}`}>{fmt(d.grossProfit)}</span>
-                                                </div>
-                                            </div>
-                                            {/* Operating expenses */}
-                                            <div className="flex justify-between">
-                                                <span className="text-xs text-muted-foreground">{t('rowDeductChannelCost')}</span>
-                                                <span className="text-xs tabular-nums text-red-600">{fmt(d.channelCost)}</span>
-                                            </div>
-                                            {d.fixedCost > 0 && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-xs text-muted-foreground">{t('rowDeductFixedCost')}</span>
-                                                    <span className="text-xs tabular-nums text-red-600">{fmt(d.fixedCost)}</span>
-                                                </div>
-                                            )}
-                                            {/* Operating Profit */}
-                                            <div className="flex justify-between border-t pt-1.5 mt-0.5">
-                                                <span className="text-xs font-semibold">{t('rowOperatingProfit')}</span>
-                                                <div className="flex items-baseline gap-1.5">
-                                                    <span className={`text-[10px] tabular-nums ${opColor}`}>({d.operatingMarginPct.toFixed(1)}%)</span>
-                                                    <span className={`text-xs font-bold tabular-nums ${opColor}`}>{fmt(d.operatingProfit)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Breakdown per Channel */}
-                            <div className="rounded-lg border overflow-hidden">
-                                <div className="px-4 py-3 border-b">
-                                    <p className="text-sm font-semibold">{t('breakdownTitle')}</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">{t('breakdownSubtitle')}</p>
-                                </div>
-                                <div className="p-4 overflow-x-auto">
-                                    <table className="w-full border-collapse text-sm" style={{ minWidth: 540 }}>
-                                        <thead>
-                                            <tr>
-                                                <th className="text-left pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">{t('colChannel')}</th>
-                                                <ChTh>{t('colGrossGmv')}</ChTh>
-                                                <ChTh>{t('colDiskon')}</ChTh>
-                                                <ChTh>{t('colReturn')}</ChTh>
-                                                <ChTh>{t('colOngkir')}</ChTh>
-                                                <ChTh>{t('colAds')}</ChTh>
-                                                <ChTh>{t('colNetGmv')}</ChTh>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {channels.map((ch, i) => (
-                                                <tr key={ch} className="border-t">
-                                                    <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
-                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(skuDetailData.grossByCh[i])}</td>
-                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.discByCh[i])}</td>
-                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.retByCh[i])}</td>
-                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.shipByCh[i])}</td>
-                                                    <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(skuDetailData.adsByCh[i])}</td>
-                                                    <td className={`py-2.5 px-2 text-right text-xs tabular-nums font-semibold ${skuDetailData.netByCh[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                                                        {fmt(skuDetailData.netByCh[i])}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            <tr className="border-t bg-muted/40">
-                                                <td className="py-2.5 text-xs font-semibold">{t('totalRow')}</td>
-                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(skuDetailData.grossTotal)}</td>
-                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.discByCh.reduce((a, b) => a + b, 0))}</td>
-                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.retByCh.reduce((a, b) => a + b, 0))}</td>
-                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.shipByCh.reduce((a, b) => a + b, 0))}</td>
-                                                <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(skuDetailData.adsByCh.reduce((a, b) => a + b, 0))}</td>
-                                                <td className={`py-2.5 px-2 text-right text-xs font-bold tabular-nums ${skuDetailData.netTotal < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                                                    {fmt(skuDetailData.netTotal)}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            {/* ── SKU Selection Modal ───────────────────────────────────────── */}
-            <Dialog open={skuModalOpen} onOpenChange={setSkuModalOpen}>
-                <DialogContent className="max-w-lg h-[70vh] flex flex-col gap-0 p-0 overflow-hidden">
-                    <DialogHeader className="px-5 pt-5 pb-4 border-b flex-shrink-0">
-                        <DialogTitle>{t('selectSkuTitle')}</DialogTitle>
-                    </DialogHeader>
-                    <div className="px-4 py-3 border-b flex-shrink-0">
-                        <div className="relative">
-                            <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                className="pl-9"
-                                placeholder={t('searchSkuPlaceholder')}
-                                value={skuSearch}
-                                onChange={e => setSkuSearch(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="overflow-y-auto flex-1 min-h-0 p-4 space-y-2">
-                        {isSkusLoading ? (
-                            Array.from({ length: 5 }).map((_, i) => (
-                                <Skeleton key={i} className="h-14 w-full rounded-md" />
-                            ))
-                        ) : filteredSkus.length === 0 ? (
-                            <p className="text-center text-sm text-muted-foreground py-8">{t('noSkusFound')}</p>
-                        ) : (
-                            filteredSkus.map(sku => {
-                                const isSelected = p.sku?.id === sku.id
-                                return (
-                                    <button
-                                        key={sku.id}
-                                        type="button"
-                                        onClick={() => selectSku(sku)}
-                                        className={`w-full text-left rounded-md border p-3 transition-colors space-y-0.5 ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/60'}`}
-                                    >
-                                        <p className={`text-sm font-medium ${isSelected ? 'text-primary' : ''}`}>{sku.product_name || '—'}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {sku.sku_code}
-                                            {sku.brand && ` · ${sku.brand}`}
-                                            {sku.variant && ` · ${sku.variant}`}
-                                        </p>
-                                    </button>
-                                )
-                            })
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
+            {/* Modals */}
+            <SkuDetailModal
+                t={t} channels={plChannels}
+                detailModalSku={detailModalSku} setDetailModalSku={setDetailModalSku}
+                skuDetailData={skuDetailData}
+            />
+            <SkuSelectionModal
+                t={t}
+                skuModalOpen={skuModalOpen} setSkuModalOpen={setSkuModalOpen}
+                skuSearch={skuSearch} setSkuSearch={setSkuSearch}
+                isSkusLoading={isSkusLoading} filteredSkus={filteredSkus}
+                currentSku={p.sku} selectSku={selectSku}
+            />
         </>
     )
 }

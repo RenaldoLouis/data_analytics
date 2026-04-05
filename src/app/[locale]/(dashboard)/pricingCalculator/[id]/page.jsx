@@ -1,5 +1,5 @@
 import CalculatorHPP from "./calculatorHPP";
-import PlCalculator from "../pl/plCalculator";
+import PlCalculator from "../pl/PlCalculator";
 import SkuList from "../sku/skuList";
 
 export default async function Page({ params }) {

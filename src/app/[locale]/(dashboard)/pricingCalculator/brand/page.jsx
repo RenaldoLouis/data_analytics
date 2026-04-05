@@ -3,7 +3,7 @@
 import LoadingScreen from "@/components/ui/loadingScreen"
 import services from "@/services"
 import { useEffect, useState } from "react"
-import PlCalculator from "../pl/plCalculator"
+import PlCalculator from "../pl/PlCalculator"
 
 export default function BrandPage() {
     const [brandId, setBrandId] = useState(undefined) // undefined = loading, null = none, string = has brand

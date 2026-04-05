@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from "react"
-import PlCalculator from "./plCalculator"
-import PlList from "./plList"
+import PlCalculator from "./PlCalculator"
+import PlList from "./PlList"
 
 export default function Page() {
     const [view, setView] = useState('list')
