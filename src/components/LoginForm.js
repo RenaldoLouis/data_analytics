@@ -370,17 +370,17 @@ export default function LoginForm() {
                             <div className="flex-grow border-t" />
                         </div>
                         <Small className="mb-4 font-normal">
-                            Not have an account yet?
+                            {t("noAccountYet")}
                         </Small>
 
                         <div className="flex gap-3">
 
-                            <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
+                            <Button type="button" variant="outline" className="w-full border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickFreeTrial}>
                                 {t("tryFreeTrial")}
                             </Button>
-                            <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickDemoVideo}>
+                            {/* <Button type="button" variant="outline" className="w-1/2 border-blue-600 text-blue-600 cursor-pointer" onClick={handleClickDemoVideo}>
                                 {t("requestFreeDemo")}
-                            </Button>
+                            </Button> */}
                         </div>
                     </form>
                 </Form>

@@ -123,7 +123,7 @@ export default {
     auth: {
         register: (payload) => postAPIRequest('/next-api/register', payload),
         pricingPlans: () => getRequest('/next-api/pricing-plans'),
-        verifyEmail: (token) => getAPIRequest(`/auth/verify-email?token=${token}`),
+        verifyEmail: (token) => getRequest(`/next-api/verify-email?token=${token}`),
         resendVerification: (email) => postRequest('/auth/resend-verification', email),
         upgradePlan: (email) => postRequest('/auth/upgrade-plan', email),
         authenticate: () => postAPIRequest('/next-api/authenticate'),

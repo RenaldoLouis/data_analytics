@@ -34,7 +34,7 @@ export default function VerificationForm() {
             try {
                 const res = await services.auth.verifyEmail(token);
 
-                if (res.status === 200) {
+                if (res?.success) {
                     setStatus("success");
                     // Auto redirect after 3 seconds
                     setTimeout(() => {
@@ -42,7 +42,7 @@ export default function VerificationForm() {
                     }, 3000);
                 } else {
                     setStatus("error");
-                    setErrorMessage(res.error?.message || "Verification failed. Token might be expired.");
+                    setErrorMessage(res?.message || "Verification failed. Token might be expired.");
                 }
             } catch (error) {
                 setStatus("error");
