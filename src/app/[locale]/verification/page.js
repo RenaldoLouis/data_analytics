@@ -1,6 +1,5 @@
 "use client";
 
-import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,6 @@ import { ArrowRight, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export default function VerificationForm() {
-    const t = useTranslations("verification"); // Ensure you have translations or fallback
     const router = useRouter();
     const searchParams = useSearchParams();
     const token = searchParams.get("token");

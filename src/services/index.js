@@ -121,7 +121,7 @@ const deleteRequest = async (path) => {
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
     auth: {
-        register: (payload) => postRequest('/auth/register', payload),
+        register: (payload) => postAPIRequest('/next-api/register', payload),
         pricingPlans: () => getRequest('/next-api/pricing-plans'),
         verifyEmail: (token) => getAPIRequest(`/auth/verify-email?token=${token}`),
         resendVerification: (email) => postRequest('/auth/resend-verification', email),

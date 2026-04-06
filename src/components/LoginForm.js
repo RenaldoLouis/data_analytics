@@ -37,7 +37,7 @@ const forgotOTPSchema = (t) => z.object({
 });
 
 const newPasswordSchema = (t) => z.object({
-    password: z.string().min(8, { message: t("passwordMinLength") || "Password must be at least 8 characters" }),
+    password: z.string().min(6, { message: t("passwordMinLength") || "Password must be at least 6 characters" }),
     confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
     message: t("passwordsNoMatch") || "Passwords do not match",
@@ -82,6 +82,7 @@ export default function LoginForm() {
     const [resetOTP, setResetOTP] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const onLoginSubmit = async (data) => {

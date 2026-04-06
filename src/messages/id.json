@@ -25,7 +25,7 @@
     "forgotPasswordSubtitle": "Masukkan email untuk menerima OTP.",
     "sendOTP": "Kirim OTP",
     "backToLogin": "Kembali ke login",
-    "otpSent": "OTP telah dikirim ke",
+    "otpSent": "OTP telah dikirim ke {email}",
     "verifyOTP": "Verifikasi OTP",
     "createNewPasswordSubtitle": "Buat password baru untuk akun anda",
     "confirmNewPassword": "Konfirmasi password baru",

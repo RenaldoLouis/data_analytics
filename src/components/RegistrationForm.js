@@ -107,23 +107,21 @@ export default function RegistrationForm() {
         try {
             const res = await services.auth.register(tempData);
 
-            if (res.status === 200) {
+            if (res?.success) {
                 // SUCCESS: Switch to verification view instead of modal
                 setRegistrationStep("verification");
             }
             else {
-                const errData = await res.error.data;
-
                 let errorMessage = "Registration failed. Try again.";
 
                 // Safely handle different error formats
-                if (errData?.message) {
-                    if (typeof errData.message === 'string') {
-                        errorMessage = errData.message;
-                    } else if (typeof errData.message === 'object') {
+                if (res?.message) {
+                    if (typeof res.message === 'string') {
+                        errorMessage = res.message;
+                    } else if (typeof res.message === 'object') {
                         // If message is an object (validation errors), flatten it to a string
                         // e.g. { lastName: "Required", pricingPlan: "Invalid" }
-                        errorMessage = Object.values(errData.message).flat().join(", ");
+                        errorMessage = Object.values(res.message).flat().join(", ");
                     }
                 }
 
