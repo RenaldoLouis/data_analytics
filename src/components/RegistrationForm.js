@@ -79,8 +79,8 @@ export default function RegistrationForm() {
             try {
                 const res = await services.auth.pricingPlans();
 
-                if (res.status === 200 || res.success) {
-                    const pricingPlan = res.data.data.pricingPlans.map((data) => (
+                if (res?.success) {
+                    const pricingPlan = res.data.pricingPlans.map((data) => (
                         { id: data.id, name: data.name }
                     ))
                     setPricingPlans(pricingPlan || []);

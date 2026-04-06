@@ -122,7 +122,7 @@ const deleteRequest = async (path) => {
 export default {
     auth: {
         register: (payload) => postRequest('/auth/register', payload),
-        pricingPlans: () => getAPIRequest('/pricing-plans'),
+        pricingPlans: () => getRequest('/next-api/pricing-plans'),
         verifyEmail: (token) => getAPIRequest(`/auth/verify-email?token=${token}`),
         resendVerification: (email) => postRequest('/auth/resend-verification', email),
         upgradePlan: (email) => postRequest('/auth/upgrade-plan', email),

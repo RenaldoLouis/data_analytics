@@ -51,8 +51,8 @@ export const DashboardProvider = ({ children }) => {
             try {
                 const res = await services.auth.pricingPlans();
 
-                if (res.status === 200 || res.success) {
-                    setPricingPlans(res.data.data.pricingPlans || []);
+                if (res?.success) {
+                    setPricingPlans(res.data.pricingPlans || []);
                 }
             } catch (err) {
                 console.error("Failed to fetch pricing plans:", err);
