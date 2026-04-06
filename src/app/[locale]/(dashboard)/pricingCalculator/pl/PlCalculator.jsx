@@ -399,7 +399,7 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
             } else if (editId) {
                 const monthlyRes = await services.pl.getMonthlyById(editId)
                 const m = monthlyRes?.data?.data ?? monthlyRes?.data
-                if (!m) return
+                if (!m) { setIsPageLoading(false); return }
                 monthlyRecord = m
                 setMonthlyId(m.id ?? editId)
                 const skuId = m.sku_id ?? m.sku?.id
@@ -415,16 +415,22 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                 const listRes = await services.pl.getBrands()
                 const raw = listRes?.data?.data ?? listRes?.data ?? null
                 const brands = Array.isArray(raw) ? raw : (raw ? [raw] : [])
-                if (!brands.length) return
+                if (!brands.length) {
+                    // Fresh account: no brands yet. Toast and bounce back to the list.
+                    toast.error(t('errorNoBrandProfile'), { id: 'pl-no-brand-profile' })
+                    setIsPageLoading(false)
+                    onBack?.()
+                    return
+                }
                 brandId = brands[0].id
             }
 
-            if (!brandId) return
+            if (!brandId) { setIsPageLoading(false); return }
             const res = await services.pl.getBrands()
             const raw = res?.data?.data ?? res?.data ?? null
             const brandList = Array.isArray(raw) ? raw : (raw ? [raw] : [])
             const d = brandList.find(b => b.id === brandId) ?? brandList[0]
-            if (!d) return
+            if (!d) { setIsPageLoading(false); return }
 
             setSetup({ brand_name: d.name || '', category: d.category || '', enabler: d.enabler_name || '' })
 

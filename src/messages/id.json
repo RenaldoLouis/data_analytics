@@ -271,6 +271,7 @@
     "editTitle": "Edit P/L",
     "addNew": "P/L Baru",
     "noData": "Belum ada data P/L. Klik \"P/L Baru\" untuk memulai.",
+    "errorNoBrandProfile": "Profil brand harus dibuat terlebih dahulu.",
     "colBrand": "Profil Brand",
     "colSku": "SKU",
     "colCategory": "Kategori",

@@ -271,6 +271,7 @@
     "editTitle": "Edit P/L",
     "addNew": "New P/L",
     "noData": "No P/L records yet. Click \"New P/L\" to get started.",
+    "errorNoBrandProfile": "Brand profile must be created first.",
     "colBrand": "Brand Profile",
     "colSku": "SKU",
     "colCategory": "Category",
