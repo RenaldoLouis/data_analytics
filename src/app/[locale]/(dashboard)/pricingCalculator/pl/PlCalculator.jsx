@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import LoadingScreen from "@/components/ui/loadingScreen"
 import { useSidebar } from "@/components/ui/sidebar"
@@ -16,11 +17,67 @@ import {
     num, toAmt, toRate,
     makeProduct, mapMonthlyRecordToFormData, buildMonthlyPayloadFromData, computeSkuMetrics,
 } from "./plLib"
+import { exportPlToExcel } from "./plExcel"
+import * as XLSX from "xlsx"
 import SetupPhase from "./SetupPhase"
 import MonthlyInputSection from "./MonthlyInputSection"
 import ResultsSection from "./ResultsSection"
 import SkuDetailModal from "./SkuDetailModal"
 import SkuSelectionModal from "./SkuSelectionModal"
+
+function computeSkuDiff(skuName, oldData, newData, channels) {
+    const n = (v) => String(v ?? '').trim()
+    const sections = []
+
+    const perCh = (title, getter) => {
+        const rows = []
+        channels.forEach(ch => getter(ch).forEach(({ label, from, to }) => {
+            if (n(from) !== n(to)) rows.push({ label: `${ch} - ${label}`, from: n(from), to: n(to) })
+        }))
+        if (rows.length) sections.push({ title, rows })
+    }
+
+    perCh('Basic Info', ch => [
+        { label: 'Units Sold', from: oldData.infoData?.[ch]?.vol, to: newData.infoData?.[ch]?.vol },
+    ])
+    perCh('COGS / HPP', ch => [
+        { label: 'Bundling COGS/set', from: oldData.bundlingData?.[ch]?.cogs, to: newData.bundlingData?.[ch]?.cogs },
+        { label: 'Units per Bundle',  from: oldData.bundlingData?.[ch]?.units, to: newData.bundlingData?.[ch]?.units },
+    ])
+    perCh('Return Rate', ch => [
+        { label: 'Unit Returns',    from: oldData.returnData?.[ch]?.units,  to: newData.returnData?.[ch]?.units },
+        { label: 'Actual Refund',   from: oldData.returnData?.[ch]?.actual, to: newData.returnData?.[ch]?.actual },
+    ])
+    perCh('Seller Discount', ch => [
+        { label: 'Voucher',    from: oldData.discountData?.[ch]?.voucher,   to: newData.discountData?.[ch]?.voucher },
+        { label: 'Subsidy',    from: oldData.discountData?.[ch]?.subsidy,   to: newData.discountData?.[ch]?.subsidy },
+        { label: 'Flash Sale', from: oldData.discountData?.[ch]?.flash,     to: newData.discountData?.[ch]?.flash },
+        { label: 'Affiliate',  from: oldData.discountData?.[ch]?.affiliate, to: newData.discountData?.[ch]?.affiliate },
+        { label: 'Bundling',   from: oldData.discountData?.[ch]?.bundling,  to: newData.discountData?.[ch]?.bundling },
+        { label: 'Member',     from: oldData.discountData?.[ch]?.loyalty,   to: newData.discountData?.[ch]?.loyalty },
+    ])
+    perCh('Shipping', ch => [
+        { label: 'Subsidy',        from: oldData.shippingData?.[ch]?.subsidy,    to: newData.shippingData?.[ch]?.subsidy },
+        { label: 'Processing Fee', from: oldData.shippingData?.[ch]?.processing, to: newData.shippingData?.[ch]?.processing },
+    ])
+    perCh('Ads Spend', ch => [
+        { label: 'Ads Rate', from: oldData.adsData?.[ch]?.rate, to: newData.adsData?.[ch]?.rate },
+    ])
+
+    // Fixed Costs — match by name, fall back to index
+    const oldFixed = (oldData.customRows ?? []).filter(r => r.name || r.val)
+    const newFixed = (newData.customRows ?? []).filter(r => r.name || r.val)
+    const fixedRows = []
+    const maxLen = Math.max(oldFixed.length, newFixed.length)
+    for (let i = 0; i < maxLen; i++) {
+        const o = oldFixed[i], nw = newFixed[i]
+        const oVal = `${o?.name ?? ''}: ${n(o?.val)}`, nwVal = `${nw?.name ?? ''}: ${n(nw?.val)}`
+        if (oVal !== nwVal) fixedRows.push({ label: nw?.name || o?.name || `Row ${i + 1}`, from: o ? n(o.val) : '', to: nw ? n(nw.val) : '' })
+    }
+    if (fixedRows.length) sections.push({ title: 'Fixed Costs', rows: fixedRows })
+
+    return sections.length ? { skuName, sections } : null
+}
 
 export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly = false, startAtMonthly = false }) {
     const t = useTranslations('plpage')
@@ -177,6 +234,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const [bundlingData, setBundlingData] = useState({})
     const [orders, setOrders] = useState('')
     const [secFilled, setSecFilled] = useState({ info: false, discount: false, ret: false, ads: false, fixed: false })
+    const [importSummary, setImportSummary] = useState(null)   // diff preview
+    const [pendingImport, setPendingImport] = useState(null)   // skuSheets waiting to be applied
     const markFilled = (sec) => setSecFilled(prev => ({ ...prev, [sec]: true }))
 
     // ── Active SKU for monthly ───────────────────────────────────────────────
@@ -367,6 +426,81 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
     const skuDetailData = detailModalSku
         ? allSkuMetrics.find(m => m.sku.id === detailModalSku.id) ?? null
         : null
+
+    // ── Excel export handler ─────────────────────────────────────────────────
+    const handleExportCurrent = () => {
+        const skuDataList = products.filter(p => p.name).map(p => {
+            if (p.id === selectedSku) {
+                return { name: p.name, cogs: p.cogs, pkg: p.pkg, formData: { infoData, adsData, discountData, returnData, shippingData, bundlingData, customRows } }
+            }
+            const cached = skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id] ?? {}
+            return { name: p.name, cogs: p.cogs, pkg: p.pkg, formData: cached }
+        })
+
+        const wb = exportPlToExcel(plChannels, skuDataList)
+        const periodLabel = activeMo ? `_${activeYear}_${activeMo}` : `_${activeYear}`
+        XLSX.writeFile(wb, `pl_data${periodLabel}.xlsx`)
+    }
+
+    // ── Excel import handler — preview diff, wait for confirmation ───────────
+    const handleImportExcel = ({ skuSheets }) => {
+        const namedProducts = products.filter(p => p.name)
+
+        const beforeStates = {}
+        namedProducts.forEach(p => {
+            beforeStates[p.id] = p.id === selectedSku
+                ? { infoData, adsData, discountData, returnData, shippingData, bundlingData, customRows }
+                : skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id] ?? {}
+        })
+
+        const diffs = []
+        skuSheets.forEach((sheet, idx) => {
+            const product =
+                namedProducts.find(p => p.name === sheet.sheetName) ??
+                namedProducts.find(p => p.name.toLowerCase() === sheet.sheetName.toLowerCase()) ??
+                namedProducts[idx]
+            if (!product) return
+            const d = computeSkuDiff(product.name, beforeStates[product.id] ?? {}, sheet.formData, plChannels)
+            if (d) diffs.push(d)
+        })
+
+        setPendingImport({ skuSheets })
+        setImportSummary(diffs)
+    }
+
+    const applyPendingImport = () => {
+        if (!pendingImport) return
+        const namedProducts = products.filter(p => p.name)
+        pendingImport.skuSheets.forEach((sheet, idx) => {
+            const product =
+                namedProducts.find(p => p.name === sheet.sheetName) ??
+                namedProducts.find(p => p.name.toLowerCase() === sheet.sheetName.toLowerCase()) ??
+                namedProducts[idx]
+            if (!product) return
+            const { formData } = sheet
+            if (product.id === selectedSku) {
+                setInfoData(formData.infoData)
+                setAdsData(formData.adsData)
+                setDiscountData(formData.discountData)
+                setReturnData(formData.returnData)
+                setShippingData(formData.shippingData)
+                setBundlingData(formData.bundlingData)
+                if (formData.customRows.length > 0) setCustomRows(formData.customRows)
+                setSecFilled(formData.secFilled)
+            } else {
+                skuDataCacheRef.current[product.id] = { data: formData, recordId: null }
+                setPrefetchedSkuData(prev => ({ ...prev, [product.id]: formData }))
+            }
+        })
+        toast.success(t('importSuccess'))
+        setPendingImport(null)
+        setImportSummary(null)
+    }
+
+    const cancelPendingImport = () => {
+        setPendingImport(null)
+        setImportSummary(null)
+    }
 
     // ── Save / loading state ─────────────────────────────────────────────────
     const [isSaving, setIsSaving] = useState(false)
@@ -813,6 +947,8 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                                 totalDiscountPct={totalDiscountPct} fixedTotal={fixedTotal}
                                 getChFee={getChFee}
                                 DISCOUNT_LABELS={DISCOUNT_LABELS}
+                                onImportExcel={handleImportExcel}
+                                onExportCurrent={handleExportCurrent}
                             />
 
                             <ResultsSection
@@ -844,6 +980,49 @@ export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly
                     </div>
                 </div>
             )}
+
+            {/* Import Confirmation Modal */}
+            <Dialog open={!!pendingImport} onOpenChange={cancelPendingImport}>
+                <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+                    <DialogHeader className="pb-4">
+                        <DialogTitle>{t('importSummaryTitle')}</DialogTitle>
+                        <p className="text-sm text-muted-foreground">{t('importSummarySubtitle')}</p>
+                    </DialogHeader>
+                    <Separator />
+                    <div className="overflow-y-auto flex-1 space-y-5 pr-1 pt-2">
+                        {importSummary?.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-6">{t('importNoChanges')}</p>
+                        )}
+                        {(importSummary ?? []).map((skuDiff, skuIdx) => (
+                            <div key={skuDiff.skuName}>
+                                {skuIdx > 0 && <Separator className="mb-5" />}
+                                <p className="text-sm font-semibold mb-2">{skuDiff.skuName}</p>
+                                <div className="space-y-3">
+                                    {skuDiff.sections.map((section) => (
+                                        <div key={section.title}>
+                                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">{section.title}</p>
+                                            <div className="rounded border divide-y text-xs">
+                                                {section.rows.map((row, i) => (
+                                                    <div key={i} className="flex items-center gap-2 px-3 py-2">
+                                                        <span className="flex-1 text-muted-foreground">{row.label}</span>
+                                                        {row.from ? <span className="text-red-500 line-through whitespace-nowrap">{row.from}</span> : <span className="text-muted-foreground whitespace-nowrap">-</span>}
+                                                        <span className="text-muted-foreground">→</span>
+                                                        <span className="text-green-600 font-medium whitespace-nowrap">{row.to || '-'}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={cancelPendingImport}>{t('cancel')}</Button>
+                        {importSummary?.length > 0 && <Button onClick={applyPendingImport}>{t('importProceed')}</Button>}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Modals */}
             <SkuDetailModal

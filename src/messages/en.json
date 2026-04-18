@@ -521,6 +521,16 @@
     "selectSkuFirst": "Please select a SKU first",
     "errorChannelRequired": "Input at least 1 target platform",
     "errorSkuRequired": "Input at least 1 SKU name",
-    "errorSkuPriceRequired": "Each SKU must have a selling price for every channel"
+    "errorSkuPriceRequired": "Each SKU must have a selling price for every channel",
+    "downloadTemplate": "Download Template",
+    "importExcel": "Upload SKU Data",
+    "exportCurrent": "Download Report",
+    "importSummaryTitle": "Import Summary",
+    "importSummarySubtitle": "Review the changes below before applying.",
+    "importNoChanges": "No changes detected — imported data matches the current form.",
+    "importProceed": "Proceed",
+    "cancel": "Cancel",
+    "importSuccess": "P/L data imported from Excel",
+    "importError": "Failed to read Excel file. Make sure you are using the correct template."
   }
 }

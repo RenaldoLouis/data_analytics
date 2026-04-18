@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -10,8 +11,12 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { IconBuildingStore, IconPresentationAnalytics } from "@tabler/icons-react"
+import { IconBuildingStore, IconDownload, IconFileExport, IconFileImport, IconPresentationAnalytics } from "@tabler/icons-react"
+import * as XLSX from "xlsx"
+import { useRef } from "react"
+import { toast } from "sonner"
 import { DISCOUNT_COLS, MONTH_LABELS, fmt } from "./plLib"
+import { generatePlTemplate, parsePlImport, exportPlToExcel } from "./plExcel"
 import { ChBadge, ChInput, PnLAccordion, SectionCard, SetupSummaryCard, ChTh } from "./PlComponents"
 
 export default function MonthlyInputSection({
@@ -43,7 +48,35 @@ export default function MonthlyInputSection({
     getChFee,
     // labels
     DISCOUNT_LABELS,
+    // excel import/export
+    onImportExcel,
+    onExportCurrent,
 }) {
+    const fileInputRef = useRef(null)
+
+    const handleDownloadTemplate = () => {
+        const wb = generatePlTemplate(channels, products)
+        XLSX.writeFile(wb, 'pl_monthly_template.xlsx')
+    }
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = (evt) => {
+            try {
+                const wb = XLSX.read(evt.target.result, { type: 'binary' })
+                const parsed = parsePlImport(wb, channels)
+                onImportExcel(parsed)
+            } catch {
+                toast.error(t('importError'))
+            }
+        }
+        reader.onerror = () => toast.error(t('importError'))
+        reader.readAsBinaryString(file)
+        e.target.value = ''
+    }
+
     return (
         <>
             {/* Setup summary */}
@@ -182,6 +215,31 @@ export default function MonthlyInputSection({
                     </PnLAccordion>
                 </div>
             </SectionCard>
+
+            {/* Excel import / export / download template */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={handleDownloadTemplate}>
+                        <IconDownload size={16} />
+                        {t('downloadTemplate')}
+                    </Button>
+                    <Button onClick={() => fileInputRef.current?.click()}>
+                        <IconFileImport size={16} />
+                        {t('importExcel')}
+                    </Button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        onChange={handleFileChange}
+                    />
+                </div>
+                <Button variant="outline" onClick={onExportCurrent}>
+                    <IconFileExport size={16} />
+                    {t('exportCurrent')}
+                </Button>
+            </div>
 
             {/* SKU selector chips */}
             <div className="rounded-lg border bg-card p-4">

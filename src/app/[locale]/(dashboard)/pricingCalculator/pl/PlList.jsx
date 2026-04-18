@@ -15,12 +15,15 @@ import {
 import { H3 } from "@/components/ui/typography"
 import services from "@/services"
 import {
+    IconArrowsSort,
     IconChevronLeft,
     IconChevronRight,
     IconChevronsLeft,
     IconChevronsRight,
     IconPencil,
     IconPlus,
+    IconSortAscending,
+    IconSortDescending,
     IconTrash,
 } from "@tabler/icons-react"
 import {
@@ -139,6 +142,19 @@ function groupByPeriod(pls, brandsMap) {
     return Array.from(map.values())
 }
 
+function SortableHeader({ column, children, className }) {
+    const sorted = column.getIsSorted()
+    return (
+        <div
+            className={`flex items-center gap-1 cursor-pointer select-none hover:text-foreground transition-colors ${className ?? ''}`}
+            onClick={() => column.toggleSorting(sorted === 'asc')}
+        >
+            {children}
+            {sorted === 'asc' ? <IconSortAscending size={13} /> : sorted === 'desc' ? <IconSortDescending size={13} /> : <IconArrowsSort size={13} className="opacity-40" />}
+        </div>
+    )
+}
+
 const SKELETON_ROWS = 5
 const SKELETON_COLS = 6
 
@@ -149,6 +165,7 @@ export default function PlList({ onAdd, onEdit }) {
     const [isMutating, setIsMutating] = useState(false)
     const [isFetch, setIsFetch] = useState(false)
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+    const [sorting, setSorting] = useState([])
 
     const [brandsMap, setBrandsMap] = useState({})
 
@@ -200,18 +217,15 @@ export default function PlList({ onAdd, onEdit }) {
 
     const columns = useMemo(() => [
         {
-            accessorKey: 'name',
-            header: t('colBrand'),
-            cell: ({ row }) => <span className="font-medium">{row.original.name || row.original.brand_name || '-'}</span>,
-        },
-        {
             id: 'sku',
-            header: t('colSku'),
+            accessorFn: row => row.sku_names?.join(', ') || '',
+            header: ({ column }) => <SortableHeader column={column}>{t('colSku')}</SortableHeader>,
             cell: ({ row }) => <span>{row.original.sku_names?.join(', ') || '-'}</span>,
         },
         {
             id: 'period',
-            header: t('colPeriod'),
+            accessorFn: row => (row.period_year ?? 0) * 100 + (row.period_month ?? 0),
+            header: ({ column }) => <SortableHeader column={column}>{t('colPeriod')}</SortableHeader>,
             cell: ({ row }) => {
                 const month = row.original.period_month
                 const year = row.original.period_year
@@ -222,7 +236,7 @@ export default function PlList({ onAdd, onEdit }) {
         },
         {
             accessorKey: 'created_at',
-            header: t('colCreatedAt'),
+            header: ({ column }) => <SortableHeader column={column}>{t('colCreatedAt')}</SortableHeader>,
             cell: ({ row }) => {
                 const d = row.original.created_at
                 if (!d) return '-'
@@ -231,7 +245,7 @@ export default function PlList({ onAdd, onEdit }) {
         },
         {
             accessorKey: 'updated_at',
-            header: t('colUpdatedAt'),
+            header: ({ column }) => <SortableHeader column={column}>{t('colUpdatedAt')}</SortableHeader>,
             cell: ({ row }) => {
                 const d = row.original.updated_at
                 if (!d) return '-'
@@ -240,7 +254,8 @@ export default function PlList({ onAdd, onEdit }) {
         },
         {
             id: 'finalPL',
-            header: () => <div className="text-right">{t('colFinalPL')}</div>,
+            accessorFn: row => row.finalMonthlyPL ?? -Infinity,
+            header: ({ column }) => <SortableHeader column={column} className="justify-end">{t('colFinalPL')}</SortableHeader>,
             cell: ({ row }) => {
                 const pl = row.original.finalMonthlyPL
                 if (pl == null) return '-'
@@ -257,6 +272,7 @@ export default function PlList({ onAdd, onEdit }) {
         },
         {
             id: 'actions',
+            enableSorting: false,
             header: () => <div className="text-right">{t('colActions')}</div>,
             cell: ({ row }) => (
                 <div className="flex items-center justify-end gap-3">
@@ -279,8 +295,9 @@ export default function PlList({ onAdd, onEdit }) {
     const table = useReactTable({
         data: groupedPls,
         columns,
-        state: { pagination },
+        state: { pagination, sorting },
         onPaginationChange: setPagination,
+        onSortingChange: setSorting,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),

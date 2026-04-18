@@ -521,6 +521,16 @@
     "selectSkuFirst": "Pilih SKU terlebih dahulu",
     "errorChannelRequired": "Input minimal 1 target platform",
     "errorSkuRequired": "Input minimal 1 nama SKU",
-    "errorSkuPriceRequired": "Setiap SKU harus memiliki harga jual untuk setiap channel"
+    "errorSkuPriceRequired": "Setiap SKU harus memiliki harga jual untuk setiap channel",
+    "downloadTemplate": "Unduh Template",
+    "importExcel": "Upload SKU Data",
+    "exportCurrent": "Download Report",
+    "importSummaryTitle": "Ringkasan Import",
+    "importSummarySubtitle": "Tinjau perubahan berikut sebelum diterapkan.",
+    "importNoChanges": "Tidak ada perubahan — data yang diimpor sama dengan form saat ini.",
+    "importProceed": "Terapkan",
+    "cancel": "Batal",
+    "importSuccess": "Data P/L berhasil diimpor dari Excel",
+    "importError": "Gagal membaca file Excel. Pastikan Anda menggunakan template yang benar."
   }
 }
