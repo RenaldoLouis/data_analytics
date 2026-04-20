@@ -1,3 +1,4 @@
+import { backend } from "@/lib/backendClient";
 import { Toaster } from "@/components/ui/sonner";
 import { routing } from "@/i18n/routing";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
@@ -40,36 +41,19 @@ export default async function RootLayout({ children, params }) {
     notFound();
   }
 
-  // --- PRO STRATEGY: VERIFY SESSION HERE ---
+  // Verify session on every page render
   const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+  const accessToken = cookieStore.get('access_token')?.value;
 
-  // Only verify if a token exists. 
-  // If no token exists, Middleware has already handled the "Protected Route" check.
-  if (token) {
+  if (accessToken) {
     try {
-      const res = await fetch(`${process.env.BACKEND_URL}/auth/authenticate`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store' // Ensure we don't cache auth checks
+      await backend.post('/auth/authenticate', {}, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-
-      // If token is invalid (401/403), we must clear it to stop the loop.
-      if (!res.ok) {
-        // We cannot delete cookies in a Server Component directly.
-        // So we redirect to our helper route which deletes the cookie and sends to login.
-        redirect('/next-api/authenticate/session-expired');
-      }
-    } catch (error) {
-      console.error("Auth check failed:", error);
-      // Optional: If backend is completely down, do you want to logout user?
-      // Usually keeping them logged in but showing an error state in the page is safer 
-      // to avoid mass logouts during server blips. 
-      // But if you want strict security:
+    } catch {
       redirect('/next-api/authenticate/session-expired');
     }
   }
-  // -----------------------------------------
 
   const messages = await getMessages()
 

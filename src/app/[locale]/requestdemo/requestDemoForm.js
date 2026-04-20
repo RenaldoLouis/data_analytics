@@ -1,5 +1,6 @@
 "use client";
 
+import client from "@/lib/apiClient";
 import { zodResolver } from "@hookform/resolvers/zod";
 import moment from "moment";
 import Image from "next/image";
@@ -53,28 +54,13 @@ export default function RequestDemoForm() {
 
     const onSubmit = async (data) => {
         try {
-            const res = await fetch("/next-api/requestdemo", {
-                method: "POST",
-                body: JSON.stringify(data),
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
+            await client.post("/next-api/requestdemo", data);
+            toast("Register success", {
+                description: moment().format("dddd, MMMM DD, YYYY [at] h:mm A"),
             });
-
-            if (res.status === 200) {
-                toast("Register success", {
-                    description: moment().format("dddd, MMMM DD, YYYY [at] h:mm A"),
-                });
-                router.push("/login");
-            } else {
-                const errData = await res.json();
-                form.setError("root", {
-                    message: errData?.message || "Registration failed. Try again.",
-                });
-            }
+            router.push("/login");
         } catch (err) {
-            form.setError("root", {
-                message: err.message || "An unexpected error occurred.",
-            });
+            form.setError("root", { message: err.response?.data?.message || "Registration failed. Try again." });
         }
     };
 

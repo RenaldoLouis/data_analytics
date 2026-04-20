@@ -1,5 +1,6 @@
 "use client";
 
+import client from "@/lib/apiClient";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
@@ -88,112 +89,49 @@ export default function LoginForm() {
     const onLoginSubmit = async (data) => {
         setIsLoading(true);
         try {
-            const res = await fetch("/next-api/login", {
-                method: "POST",
-                body: JSON.stringify(data),
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-            if (res.status === 200) {
-                // router.replace("/dashboard");
-                router.replace("/pricingCalculator/sku");
-            } else {
-                setIsLoading(false);
-                loginForm.setError("root", { message: t("invalidCredentials") });
-            }
+            await client.post("/next-api/login", data);
+            router.replace("/pricingCalculator/sku");
         } catch (err) {
             setIsLoading(false);
-            loginForm.setError("root", { message: err.message || "Unexpected error occurred." });
+            loginForm.setError("root", { message: err.response?.data?.error || t("invalidCredentials") });
         }
     };
 
     const onForgotEmailSubmit = async (data) => {
         setIsLoading(true);
         try {
-            const res = await fetch("/next-api/resetpasswordotp", {
-                method: "POST",
-                body: JSON.stringify(data),
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-
-            if (res.status === 200) {
-                setResetEmail(data.email);
-                setFormView('FORGOT_OTP');
-                setIsLoading(false);
-
-            } else {
-                const errData = await res.json();
-                forgotEmailForm.setError("root", {
-                    message: errData?.message || "Email not found. Try again.",
-                });
-                setIsLoading(false);
-            }
+            await client.post("/next-api/resetpasswordotp", data);
+            setResetEmail(data.email);
+            setFormView('FORGOT_OTP');
         } catch (err) {
-            forgotEmailForm.setError("root", {
-                message: err.message || "An unexpected error occurred.",
-            });
+            forgotEmailForm.setError("root", { message: err.response?.data?.message || "Email not found. Try again." });
+        } finally {
             setIsLoading(false);
         }
     };
 
     const onOTPSubmit = async (data) => {
-        const dataToSend = { otp: data.otp, email: resetEmail }
         setIsLoading(true);
         try {
-            const res = await fetch("/next-api/verifyResetPasswordOtp", {
-                method: "POST",
-                body: JSON.stringify(dataToSend),
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-
-            if (res.status === 200) {
-                setResetOTP(data.otp)
-                setFormView('NEW_PASSWORD'); // Pindah ke tampilan password baru
-                setIsLoading(false);
-            } else {
-                const errData = await res.json();
-                forgotOTPForm.setError("root", {
-                    message: errData?.message || "Invalid OTP code. Try again.",
-                });
-                setIsLoading(false);
-            }
+            await client.post("/next-api/verifyResetPasswordOtp", { otp: data.otp, email: resetEmail });
+            setResetOTP(data.otp);
+            setFormView('NEW_PASSWORD');
         } catch (err) {
-            forgotOTPForm.setError("root", {
-                message: err.message || "An unexpected error occurred.",
-            });
+            forgotOTPForm.setError("root", { message: err.response?.data?.message || "Invalid OTP code. Try again." });
+        } finally {
             setIsLoading(false);
         }
     };
 
     const onNewPasswordSubmit = async (data) => {
-        const dataToSend = { otp: resetOTP, email: resetEmail, newPassword: data.password }
         setIsLoading(true);
         try {
-            const res = await fetch("/next-api/resetPassword", {
-                method: "POST",
-                body: JSON.stringify(dataToSend),
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-
-            if (res.status === 200) {
-
-                setFormView('LOGIN'); // Kembali ke login
-                setResetEmail('');
-                setIsLoading(false);
-            } else {
-                const errData = await res.json();
-                newPasswordForm.setError("root", {
-                    message: errData?.message || "Error setting password. Try again.",
-                });
-                setIsLoading(false);
-            }
+            await client.post("/next-api/resetPassword", { otp: resetOTP, email: resetEmail, newPassword: data.password });
+            setFormView('LOGIN');
+            setResetEmail('');
         } catch (err) {
-            newPasswordForm.setError("root", {
-                message: err.message || "An unexpected error occurred.",
-            });
+            newPasswordForm.setError("root", { message: err.response?.data?.message || "Error setting password. Try again." });
+        } finally {
             setIsLoading(false);
         }
     };

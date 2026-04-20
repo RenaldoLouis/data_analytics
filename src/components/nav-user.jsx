@@ -1,5 +1,6 @@
 "use client"
 
+import client from "@/lib/apiClient"
 import {
   IconCreditCard,
   IconDotsVertical,
@@ -38,16 +39,8 @@ export function NavUser({
 
   const handleClickSignOut = async () => {
     try {
-      const res = await fetch('/next-api/logout', {
-        method: 'POST',
-      });
-
-      if (res.ok) {
-        // Redirect to the login page after successful logout
-        router.push('/login');
-      } else {
-        console.error("Logout failed");
-      }
+      await client.post('/next-api/logout');
+      router.push('/login');
     } catch (error) {
       console.error("An error occurred during logout:", error);
     }

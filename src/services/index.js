@@ -1,182 +1,83 @@
-import { apiClient } from "@/lib/apiClient";
-import http from "./http";
+import client from '@/lib/apiClient'
+import http from './http'
 
-const handleErrors = (err /* path  payload */) => {
-    // const errorMessageKey = err.response?.data?.error.Message;
-    const errorMessageKey = err.response;
-    return { error: errorMessageKey };
-};
+const handleError = (err) => ({ error: err.response ?? err.message })
 
+// All requests through /next-api/ use the cookie-authed client
+const get    = (path)         => client.get(path).then(r => r.data).catch(handleError)
+const post   = (path, body)   => client.post(path, body).then(r => r.data).catch(handleError)
+const put    = (path, body)   => client.put(path, body).then(r => r.data).catch(handleError)
+const del    = (path)         => client.delete(path).then(r => r.data).catch(handleError)
+const postForm = (path, body) => client.post(path, body, {
+    headers: { 'Content-Type': undefined }, // let axios set multipart boundary
+}).then(r => r.data).catch(handleError)
 
-const getRequest = async (path) => {
-    try {
-        return apiClient(path, {
-            method: 'GET',
-            form: false,
-        });
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const postAPIRequest = async (path, payload = {}) => {
-    try {
-        return apiClient(path, {
-            method: 'POST',
-            body: payload,
-            form: false,
-        });
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const postRequest = async (path, payload) => {
-    try {
-        const res = await http.post(path, payload);
-        return res;
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const getAPIRequest = async (path) => {
-    try {
-        const res = await http.get(path);
-        return res;
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const postFormRequest = async (path, payload) => {
-    try {
-        return apiClient(path, {
-            method: 'POST',
-            body: payload,
-            form: true,
-        });
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const putRequestMiddleware = async (path, payload) => {
-    try {
-        return apiClient(path, {
-            method: 'PUT',
-            body: payload,
-            form: false,
-        });
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const deleteRequestMiddleware = async (path) => {
-    try {
-        return apiClient(path, {
-            method: 'DELETE',
-            form: false,
-        });
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const postBlobRequest = async (path, payload) => {
-    try {
-        const res = await http.postBlob(path, payload);
-        return res;
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const putRequest = async (path, payload) => {
-    try {
-        const res = await http.put(path, payload);
-        return res;
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const patchRequest = async (path, payload) => {
-    try {
-        return await http.patch(path, payload);
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
-
-const deleteRequest = async (path) => {
-    try {
-        return await http.delete(path);
-    } catch (err) {
-        return handleErrors(err);
-    }
-};
+// Direct-to-backend requests (public, no cookie needed)
+const directPost = (path, body) => http.post(path, body).then(r => r.data).catch(handleError)
+const directGet  = (path)       => http.get(path).then(r => r.data).catch(handleError)
 
 // eslint-disable-next-line import/no-anonymous-default-export
 export default {
     auth: {
-        register: (payload) => postAPIRequest('/next-api/register', payload),
-        pricingPlans: () => getRequest('/next-api/pricing-plans'),
-        verifyEmail: (token) => getRequest(`/next-api/verify-email?token=${token}`),
-        resendVerification: (email) => postRequest('/auth/resend-verification', email),
-        upgradePlan: (email) => postRequest('/auth/upgrade-plan', email),
-        authenticate: () => postAPIRequest('/next-api/authenticate'),
+        register:           (payload) => post('/next-api/register', payload),
+        pricingPlans:       ()        => get('/next-api/pricing-plans'),
+        verifyEmail:        (token)   => get(`/next-api/verify-email?token=${token}`),
+        resendVerification: (email)   => directPost('/auth/resend-verification', email),
+        upgradePlan:        (email)   => directPost('/auth/upgrade-plan', email),
+        authenticate:       ()        => post('/next-api/authenticate'),
     },
     aws: {
-        postSignedUrl: (directoryname, fileName) => postRequest(`/next-api/v1/apcs/signed-url-images?directoryname=${directoryname}&fileName=${fileName}`),
-        downloadFiles: (files) => postBlobRequest(`/next-api/v1/apcs/download-files-aws`, files),
+        postSignedUrl: (directoryname, fileName) =>
+            directPost(`/next-api/v1/apcs/signed-url-images?directoryname=${directoryname}&fileName=${fileName}`),
+        downloadFiles: (files) =>
+            http.post('/next-api/v1/apcs/download-files-aws', files, { responseType: 'blob' })
+                .then(r => r.data).catch(handleError),
     },
     dataset: {
-        addNewDataSet: (files) => postFormRequest(`/next-api/dataset`, files),
-        getAllDataset: () => getRequest(`/next-api/dataset`),
-        getAllDatasetById: (id, limit, page) => getRequest(`/next-api/dataset/${id}?limit=${limit}&page=${page}`),
-        updateDatasetContents: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDatasetContents/${id}`, datasetContents),
-        updateDataset: (id, datasetContents) => putRequestMiddleware(`/next-api/dataset/updateDataset/${id}`, datasetContents),
-        deleteDataset: (id) => deleteRequestMiddleware(`/next-api/dataset/${id}`),
-        searchDataset: (name) => getRequest(`/next-api/dataset/searchDataset/?name=${name}`),
+        addNewDataSet:          (files) => postForm('/next-api/dataset', files),
+        getAllDataset:           ()      => get('/next-api/dataset'),
+        getAllDatasetById:       (id, limit, page) => get(`/next-api/dataset/${id}?limit=${limit}&page=${page}`),
+        updateDatasetContents:  (id, body) => put(`/next-api/dataset/updateDatasetContents/${id}`, body),
+        updateDataset:          (id, body) => put(`/next-api/dataset/updateDataset/${id}`, body),
+        deleteDataset:          (id)       => del(`/next-api/dataset/${id}`),
+        searchDataset:          (name)     => get(`/next-api/dataset/searchDataset/?name=${name}`),
     },
     chart: {
-        getChart: () => getRequest(`/next-api/chart`),
-        getChartData: (data) => postAPIRequest(`/next-api/chart`, data),
-        getChartRecords: (id) => getRequest(`/next-api/records/${id}`),
-        postChartRecords: (data) => postAPIRequest(`/next-api/records`, data)
+        getChart:       ()     => get('/next-api/chart'),
+        getChartData:   (data) => post('/next-api/chart', data),
+        getChartRecords:(id)   => get(`/next-api/records/${id}`),
+        postChartRecords:(data)=> post('/next-api/records', data),
     },
     dashboard: {
-        getDashboard: (layoutNumber) => getRequest(`/next-api/dashboard/${layoutNumber}`),
-        postSaveDashboardRecord: (data) => postAPIRequest(`/next-api/dashboard`, data),
-        deleteDashboardChart: (id) => deleteRequestMiddleware(`/next-api/dashboard/chart/${id}`),
+        getDashboard:           (layoutNumber) => get(`/next-api/dashboard/${layoutNumber}`),
+        postSaveDashboardRecord:(data)         => post('/next-api/dashboard', data),
+        deleteDashboardChart:   (id)           => del(`/next-api/dashboard/chart/${id}`),
     },
     pl: {
-        getPls: () => getRequest('/next-api/pl'),
-        getBrands: () => getRequest('/next-api/pl/brand'),
-        getPlById: (plId) => getRequest(`/next-api/pl/${plId}`),
-        createPl: (payload) => postAPIRequest('/next-api/pl', payload),
-        updatePl: (plId, payload) => putRequestMiddleware(`/next-api/pl/${plId}`, payload),
-        deletePl: (plId) => deleteRequestMiddleware(`/next-api/pl/${plId}`),
-        getMonthlyByBrand: (brandId) => getRequest(`/next-api/pl/brands/${brandId}/monthly`),
-        getMonthlyById: (updateId) => getRequest(`/next-api/pl/monthly/${updateId}`),
-        getPreviousMonthly: (params) => getRequest(`/next-api/pl/monthly/previous?brandId=${params.brandId}&skuId=${params.skuId}&periodMonth=${params.periodMonth}&periodYear=${params.periodYear}`),
-        getTakenMonths: (brandId, year) => getRequest(`/next-api/pl/monthly/taken-months?brandId=${brandId}&periodYear=${year}`),
-        getMonthlyByPeriod: (brandId, skuId, periodMonth, periodYear) => getRequest(`/next-api/pl/monthly/by-period?brandId=${brandId}&skuId=${skuId}&periodMonth=${periodMonth}&periodYear=${periodYear}`),
-        createMonthly: (payload) => postAPIRequest('/next-api/pl/monthly', payload),
-        updateMonthly: (updateId, payload) => putRequestMiddleware(`/next-api/pl/monthly/${updateId}`, payload),
-        deleteMonthly: (updateId) => deleteRequestMiddleware(`/next-api/pl/monthly/${updateId}`),
+        getPls:             ()          => get('/next-api/pl'),
+        getBrands:          ()          => get('/next-api/pl/brand'),
+        getPlById:          (plId)      => get(`/next-api/pl/${plId}`),
+        createPl:           (payload)   => post('/next-api/pl', payload),
+        updatePl:           (plId, payload) => put(`/next-api/pl/${plId}`, payload),
+        deletePl:           (plId)      => del(`/next-api/pl/${plId}`),
+        getMonthlyByBrand:  (brandId)   => get(`/next-api/pl/brands/${brandId}/monthly`),
+        getMonthlyById:     (updateId)  => get(`/next-api/pl/monthly/${updateId}`),
+        getPreviousMonthly: (params)    => get(`/next-api/pl/monthly/previous?brandId=${params.brandId}&skuId=${params.skuId}&periodMonth=${params.periodMonth}&periodYear=${params.periodYear}`),
+        getTakenMonths:     (brandId, year) => get(`/next-api/pl/monthly/taken-months?brandId=${brandId}&periodYear=${year}`),
+        getMonthlyByPeriod: (brandId, skuId, periodMonth, periodYear) => get(`/next-api/pl/monthly/by-period?brandId=${brandId}&skuId=${skuId}&periodMonth=${periodMonth}&periodYear=${periodYear}`),
+        createMonthly:      (payload)   => post('/next-api/pl/monthly', payload),
+        updateMonthly:      (updateId, payload) => put(`/next-api/pl/monthly/${updateId}`, payload),
+        deleteMonthly:      (updateId)  => del(`/next-api/pl/monthly/${updateId}`),
     },
     sku: {
-        getSkus: () => getRequest('/next-api/sku'),
-        getSkuById: (skuId) => getRequest(`/next-api/sku/${skuId}`),
-        createSku: (payload) => postAPIRequest('/next-api/sku', payload),
-        updateSku: (skuId, payload) => putRequestMiddleware(`/next-api/sku/${skuId}`, payload),
-        deleteSku: (skuId) => deleteRequestMiddleware(`/next-api/sku/${skuId}`),
-        getCategories: () => getRequest('/next-api/sku/categories'),
-        getCategoryById: (categoryId) => getRequest(`/next-api/sku/categories/${categoryId}`),
-        getSubCategories: () => getRequest('/next-api/sku/subcategories'),
-        getSubCategoriesByCategory: (categoryId) => getRequest(`/next-api/sku/subcategories?categoryId=${categoryId}`),
+        getSkus:                    ()           => get('/next-api/sku'),
+        getSkuById:                 (skuId)      => get(`/next-api/sku/${skuId}`),
+        createSku:                  (payload)    => post('/next-api/sku', payload),
+        updateSku:                  (skuId, payload) => put(`/next-api/sku/${skuId}`, payload),
+        deleteSku:                  (skuId)      => del(`/next-api/sku/${skuId}`),
+        getCategories:              ()           => get('/next-api/sku/categories'),
+        getCategoryById:            (categoryId) => get(`/next-api/sku/categories/${categoryId}`),
+        getSubCategories:           ()           => get('/next-api/sku/subcategories'),
+        getSubCategoriesByCategory: (categoryId) => get(`/next-api/sku/subcategories?categoryId=${categoryId}`),
     },
-};
+}
