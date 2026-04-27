@@ -1,7 +1,7 @@
 import createIntlMiddleware from 'next-intl/middleware';
 import { NextResponse } from 'next/server';
 
-const protectedRoutes = ['/dashboard', '/admin'];
+const protectedRoutes = ['/admin'];
 const publicRoutes = ['/login', '/register'];
 
 const i18n = createIntlMiddleware({
@@ -25,9 +25,14 @@ export function middleware(req) {
     const isPublic = publicRoutes.some(startsWith);
     const isProtected = protectedRoutes.some(startsWith);
     const isLocaleRoot = pathNoLocale === '/';
+    const isDashboard = startsWith('/dashboard');
+
+    if (isDashboard) {
+        return NextResponse.redirect(new URL(`/${locale}/pricingCalculator/sku`, req.url));
+    }
 
     if (hasSession && (isPublic || isLocaleRoot)) {
-        return NextResponse.redirect(new URL(`/${locale}/dashboard`, req.url));
+        return NextResponse.redirect(new URL(`/${locale}/pricingCalculator/sku`, req.url));
     }
 
     if (!hasSession && (isProtected || isLocaleRoot)) {
