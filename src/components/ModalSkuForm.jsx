@@ -96,18 +96,20 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
         fetchCategories()
 
         if (initForm.category_id) {
-            const fetchSubCategories = async () => {
-                setIsSubCategoriesLoading(true)
-                const res = await services.sku.getCategoryById(initForm.category_id)
+            setIsSubCategoriesLoading(true)
+            services.sku.getCategoryById(initForm.category_id).then((res) => {
                 const subs = res?.data?.sub_categories ?? []
                 setSubCategories(subs)
                 setIsSubCategoriesLoading(false)
-            }
-            fetchSubCategories()
+                if (initForm.subcategory_id && !subs.find((s) => s.id === initForm.subcategory_id)) {
+                    setForm((prev) => ({ ...prev, subcategory_id: '' }))
+                }
+            })
         }
+
     }, [open, editingSku])
 
-    // Fetch subcategories when category changes
+    // Fetch subcategories when user changes category
     useEffect(() => {
         if (!form.category_id) {
             setSubCategories([])
@@ -116,8 +118,7 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
         const fetchSubCategories = async () => {
             setIsSubCategoriesLoading(true)
             const res = await services.sku.getCategoryById(form.category_id)
-            const subs = res?.data?.sub_categories ?? []
-            setSubCategories(subs)
+            setSubCategories(res?.data?.sub_categories ?? [])
             setIsSubCategoriesLoading(false)
         }
         fetchSubCategories()
@@ -156,13 +157,20 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
             width: parseFloat(form.width),
             height: parseFloat(form.height),
             weight: parseFloat(form.weight),
-            ...(form.subcategory_id && { subcategory_id: form.subcategory_id }),
-            ...(form.product_name && { product_name: form.product_name }),
-            ...(form.variant && { variant: form.variant }),
-            ...(form.size && { size: form.size }),
             ...(editingSku
-                ? { sku_image: form.sku_image || null, sku_barcode: form.sku_barcode || null }
+                ? {
+                    subcategory_id: form.subcategory_id || null,
+                    product_name: form.product_name || null,
+                    variant: form.variant || null,
+                    size: form.size || null,
+                    sku_image: form.sku_image || null,
+                    sku_barcode: form.sku_barcode || null,
+                }
                 : {
+                    ...(form.subcategory_id && { subcategory_id: form.subcategory_id }),
+                    ...(form.product_name && { product_name: form.product_name }),
+                    ...(form.variant && { variant: form.variant }),
+                    ...(form.size && { size: form.size }),
                     ...(form.sku_image && { sku_image: form.sku_image }),
                     ...(form.sku_barcode && { sku_barcode: form.sku_barcode }),
                 }),

@@ -45,7 +45,7 @@ export default function SkuSelectionModal({ t, skuModalOpen, setSkuModalOpen, sk
                                     onClick={() => selectSku(sku)}
                                     className={`w-full text-left rounded-md border p-3 transition-colors space-y-0.5 ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/60'}`}
                                 >
-                                    <p className={`text-sm font-medium ${isSelected ? 'text-primary' : ''}`}>{sku.product_name || '—'}</p>
+                                    <p className={`text-sm font-medium ${isSelected ? 'text-primary' : ''}`}>{sku.product_name || '-'}</p>
                                     <p className="text-xs text-muted-foreground">
                                         {sku.sku_code}
                                         {sku.brand && ` · ${sku.brand}`}
