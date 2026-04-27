@@ -26,7 +26,7 @@ export function middleware(req) {
     const isProtected = protectedRoutes.some(startsWith);
     const isLocaleRoot = pathNoLocale === '/';
 
-    if (isPublic && hasSession) {
+    if (hasSession && (isPublic || isLocaleRoot)) {
         return NextResponse.redirect(new URL(`/${locale}/dashboard`, req.url));
     }
 
