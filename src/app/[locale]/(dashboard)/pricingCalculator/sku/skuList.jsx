@@ -329,7 +329,7 @@ export default function SkuList() {
                     <DialogHeader>
                         <DialogTitle>{t('deleteConfirmTitle')}</DialogTitle>
                         <DialogDescription>
-                            {t('deleteConfirmDesc', { name: deletingSku?.product_name || deletingSku?.sku_code || '' })}
+                            {t('deleteConfirmDesc', { name: deletingSku?.sku_code || deletingSku?.product_name || '' })}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>

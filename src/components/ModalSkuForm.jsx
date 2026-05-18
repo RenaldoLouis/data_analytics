@@ -148,6 +148,15 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
             toast(t('brandRequired'))
             return
         }
+        if (!form.product_name.trim()) {
+            toast(t('productNameRequired'))
+            return
+        }
+        const allDimensions = [form.length, form.width, form.height, form.weight]
+        if (!allDimensions.every(v => parseFloat(v) > 0)) {
+            toast(t('dimensionsRequired'))
+            return
+        }
 
         const payload = {
             sku_code: form.sku_code,
@@ -185,7 +194,7 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
             toast(editingSku ? t('updateSuccess') : t('createSuccess'))
             onSuccess()
         } else {
-            toast(editingSku ? t('updateFailed') : t('createFailed'))
+            toast(res?.error?.data?.message || (editingSku ? t('updateFailed') : t('createFailed')))
         }
         setIsSubmitting(false)
     }
@@ -215,7 +224,7 @@ export default function ModalSkuForm({ open, onOpenChange, editingSku, onSuccess
                             />
                         </div>
                         <div className="space-y-1">
-                            <Label>{t('productName')}</Label>
+                            <Label>{t('productName')} <span className="text-destructive">*</span></Label>
                             <Input
                                 placeholder={t('productNamePlaceholder')}
                                 value={form.product_name}

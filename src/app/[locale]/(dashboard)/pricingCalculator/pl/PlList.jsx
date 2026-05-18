@@ -1,6 +1,14 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import LoadingScreen from "@/components/ui/loadingScreen"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -164,6 +172,7 @@ export default function PlList({ onAdd, onEdit }) {
     const [isPageLoading, setIsPageLoading] = useState(true)
     const [isMutating, setIsMutating] = useState(false)
     const [isFetch, setIsFetch] = useState(false)
+    const [deletingPl, setDeletingPl] = useState(null)
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
     const [sorting, setSorting] = useState([])
 
@@ -203,10 +212,12 @@ export default function PlList({ onAdd, onEdit }) {
 
     const groupedPls = useMemo(() => groupByPeriod(pls, brandsMap), [pls, brandsMap])
 
-    const handleDelete = async (allIds) => {
+    const confirmDelete = async () => {
+        if (!deletingPl) return
+        setDeletingPl(null)
         setIsMutating(true)
         try {
-            await Promise.all(allIds.map(id => services.pl.deleteMonthly(id)))
+            await Promise.all(deletingPl.map(id => services.pl.deleteMonthly(id)))
             toast.success(t('deleteSuccess'))
             setIsFetch(prev => !prev)
         } catch {
@@ -284,7 +295,7 @@ export default function PlList({ onAdd, onEdit }) {
                     <IconTrash
                         size={16}
                         className="cursor-pointer text-red-500 hover:text-red-700 transition-colors"
-                        onClick={() => handleDelete(row.original.all_ids)}
+                        onClick={() => setDeletingPl(row.original.all_ids)}
                     />
                 </div>
             ),
@@ -307,6 +318,19 @@ export default function PlList({ onAdd, onEdit }) {
     return (
         <>
             {isMutating && <LoadingScreen />}
+
+            <Dialog open={!!deletingPl} onOpenChange={(open) => { if (!open) setDeletingPl(null) }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('deleteConfirmTitle')}</DialogTitle>
+                        <DialogDescription>{t('deleteConfirmDesc')}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeletingPl(null)}>{t('deleteCancel')}</Button>
+                        <Button variant="destructive" onClick={confirmDelete}>{t('deleteConfirm')}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <div className="space-y-4">
                 <div className="flex justify-between items-center px-4 lg:px-6">
