@@ -16,17 +16,17 @@ export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
 
     const items = [
         {
+            id: "pricing-calculator",
+            title: "HPP Calculator",
+            url: "/pricingCalculator/hpp",
+            icon: IconCalculator,
+        },
+        {
             id: "pricing-sku",
             title: t("sku"),
             url: "/pricingCalculator/sku",
             icon: IconTag,
         },
-        // {
-        //     id: "pricing-calculator",
-        //     title: "HPP Calculator",
-        //     url: "/pricingCalculator/hpp",
-        //     icon: IconCalculator,
-        // },
         {
             id: "pricing-brand",
             title: t("brand"),
