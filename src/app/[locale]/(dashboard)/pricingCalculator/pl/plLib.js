@@ -14,14 +14,14 @@ export const DISCOUNT_PCT_KEYS = DISCOUNT_COLS.filter(c => !c.currency).map(c =>
 export const DISCOUNT_AMT_KEYS = DISCOUNT_COLS.filter(c => c.currency).map(c => c.key)
 
 // ─── Formatters / parsers ─────────────────────────────────────────────────────
-export const fmt = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
+export const fmt = (n) => 'Rp ' + Math.round(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 export const pct = (n) => (isFinite(n) ? n.toFixed(1) : '0.0') + '%'
 export const num = (s) => parseFloat(String(s).replace(/[^\d.]/g, '')) || 0
 
 export const fmtCurrency = (v) => {
     if (v === '' || v == null) return ''
     const n = parseInt(String(v).replace(/\D/g, ''), 10)
-    return isNaN(n) ? '' : n.toLocaleString('id-ID')
+    return isNaN(n) ? '' : n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 export const parseCurrency = (v) => String(v).replace(/\D/g, '')
 

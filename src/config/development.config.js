@@ -2,10 +2,10 @@
 export default {
   api: {
     // baseURL: 'https://app.siriusbi.com/api',
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:8080',
   },
   client: {
     // baseURL: 'https://app.siriusbi.com/api',
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://localhost:8000',
   },
 };

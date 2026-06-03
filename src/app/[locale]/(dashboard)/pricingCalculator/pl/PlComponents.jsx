@@ -1,12 +1,19 @@
 'use client'
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableRow,
+} from "@/components/ui/table"
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react"
 import { Fragment, useState } from "react"
-import { fmtCurrency, getChColor, parseCurrency } from "./plLib"
+import { fmt, fmtCurrency, getChColor, parseCurrency } from "./plLib"
 
 // ─── ChBadge ──────────────────────────────────────────────────────────────────
 export function ChBadge({ code, label }) {
@@ -261,6 +268,95 @@ export function ChTh({ children, className = '' }) {
         <th className={`pb-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 text-right whitespace-nowrap ${className}`}>
             {children}
         </th>
+    )
+}
+
+// ─── SectionHeader - bar title for use inside a Section wrapper ──────────────
+export function SectionHeader({ title }) {
+    return (
+        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted px-2.5 py-1.5 border-b">
+            {title}
+        </div>
+    )
+}
+
+// ─── Section - rounded border wrapper that contains SectionHeader + content ──
+export function Section({ title, children }) {
+    return (
+        <div className="overflow-hidden rounded-md border">
+            <SectionHeader title={title} />
+            {children}
+        </div>
+    )
+}
+
+// ─── AuditTable - label / value rows with optional subtotal row ───────────────
+export function AuditTable({ rows, subtotal, noBorder = false }) {
+    return (
+        <div className={noBorder ? '' : 'overflow-hidden rounded-lg border'}>
+            <Table className="[&_th]:text-[11px] [&_td]:text-xs">
+                <TableBody>
+                    {rows.map(({ label, value, cls, note }) => (
+                        <TableRow key={label}>
+                            <TableCell className="text-muted-foreground w-[60%]">{label}</TableCell>
+                            <TableCell className={`text-right tabular-nums ${cls ?? ''}`}>
+                                {fmt(value)}
+                                {note && <span className="text-[10px] text-muted-foreground ml-1">({note})</span>}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                    {subtotal && (
+                        <TableRow className="bg-muted/40">
+                            <TableCell className="font-medium">{subtotal.label}</TableCell>
+                            <TableCell className={`text-right tabular-nums font-medium ${subtotal.cls ?? ''}`}>
+                                {fmt(subtotal.value)}
+                            </TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </div>
+    )
+}
+
+// ─── KpiCards - flexible metric summary grid (3 or 4 columns) ────────────────
+export function KpiCards({ cards }) {
+    // cards: [{ label, value, cls, subtitle? }]
+    const cols = cards.length >= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
+    return (
+        <div className={`grid ${cols} gap-2`}>
+            {cards.map(({ label, value, cls, subtitle }) => (
+                <div key={label} className="rounded-lg border bg-muted/30 px-3 py-2">
+                    <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
+                    <p className={`text-sm font-semibold tabular-nums ${cls ?? ''}`}>{fmt(value)}</p>
+                    {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>}
+                </div>
+            ))}
+        </div>
+    )
+}
+
+// ─── ShopeeChip - orange Shopee platform badge ────────────────────────────────
+export function ShopeeChip() {
+    return (
+        <Badge className="bg-orange-50 text-orange-600 border-orange-200 font-medium text-xs rounded-full px-2.5 py-0.5 hover:bg-orange-50">
+            Shopee
+        </Badge>
+    )
+}
+
+// ─── SkuCell - SKU canonical name + code + optional import alias ──────────────
+export function SkuCell({ rec }) {
+    const name      = rec?.sku_name
+    const code      = rec?.sku_code
+    const alias     = rec?.product_names?.[0]
+    const showAlias = alias && alias !== name
+    return (
+        <div>
+            <p className="font-medium text-sm">{name ?? code ?? 'SKU'}</p>
+            {code      && <p className="text-[11px] text-muted-foreground mt-0.5">{code}</p>}
+            {showAlias && <p className="text-[10px] text-muted-foreground/60 mt-0.5">↳ {alias}</p>}
+        </div>
     )
 }
 

@@ -92,52 +92,39 @@ export default function SetupPhase({
                     <div className="grid gap-2">
                         <Label>{t('targetPlatform')}</Label>
                         <p className="text-xs text-muted-foreground">{t('platformSubtitle')}</p>
-                        <div
-                            className="flex flex-wrap gap-1.5 min-h-10 rounded-md border border-input px-3 py-2 cursor-text"
-                            onClick={() => document.getElementById('ch-tag-inp').focus()}
-                        >
-                            {channels.map(ch => (
-                                <span key={ch} className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium bg-muted border">
-                                    {ch}
-                                    <span className="cursor-pointer opacity-50 hover:opacity-100 leading-none" onClick={e => { e.stopPropagation(); removeChannel(ch) }}>×</span>
-                                </span>
-                            ))}
-                            <input
-                                id="ch-tag-inp"
-                                className="flex-1 min-w-24 text-sm bg-transparent outline-none"
-                                value={tagInput}
-                                onChange={e => setTagInput(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addChannel(tagInput); setTagInput('') }
-                                    else if (e.key === 'Backspace' && !tagInput && channels.length > 0) removeChannel(channels[channels.length - 1])
-                                }}
-                                placeholder={channels.length === 0 ? t('addChannelPlaceholder') : ''}
-                            />
+                        <div className="flex flex-wrap gap-1.5 min-h-10 rounded-md border border-input px-3 py-2 bg-muted/30 cursor-not-allowed">
+                            <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium bg-muted border">
+                                Shopee
+                            </span>
                         </div>
+                        <p className="text-xs text-muted-foreground">{t('channelLockedHint')}</p>
                     </div>
                     {channels.length > 0 && (
                         <div className="grid gap-2">
                             <Label>{t('channelSettingsTitle')}</Label>
-                            {channels.map(ch => (
-                                <div key={ch} className={`flex items-center justify-between rounded-md border px-4 py-3 ${channelActive[ch] === false ? 'opacity-50' : ''}`}>
-                                    <div>
-                                        <p className="text-sm font-medium">{ch}</p>
-                                        <p className="text-xs text-muted-foreground">{ch} Official Store / Mall</p>
+                            {channels.map(ch => {
+                                const isShopee = ch.toLowerCase().includes('shopee')
+                                return (
+                                    <div key={ch} className={`flex items-center justify-between rounded-md border px-4 py-3 ${!isShopee ? 'opacity-40' : ''}`}>
+                                        <div>
+                                            <p className="text-sm font-medium">{ch}</p>
+                                            <p className="text-xs text-muted-foreground">{ch} Official Store / Mall</p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm text-muted-foreground">{t('channelActiveLabel')}</span>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={isShopee}
+                                                disabled
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full cursor-not-allowed ${isShopee ? 'bg-green-600' : 'bg-input'}`}
+                                            >
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isShopee ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-sm text-muted-foreground">{t('channelActiveLabel')}</span>
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            aria-checked={channelActive[ch] !== false}
-                                            onClick={() => setChannelActive(prev => ({ ...prev, [ch]: prev[ch] === false ? true : false }))}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${channelActive[ch] !== false ? 'bg-green-600' : 'bg-input'}`}
-                                        >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${channelActive[ch] !== false ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
                 </div>
@@ -280,28 +267,31 @@ export default function SetupPhase({
 
                     {/* SKU chooser */}
                     <InnerCard title={t('chooseSku')}>
-                        {p.sku ? (
-                            <div className="space-y-2">
-                                <div className="rounded-md border bg-card p-3 space-y-0.5">
-                                    <p className="text-sm font-semibold">{p.sku.product_name || p.sku.name || '—'}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {p.sku.sku_code}
-                                        {p.sku.variant && ` · ${p.sku.variant}`}
-                                    </p>
+                        <div className="space-y-2">
+                            <Input
+                                value={p.name || ''}
+                                onChange={e => updateP('name', e.target.value)}
+                                placeholder={t('productNamePlaceholder')}
+                            />
+                            {p.sku ? (
+                                <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-muted-foreground truncate">{p.sku.sku_code}{p.sku.variant && ` · ${p.sku.variant}`}</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" className="h-7 text-xs flex-shrink-0" onClick={openSkuModal}>
+                                        {t('changeSku')}
+                                    </Button>
                                 </div>
-                                <Button variant="outline" size="sm" className="w-full" onClick={openSkuModal}>
-                                    {t('changeSku')}
-                                </Button>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={openSkuModal}
-                                className="w-full rounded-md border border-dashed p-4 text-sm text-muted-foreground hover:bg-muted/50 transition-colors text-center"
-                            >
-                                {t('noSkuSelected')}
-                            </button>
-                        )}
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={openSkuModal}
+                                    className="w-full text-left text-xs text-primary hover:underline"
+                                >
+                                    {t('linkToSkuCatalog')}
+                                </button>
+                            )}
+                        </div>
                     </InnerCard>
 
                     {/* COGS + Packaging */}

@@ -13,12 +13,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { IconBuildingStore, IconDownload, IconFileExport, IconFileImport, IconPresentationAnalytics } from "@tabler/icons-react"
 import * as XLSX from "xlsx"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { DISCOUNT_COLS, MONTH_LABELS, fmt } from "./plLib"
 import { generatePlTemplate, parsePlImport, exportPlToExcel } from "./plExcel"
 import { ChBadge, ChInput, PnLAccordion, SectionCard, SetupSummaryCard, ChTh } from "./PlComponents"
-
 export default function MonthlyInputSection({
     t,
     // setup summary
@@ -51,9 +50,10 @@ export default function MonthlyInputSection({
     // excel import/export
     onImportExcel,
     onExportCurrent,
+    // lock period from import modal
+    importPeriod = null,
 }) {
     const fileInputRef = useRef(null)
-
     const handleDownloadTemplate = () => {
         const wb = generatePlTemplate(channels, products)
         XLSX.writeFile(wb, 'pl_monthly_template.xlsx')
@@ -92,7 +92,7 @@ export default function MonthlyInputSection({
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">{t('periodTitle')} <span className="text-red-500">*</span></p>
                 <div className="mb-3">
                     <Label className="text-xs mb-1 block">{t('yearLabel')}</Label>
-                    <Select value={activeYear} onValueChange={val => setActiveYear(val)}>
+                    <Select value={activeYear} onValueChange={val => setActiveYear(val)} disabled={!!importPeriod}>
                         <SelectTrigger className="w-36">
                             <SelectValue placeholder={t('yearLabel')} />
                         </SelectTrigger>
@@ -112,16 +112,18 @@ export default function MonthlyInputSection({
                         : MONTH_LABELS.map((m, i) => {
                             const monthCode = String(i + 1).padStart(2, '0')
                             const isTaken = takenMonths.includes(monthCode)
+                            const isLocked = !!importPeriod
                             return (
                                 <button
                                     key={m}
                                     type="button"
-                                    disabled={isTaken}
-                                    onClick={() => !isTaken && setActiveMo(m)}
+                                    disabled={isTaken || isLocked}
+                                    onClick={() => !isTaken && !isLocked && setActiveMo(m)}
                                     className={`h-8 w-11 rounded text-xs font-medium border transition-colors
                                         ${activeMo === m ? 'bg-primary text-primary-foreground border-primary'
                                             : isTaken ? 'bg-muted text-muted-foreground border-muted cursor-not-allowed opacity-50'
-                                                : 'bg-card hover:bg-muted/50'}`}
+                                                : isLocked ? 'bg-card text-muted-foreground cursor-not-allowed opacity-60'
+                                                    : 'bg-card hover:bg-muted/50'}`}
                                 >{m}</button>
                             )
                         })
@@ -216,14 +218,14 @@ export default function MonthlyInputSection({
                 </div>
             </SectionCard>
 
-            {/* Excel import / export / download template */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            {/* Import / export tools */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                     <Button variant="outline" onClick={handleDownloadTemplate}>
                         <IconDownload size={16} />
                         {t('downloadTemplate')}
                     </Button>
-                    <Button onClick={() => fileInputRef.current?.click()}>
+                    <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                         <IconFileImport size={16} />
                         {t('importExcel')}
                     </Button>

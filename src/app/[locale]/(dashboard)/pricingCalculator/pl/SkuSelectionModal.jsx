@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IconSearch } from "@tabler/icons-react"
 
-export default function SkuSelectionModal({ t, skuModalOpen, setSkuModalOpen, skuSearch, setSkuSearch, isSkusLoading, filteredSkus, currentSku, selectSku }) {
+export default function SkuSelectionModal({ t, skuModalOpen, setSkuModalOpen, skuSearch, setSkuSearch, isSkusLoading, filteredSkus, currentSku, selectSku, onCreateNew }) {
     return (
         <Dialog open={skuModalOpen} onOpenChange={setSkuModalOpen}>
             <DialogContent className="max-w-lg h-[70vh] flex flex-col gap-0 p-0 overflow-hidden">
@@ -34,7 +34,18 @@ export default function SkuSelectionModal({ t, skuModalOpen, setSkuModalOpen, sk
                             <Skeleton key={i} className="h-14 w-full rounded-md" />
                         ))
                     ) : filteredSkus.length === 0 ? (
-                        <p className="text-center text-sm text-muted-foreground py-8">{t('noSkusFound')}</p>
+                        <div className="flex flex-col items-center gap-3 py-8">
+                            <p className="text-center text-sm text-muted-foreground">{t('noSkusFound')}</p>
+                            {onCreateNew && (
+                                <button
+                                    type="button"
+                                    onClick={onCreateNew}
+                                    className="text-sm font-medium text-primary hover:underline"
+                                >
+                                    + {t('createNewSku')}
+                                </button>
+                            )}
+                        </div>
                     ) : (
                         filteredSkus.map(sku => {
                             const isSelected = currentSku?.id === sku.id
@@ -56,6 +67,17 @@ export default function SkuSelectionModal({ t, skuModalOpen, setSkuModalOpen, sk
                         })
                     )}
                 </div>
+                {onCreateNew && filteredSkus.length > 0 && (
+                    <div className="px-4 py-3 border-t flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={onCreateNew}
+                            className="w-full text-sm font-medium text-primary hover:underline text-center"
+                        >
+                            + {t('createNewSku')}
+                        </button>
+                    </div>
+                )}
             </DialogContent>
         </Dialog>
     )

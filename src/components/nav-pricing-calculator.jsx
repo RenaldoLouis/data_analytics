@@ -6,7 +6,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { IconBuildingStore, IconCalculator, IconPresentationAnalytics, IconTag } from "@tabler/icons-react"
+import { IconCalculator, IconFlask, IconPresentationAnalytics, IconTag } from "@tabler/icons-react"
 import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
 
@@ -15,12 +15,12 @@ export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
     const t = useTranslations("nav")
 
     const items = [
-        {
-            id: "pricing-calculator",
-            title: "HPP Calculator",
-            url: "/pricingCalculator/hpp",
-            icon: IconCalculator,
-        },
+        // {
+        //     id: "pricing-calculator",
+        //     title: "HPP Calculator",
+        //     url: "/pricingCalculator/hpp",
+        //     icon: IconCalculator,
+        // },
         {
             id: "pricing-sku",
             title: t("sku"),
@@ -28,17 +28,17 @@ export function NavPricingCalculator({ selectedNav, setSelectedNav }) {
             icon: IconTag,
         },
         {
-            id: "pricing-brand",
-            title: t("brand"),
-            url: "/pricingCalculator/brand",
-            icon: IconBuildingStore,
-        },
-        {
             id: "pricing-pl",
             title: t("profitLoss"),
             url: "/pricingCalculator/pl",
             icon: IconPresentationAnalytics,
         },
+        // {
+        //     id: "pricing-simulation",
+        //     title: t("plSimulation"),
+        //     url: "/pricingCalculator/simulation",
+        //     icon: IconFlask,
+        // },
     ]
 
     const handleClick = (item) => {

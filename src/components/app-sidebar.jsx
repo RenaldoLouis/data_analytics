@@ -36,17 +36,37 @@ const data = {
 
 export function AppSidebar({ ...props }) {
   const pathname = usePathname()
-  const [selectedNav, setSelectedNav] = useState("1")
+
+  const getNavFromPath = (p) => {
+    if (p.includes("/pricingCalculator/sku-modal"))  return "pricing-sku-modal"
+    if (p.includes("/pricingCalculator/sku"))        return "pricing-sku"
+    if (p.includes("/pricingCalculator/simulation")) return "pricing-simulation"
+    if (p.includes("/pricingCalculator/pl"))         return "pricing-pl"
+    if (p.includes("/pricingCalculator/brand"))      return "pricing-brand"
+    if (p.includes("/pricingCalculator"))            return "pricing-calculator"
+    if (p.includes("/dashboard"))                    return "1"
+    return "1"
+  }
+
+  const [selectedNav, setSelectedNav] = useState(() => getNavFromPath(pathname))
   const { dataSetsList } = useDashboardContext()
 
   useEffect(() => {
-    if (pathname === "/dashboard") {
+    if (pathname.includes("/dashboard")) {
       setSelectedNav("1")
-    } else if (pathname.startsWith("/pricingCalculator/sku")) {
+    } else if (pathname.includes("/pricingCalculator/sku-modal")) {
+      setSelectedNav("pricing-sku-modal")
+    } else if (pathname.includes("/pricingCalculator/sku")) {
       setSelectedNav("pricing-sku")
-    } else if (pathname.startsWith("/pricingCalculator/pl")) {
+    } else if (pathname.includes("/pricingCalculator/simulation")) {
+      setSelectedNav("pricing-simulation")
+    } else if (pathname.includes("/pricingCalculator/pl")) {
       setSelectedNav("pricing-pl")
-    } else if (pathname.startsWith("/pricingCalculator")) {
+    } else if (pathname.includes("/pricingCalculator/brand")) {
+      setSelectedNav("pricing-brand")
+    } else if (pathname.includes("/pricingCalculator/hpp")) {
+      setSelectedNav("pricing-calculator")
+    } else if (pathname.includes("/pricingCalculator")) {
       setSelectedNav("pricing-calculator")
     } else {
       if (dataSetsList.length > 0) {

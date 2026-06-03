@@ -5,24 +5,20 @@ import PlCalculator from "./PlCalculator"
 import PlList from "./PlList"
 
 export default function Page() {
-    const [view, setView] = useState('list')
     const [editId, setEditId] = useState(null)
-    const [startAtMonthly, setStartAtMonthly] = useState(false)
+    const [allIds, setAllIds] = useState([])
 
-    const goList = () => { setView('list'); setEditId(null); setStartAtMonthly(false) }
-
-    if (view === 'form') return (
+    if (editId) return (
         <PlCalculator
-            onBack={goList}
             editId={editId}
-            startAtMonthly={startAtMonthly}
+            allIds={allIds}
+            onBack={() => { setEditId(null); setAllIds([]) }}
         />
     )
 
     return (
         <PlList
-            onAdd={() => { setEditId(null); setStartAtMonthly(true); setView('form') }}
-            onEdit={(id) => { setEditId(id); setStartAtMonthly(true); setView('form') }}
+            onEdit={(id, ids) => { setEditId(id); setAllIds(ids ?? [id]) }}
         />
     )
 }

@@ -28,7 +28,7 @@ import {
     IconChevronRight,
     IconChevronsLeft,
     IconChevronsRight,
-    IconPencil,
+    IconInfoCircle,
     IconPlus,
     IconSortAscending,
     IconSortDescending,
@@ -46,106 +46,55 @@ import { useTranslations } from "next-intl"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { fmt } from "./plLib"
+import PlImportModal from "./PlImportModal"
 
-// Compute P/L for a single monthly record, using brand data for channel fees & SKU COGS
-function computeRecordPL(pl, brand) {
-    const sales = pl.sales ?? []
-    const discounts = pl.discounts ?? []
-    const returns = pl.returns ?? []
-    const shippings = pl.shippings ?? []
-    const fixedCosts = pl.fixed_costs ?? []
-    const brandChannels = brand?.channels ?? []
-
-    const chFeeMap = Object.fromEntries(brandChannels.map(ch => [ch.id, ch.fee_config ?? {}]))
-    const skuId = pl.sku_id ?? pl.sku?.id
-    const sku = (brand?.skus ?? []).find(s => s.id === skuId) ?? pl.sku ?? {}
-    const cogsUnit = (parseFloat(sku.cogs_per_unit) || 0) + (parseFloat(sku.packaging_cost) || 0)
-
-    // Per-channel COGS overrides (bundling)
-    const cogsOverrides = Object.fromEntries(
-        (pl.cogs_overrides ?? []).map(co => [co.channel_id, co])
-    )
-
-    let grossTotal = 0, discTotal = 0, retTotal = 0, shipTotal = 0, adsTotal = 0, cogsTotal = 0, chCostTotal = 0
+// P/L per record = settlement - COGS
+function computeRecordPL(pl) {
+    const sales    = pl.sales ?? []
+    const cogsUnit = parseFloat(pl.cogs_per_unit) || 0
+    let settlement = 0, unitsSold = 0, grossGmv = 0
     sales.forEach(s => {
-        const vol = parseFloat(s.units_sold) || 0
-        const gross = vol * (parseFloat(s.actual_selling_price) || 0)
-        grossTotal += gross
-        adsTotal += parseFloat(s.ads_spend_amount) || (gross * (parseFloat(s.ads_spend_rate) || 0))
-        const co = cogsOverrides[s.channel_id]
-        const bundCogs = parseFloat(co?.cogs_bundling) || 0
-        const unitsPerBundle = parseFloat(co?.units_per_bundle) || 1
-        cogsTotal += vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * cogsUnit)
-        const fee = chFeeMap[s.channel_id] ?? {}
-        chCostTotal += gross * ((parseFloat(fee.commission_rate) || 0) + (parseFloat(fee.mall_fee_rate) || 0) + (parseFloat(fee.pgw_rate) || 0))
+        const units = parseInt(s.units_sold) || 0
+        const price = parseFloat(s.actual_selling_price) || 0
+        settlement += parseFloat(s.settlement_amount) || 0
+        unitsSold  += units
+        grossGmv   += units * price
     })
-    discounts.forEach(d => { discTotal += parseFloat(d.discount_amount) || 0 })
-    returns.forEach(r => { retTotal += parseFloat(r.actual_refund_amount) || 0 })
-    shippings.forEach(s => { shipTotal += (parseFloat(s.shipping_subsidy) || 0) + (parseFloat(s.processing_fee) || 0) })
-
-    const netTotal = grossTotal - discTotal - retTotal - shipTotal - adsTotal
-    const grossProfit = netTotal - cogsTotal
-    const fixedTotal = fixedCosts.reduce((s, fc) => s + (parseFloat(fc.amount) || 0), 0)
-    const operatingProfit = grossProfit - chCostTotal - fixedTotal
-
-    return { grossTotal, netTotal, operatingProfit }
+    return { settlement, grossGmv, cogs: cogsUnit * unitsSold, netPL: settlement - cogsUnit * unitsSold }
 }
 
-// Compute enabler costs from brand config + monthly enabler_var data
-function computeEnablerCost(records, brand, allSkuGross) {
-    const ev = records[0]?.enabler_var ?? {}
-    const ec = brand?.enabler_fee_config ?? {}
-
-    const enablerFixed = (parseFloat(ec.retainer_amount) || 0)
-        + (parseFloat(ec.store_operation_fee) || 0)
-        + (parseFloat(ec.platform_fee) || 0)
-        + (parseFloat(ec.live_commerce_cost) || 0)
-        + (parseFloat(ec.warehouse_cost) || 0)
-        + (ec.custom_fixed_components ?? []).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
-
-    const commissionVal = allSkuGross * (parseFloat(ev.commission_gmv_rate) || 0)
-    const fulfilTotal = (parseFloat(ev.order_count) || 0) * (parseFloat(ec.fulfillment_per_order) || 0)
-    const claimTotal = (parseFloat(ev.claim_support) || 0) + (parseFloat(ev.claim_voucher) || 0)
-        + (parseFloat(ev.claim_mp_fee) || 0) + (parseFloat(ev.mp_affiliate) || 0)
-        + (parseFloat(ev.campaign_ads_fee) || 0)
-    const customVarTotal = Object.values(ev.custom_var_items ?? {}).reduce((s, v) => s + (parseFloat(v) || 0), 0)
-    const enablerVarTotal = commissionVal + fulfilTotal + claimTotal + customVarTotal
-
-    return enablerFixed + enablerVarTotal
-}
-
-// Group raw monthly records by brand+period, compute final P/L using brand data
-function groupByPeriod(pls, brandsMap) {
+// Group individual records by period, summing P/L across all SKUs in that period
+function groupByPeriod(pls) {
     const map = new Map()
-    pls.forEach(pl => {
-        const key = `${pl.brand_id}_${pl.period_month}_${pl.period_year}`
-        const brand = brandsMap[pl.brand_id]
+    for (const pl of pls) {
+        const key = `${pl.period_year}_${pl.period_month}`
+        const { settlement, grossGmv, cogs, netPL } = computeRecordPL(pl)
         if (!map.has(key)) {
             map.set(key, {
-                ...pl,
-                sku_names: pl.sku_name ? [pl.sku_name] : [],
-                all_ids: [pl.id],
-                _records: [pl],
-                _skuPLs: [computeRecordPL(pl, brand)],
-                _brand: brand,
+                key,
+                period_month: pl.period_month,
+                period_year:  pl.period_year,
+                created_at:   pl.created_at,
+                updated_at:   pl.updated_at,
+                source:       pl.source ?? null,
+                ids:          [pl.id],
+                sku_names:    [(pl.product_names?.length ? pl.product_names[0] : null) ?? pl.sku_name ?? pl.sku_code].filter(Boolean),
+                settlement,
+                grossGmv,
+                cogs,
+                netPL,
             })
         } else {
             const g = map.get(key)
-            g.all_ids.push(pl.id)
-            g._records.push(pl)
-            g._skuPLs.push(computeRecordPL(pl, brand))
-            if (pl.sku_name && !g.sku_names.includes(pl.sku_name))
-                g.sku_names.push(pl.sku_name)
-            if (new Date(pl.updated_at) > new Date(g.updated_at))
-                g.updated_at = pl.updated_at
+            g.ids.push(pl.id)
+            g.settlement += settlement
+            g.grossGmv   += grossGmv
+            g.cogs       += cogs
+            g.netPL      += netPL
+            const skuLabel = (pl.product_names?.length ? pl.product_names[0] : null) ?? pl.sku_name ?? pl.sku_code
+            if (skuLabel && !g.sku_names.includes(skuLabel)) g.sku_names.push(skuLabel)
+            if (new Date(pl.updated_at) > new Date(g.updated_at)) g.updated_at = pl.updated_at
         }
-    })
-    for (const g of map.values()) {
-        const allSkuGross = g._skuPLs.reduce((s, p) => s + p.grossTotal, 0)
-        const allSkuOpProfit = g._skuPLs.reduce((s, p) => s + p.operatingProfit, 0)
-        const enablerCost = computeEnablerCost(g._records, g._brand, allSkuGross)
-        g.finalMonthlyPL = allSkuOpProfit - enablerCost
-        g.allSkuNetTotal = g._skuPLs.reduce((s, p) => s + p.netTotal, 0)
     }
     return Array.from(map.values())
 }
@@ -166,34 +115,24 @@ function SortableHeader({ column, children, className }) {
 const SKELETON_ROWS = 5
 const SKELETON_COLS = 6
 
-export default function PlList({ onAdd, onEdit }) {
+export default function PlList({ onEdit }) {
     const t = useTranslations('plpage')
     const [pls, setPls] = useState([])
     const [isPageLoading, setIsPageLoading] = useState(true)
     const [isMutating, setIsMutating] = useState(false)
     const [isFetch, setIsFetch] = useState(false)
-    const [deletingPl, setDeletingPl] = useState(null)
+    const [deletingGroup, setDeletingGroup] = useState(null)  // { ids, label }
+    const [importOpen, setImportOpen] = useState(false)
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
-    const [sorting, setSorting] = useState([])
-
-    const [brandsMap, setBrandsMap] = useState({})
+    const [sorting, setSorting] = useState([{ id: 'period', desc: true }])
 
     useEffect(() => {
         const fetchData = async () => {
             setIsPageLoading(true)
-            // Fetch monthly list and brands in parallel
-            const [plRes, brandRes] = await Promise.all([
-                services.pl.getPls(),
-                services.pl.getBrands(),
-            ])
-            const list = plRes?.data?.data ?? plRes?.data ?? []
-            const brands = brandRes?.data?.data ?? brandRes?.data ?? []
-            const bMap = Object.fromEntries(
-                (Array.isArray(brands) ? brands : [brands]).filter(Boolean).map(b => [b.id, b])
-            )
-            setBrandsMap(bMap)
+            const listRes = await services.pl.getPls()
+            const list = listRes?.data?.data ?? listRes?.data ?? []
 
-            // Fetch full detail for each record to get nested sales/discounts/etc.
+            // Fetch full detail for each record to get sales/cogs
             const details = await Promise.allSettled(
                 list.map(pl => services.pl.getMonthlyById(pl.id))
             )
@@ -210,14 +149,19 @@ export default function PlList({ onAdd, onEdit }) {
         fetchData()
     }, [isFetch])
 
-    const groupedPls = useMemo(() => groupByPeriod(pls, brandsMap), [pls, brandsMap])
+    const groups = useMemo(() => groupByPeriod(pls), [pls])
+
+    const takenPeriods = useMemo(() =>
+        groups.map(g => ({ year: String(g.period_year), month: g.period_month })),
+        [groups]
+    )
 
     const confirmDelete = async () => {
-        if (!deletingPl) return
-        setDeletingPl(null)
+        if (!deletingGroup) return
+        setDeletingGroup(null)
         setIsMutating(true)
         try {
-            await Promise.all(deletingPl.map(id => services.pl.deleteMonthly(id)))
+            await Promise.all(deletingGroup.ids.map(id => services.pl.deleteMonthly(id)))
             toast.success(t('deleteSuccess'))
             setIsFetch(prev => !prev)
         } catch {
@@ -228,26 +172,19 @@ export default function PlList({ onAdd, onEdit }) {
 
     const columns = useMemo(() => [
         {
-            id: 'sku',
-            accessorFn: row => row.sku_names?.join(', ') || '',
-            header: ({ column }) => <SortableHeader column={column}>{t('colSku')}</SortableHeader>,
-            cell: ({ row }) => <span>{row.original.sku_names?.join(', ') || '-'}</span>,
-        },
-        {
             id: 'period',
-            accessorFn: row => (row.period_year ?? 0) * 100 + (row.period_month ?? 0),
+            accessorFn: row => (row.period_year ?? 0) * 100 + parseInt(row.period_month ?? 0),
             header: ({ column }) => <SortableHeader column={column}>{t('colPeriod')}</SortableHeader>,
             cell: ({ row }) => {
-                const month = row.original.period_month
-                const year = row.original.period_year
-                if (!month && !year) return '-'
-                const date = new Date(year, month - 1)
-                return date.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })
+                const { period_month, period_year } = row.original
+                if (!period_month || !period_year) return '-'
+                return new Date(period_year, parseInt(period_month) - 1)
+                    .toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })
             },
         },
         {
             accessorKey: 'created_at',
-            header: ({ column }) => <SortableHeader column={column}>{t('colCreatedAt')}</SortableHeader>,
+            header: ({ column }) => <SortableHeader column={column}>{t('colUploadedAt')}</SortableHeader>,
             cell: ({ row }) => {
                 const d = row.original.created_at
                 if (!d) return '-'
@@ -255,28 +192,44 @@ export default function PlList({ onAdd, onEdit }) {
             },
         },
         {
-            accessorKey: 'updated_at',
-            header: ({ column }) => <SortableHeader column={column}>{t('colUpdatedAt')}</SortableHeader>,
+            id: 'channel',
+            accessorFn: row => row.source ?? '',
+            header: ({ column }) => <SortableHeader column={column}>{t('colChannel')}</SortableHeader>,
             cell: ({ row }) => {
-                const d = row.original.updated_at
-                if (!d) return '-'
-                return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+                const src = row.original.source
+                if (!src) return <span className="text-muted-foreground text-xs">-</span>
+                return (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-orange-50 text-orange-600 border border-orange-200">
+                        {src.charAt(0).toUpperCase() + src.slice(1)}
+                    </span>
+                )
             },
         },
         {
-            id: 'finalPL',
-            accessorFn: row => row.finalMonthlyPL ?? -Infinity,
-            header: ({ column }) => <SortableHeader column={column} className="justify-end">{t('colFinalPL')}</SortableHeader>,
+            id: 'sku',
+            accessorFn: row => row.sku_names.join(', '),
+            header: ({ column }) => <SortableHeader column={column}>{t('colSku')}</SortableHeader>,
+            cell: ({ row }) => (
+                <div>
+                    <span className="font-medium">{row.original.sku_names[0] ?? '-'}</span>
+                    {row.original.sku_names.length > 1 && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                            +{row.original.sku_names.length - 1} more
+                        </span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            id: 'grossGmv',
+            accessorFn: row => row.grossGmv ?? 0,
+            header: ({ column }) => <SortableHeader column={column} className="justify-end">{t('colGrossGmv')}</SortableHeader>,
             cell: ({ row }) => {
-                const pl = row.original.finalMonthlyPL
-                if (pl == null) return '-'
-                const color = pl < 0 ? 'text-red-600' : 'text-green-700'
-                const net = row.original.allSkuNetTotal
-                const pctVal = net > 0 ? ((pl / net) * 100).toFixed(1) : '0.0'
+                const gmv = row.original.grossGmv
+                if (gmv == null) return '-'
                 return (
                     <div className="text-right">
-                        <span className={`text-xs font-semibold tabular-nums ${color}`}>{fmt(pl)}</span>
-                        <span className={`text-[10px] ml-1 ${color}`}>({pctVal}%)</span>
+                        <span className="text-xs font-semibold tabular-nums text-blue-700">{fmt(gmv)}</span>
                     </div>
                 )
             },
@@ -287,24 +240,26 @@ export default function PlList({ onAdd, onEdit }) {
             header: () => <div className="text-right">{t('colActions')}</div>,
             cell: ({ row }) => (
                 <div className="flex items-center justify-end gap-3">
-                    <IconPencil
+                    <IconInfoCircle
                         size={16}
                         className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
-                        onClick={() => onEdit?.(row.original.id)}
+                        onClick={() => onEdit?.(row.original.ids[0], row.original.ids)}
                     />
                     <IconTrash
                         size={16}
                         className="cursor-pointer text-red-500 hover:text-red-700 transition-colors"
-                        onClick={() => setDeletingPl(row.original.all_ids)}
+                        onClick={() => setDeletingGroup({
+                            ids: row.original.ids,
+                            label: row.original.sku_names.join(', '),
+                        })}
                     />
                 </div>
             ),
         },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    ], [t])
+    ], [t, onEdit])
 
     const table = useReactTable({
-        data: groupedPls,
+        data: groups,
         columns,
         state: { pagination, sorting },
         onPaginationChange: setPagination,
@@ -319,14 +274,21 @@ export default function PlList({ onAdd, onEdit }) {
         <>
             {isMutating && <LoadingScreen />}
 
-            <Dialog open={!!deletingPl} onOpenChange={(open) => { if (!open) setDeletingPl(null) }}>
+            <PlImportModal
+                open={importOpen}
+                onOpenChange={setImportOpen}
+                takenPeriods={takenPeriods}
+                onImported={() => setIsFetch(prev => !prev)}
+            />
+
+            <Dialog open={!!deletingGroup} onOpenChange={(open) => { if (!open) setDeletingGroup(null) }}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t('deleteConfirmTitle')}</DialogTitle>
                         <DialogDescription>{t('deleteConfirmDesc')}</DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletingPl(null)}>{t('deleteCancel')}</Button>
+                        <Button variant="outline" onClick={() => setDeletingGroup(null)}>{t('deleteCancel')}</Button>
                         <Button variant="destructive" onClick={confirmDelete}>{t('deleteConfirm')}</Button>
                     </DialogFooter>
                 </DialogContent>
@@ -335,15 +297,13 @@ export default function PlList({ onAdd, onEdit }) {
             <div className="space-y-4">
                 <div className="flex justify-between items-center px-4 lg:px-6">
                     <H3 className="text-xl font-bold">{t('title')}</H3>
-                    <Button onClick={onAdd} disabled={isPageLoading}>
+                    <Button onClick={() => setImportOpen(true)} disabled={isPageLoading}>
                         <IconPlus size={16} />
                         {t('addNew')}
                     </Button>
                 </div>
 
-                <div className="px-4 lg:px-6">
-                    <Separator />
-                </div>
+                <div className="px-4 lg:px-6"><Separator /></div>
 
                 <div className="px-4 lg:px-6 py-4 space-y-4">
                     <div className="overflow-hidden rounded-lg border [&_th:first-child]:pl-4 [&_th:last-child]:pr-4 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4">
@@ -369,11 +329,11 @@ export default function PlList({ onAdd, onEdit }) {
                         ) : (
                             <Table>
                                 <TableHeader className="bg-muted sticky top-0 z-10">
-                                    {table.getHeaderGroups().map(headerGroup => (
-                                        <TableRow key={headerGroup.id}>
-                                            {headerGroup.headers.map(header => (
-                                                <TableHead key={header.id} colSpan={header.colSpan}>
-                                                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                    {table.getHeaderGroups().map(hg => (
+                                        <TableRow key={hg.id}>
+                                            {hg.headers.map(h => (
+                                                <TableHead key={h.id} colSpan={h.colSpan}>
+                                                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                                                 </TableHead>
                                             ))}
                                         </TableRow>
@@ -409,19 +369,15 @@ export default function PlList({ onAdd, onEdit }) {
                             </div>
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()}>
-                                    <span className="sr-only">Go to first page</span>
                                     <IconChevronsLeft />
                                 </Button>
                                 <Button variant="outline" className="size-8" size="icon" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-                                    <span className="sr-only">Go to previous page</span>
                                     <IconChevronLeft />
                                 </Button>
                                 <Button variant="outline" className="size-8" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-                                    <span className="sr-only">Go to next page</span>
                                     <IconChevronRight />
                                 </Button>
                                 <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => table.setPageIndex(table.getPageCount() - 1)} disabled={!table.getCanNextPage()}>
-                                    <span className="sr-only">Go to last page</span>
                                     <IconChevronsRight />
                                 </Button>
                             </div>

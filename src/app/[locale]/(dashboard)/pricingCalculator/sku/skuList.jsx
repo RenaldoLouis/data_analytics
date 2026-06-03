@@ -1,6 +1,6 @@
 'use client'
 
-import ModalSkuForm from "@/components/ModalSkuForm"
+import AddSKUModal from "../pl/AddSKUModal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,7 +46,7 @@ import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 const SKELETON_ROWS = 5
-const SKELETON_COLS = 9
+const SKELETON_COLS = 10
 
 export default function SkuList() {
     const t = useTranslations('skupage')
@@ -87,6 +87,54 @@ export default function SkuList() {
         [subCategories]
     )
 
+    const categoryOptions = useMemo(() => categories, [categories])
+
+    const handleSkuSubmit = async (data) => {
+        const payload = {
+            sku_type:          data.sku_type ?? 'single',
+            sku_code:          data.sku_code,
+            product_name:      data.product_name || null,
+            category_id:       data.category_id,
+            subcategory_id:    data.sub_category_id || null,
+            brand:             data.brand || null,
+            variant:           data.variant || null,
+            size:              data.size || null,
+            // COGS: single = manual input, bundle = auto-computed from component COGS × qty
+            cogs_per_unit:     data.sku_type === 'single'
+                ? (parseFloat(data.cogs_per_unit) || 0)
+                : (data.bundle_components ?? []).reduce(
+                    (sum, c) => sum + (parseFloat(c.cogs_per_unit) || 0) * (Math.round(Number(c.quantity) || 1)),
+                    0
+                  ),
+            length:            parseFloat(data.length) || null,
+            width:             parseFloat(data.width) || null,
+            height:            parseFloat(data.height) || null,
+            weight:            parseFloat(data.weight) || null,
+            sku_image:         data.image_url || null,
+            sku_barcode:       data.barcode_url || null,
+            status:            data.status || undefined,
+            channel_aliases:   data.channel_aliases ?? { shopee: [] },
+            bundle_components: data.sku_type === 'bundle'
+                ? (data.bundle_components ?? []).map(c => ({
+                    component_sku_id: c.id ?? c.component_sku_id,
+                    quantity: Math.round(Number(c.quantity) || 1),
+                })).filter(c => c.component_sku_id)
+                : [],
+        }
+        const res = editingSku
+            ? await services.sku.updateSku(editingSku.id, payload)
+            : await services.sku.createSku(payload)
+        if (res?.success) {
+            toast(editingSku ? t('updateSuccess') : t('createSuccess'))
+            setIsFetch(prev => !prev)
+            return true
+        } else {
+            const msg = res?.error?.data?.message || (editingSku ? t('updateFailed') : t('createFailed'))
+            toast.error(msg)
+            return false
+        }
+    }
+
     const confirmDelete = async () => {
         if (!deletingSku) return
         setDeletingSku(null)
@@ -108,6 +156,18 @@ export default function SkuList() {
             cell: ({ row }) => (
                 <span className="font-medium">{row.original.sku_code}</span>
             ),
+        },
+        {
+            accessorKey: 'sku_type',
+            header: t('skuType'),
+            cell: ({ row }) => {
+                const type = row.original.sku_type ?? 'single'
+                return (
+                    <Badge variant={type === 'bundle' ? 'default' : 'secondary'} className="capitalize">
+                        {type}
+                    </Badge>
+                )
+            },
         },
         {
             accessorKey: 'product_name',
@@ -317,11 +377,12 @@ export default function SkuList() {
                 </div>
             </div>
 
-            <ModalSkuForm
+            <AddSKUModal
                 open={isModalOpen}
-                onOpenChange={setIsModalOpen}
+                onClose={() => setIsModalOpen(false)}
                 editingSku={editingSku}
-                onSuccess={() => { setIsModalOpen(false); setIsFetch((prev) => !prev) }}
+                categoryOptions={categoryOptions}
+                onSubmit={handleSkuSubmit}
             />
 
             <Dialog open={!!deletingSku} onOpenChange={(open) => { if (!open) setDeletingSku(null) }}>

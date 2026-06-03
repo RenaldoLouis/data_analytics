@@ -1,1042 +1,611 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
-import LoadingScreen from "@/components/ui/loadingScreen"
-import { useSidebar } from "@/components/ui/sidebar"
-import { H3 } from "@/components/ui/typography"
-import services from "@/services"
-import { IconArrowLeft } from "@tabler/icons-react"
-import { useTranslations } from "next-intl"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { toast } from "sonner"
-
+import { Skeleton } from "@/components/ui/skeleton"
 import {
-    MONTH_LABELS, DISCOUNT_PCT_KEYS, DISCOUNT_AMT_KEYS,
-    num, toAmt, toRate,
-    makeProduct, mapMonthlyRecordToFormData, buildMonthlyPayloadFromData, computeSkuMetrics,
-} from "./plLib"
-import { exportPlToExcel } from "./plExcel"
+    Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import services from "@/services"
+import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconDownload } from "@tabler/icons-react"
+import { useEffect, useState, useMemo } from "react"
 import * as XLSX from "xlsx"
-import SetupPhase from "./SetupPhase"
-import MonthlyInputSection from "./MonthlyInputSection"
-import ResultsSection from "./ResultsSection"
-import SkuDetailModal from "./SkuDetailModal"
-import SkuSelectionModal from "./SkuSelectionModal"
+import { fmt } from "./plLib"
+import { AuditTable, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
-function computeSkuDiff(skuName, oldData, newData, channels) {
-    const n = (v) => String(v ?? '').trim()
-    const sections = []
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-    const perCh = (title, getter) => {
-        const rows = []
-        channels.forEach(ch => getter(ch).forEach(({ label, from, to }) => {
-            if (n(from) !== n(to)) rows.push({ label: `${ch} - ${label}`, from: n(from), to: n(to) })
-        }))
-        if (rows.length) sections.push({ title, rows })
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 3 + i))
+const ORDER_PAGE_SIZE = 10
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const n = (v) => Math.round(parseFloat(String(v || '').replace(/\./g, '').replace(',', '.')) || 0)
+const fmtInt = (v) => Math.round(v || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+const toInt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v) || 0)) : ''
+
+// Canonical SKU name (from skus table, not Shopee import name)
+const canonicalName = (r) => r?.sku_name ?? r?.product_names?.[0] ?? r?.sku_code ?? 'SKU'
+
+// ─── Build per-record form ────────────────────────────────────────────────────
+
+function buildFormFromRecord(rec) {
+    const salesArr = rec?.sales ?? []
+    const d = rec?.discounts?.[0] ?? {}
+    const r = rec?.returns?.[0] ?? {}
+    const sh = rec?.shippings?.[0] ?? {}
+
+    let aggUnits = 0, aggGrossGmv = 0, aggSettlement = 0
+    for (const s of salesArr) {
+        const u = parseInt(s.units_sold) || 0
+        const p = parseInt(s.actual_selling_price) || 0
+        const sett = parseInt(s.settlement_amount) || 0
+        aggUnits += u
+        aggGrossGmv += u * p
+        aggSettlement += sett
     }
+    const aggAvgPrice = aggUnits > 0 ? Math.round(aggGrossGmv / aggUnits) : 0
+    const s0 = salesArr[0] ?? {}
 
-    perCh('Basic Info', ch => [
-        { label: 'Units Sold', from: oldData.infoData?.[ch]?.vol, to: newData.infoData?.[ch]?.vol },
-    ])
-    perCh('COGS / HPP', ch => [
-        { label: 'Bundling COGS/set', from: oldData.bundlingData?.[ch]?.cogs, to: newData.bundlingData?.[ch]?.cogs },
-        { label: 'Units per Bundle',  from: oldData.bundlingData?.[ch]?.units, to: newData.bundlingData?.[ch]?.units },
-    ])
-    perCh('Return Rate', ch => [
-        { label: 'Unit Returns',    from: oldData.returnData?.[ch]?.units,  to: newData.returnData?.[ch]?.units },
-        { label: 'Actual Refund',   from: oldData.returnData?.[ch]?.actual, to: newData.returnData?.[ch]?.actual },
-    ])
-    perCh('Seller Discount', ch => [
-        { label: 'Voucher',    from: oldData.discountData?.[ch]?.voucher,   to: newData.discountData?.[ch]?.voucher },
-        { label: 'Subsidy',    from: oldData.discountData?.[ch]?.subsidy,   to: newData.discountData?.[ch]?.subsidy },
-        { label: 'Flash Sale', from: oldData.discountData?.[ch]?.flash,     to: newData.discountData?.[ch]?.flash },
-        { label: 'Affiliate',  from: oldData.discountData?.[ch]?.affiliate, to: newData.discountData?.[ch]?.affiliate },
-        { label: 'Bundling',   from: oldData.discountData?.[ch]?.bundling,  to: newData.discountData?.[ch]?.bundling },
-        { label: 'Member',     from: oldData.discountData?.[ch]?.loyalty,   to: newData.discountData?.[ch]?.loyalty },
-    ])
-    perCh('Shipping', ch => [
-        { label: 'Subsidy',        from: oldData.shippingData?.[ch]?.subsidy,    to: newData.shippingData?.[ch]?.subsidy },
-        { label: 'Processing Fee', from: oldData.shippingData?.[ch]?.processing, to: newData.shippingData?.[ch]?.processing },
-    ])
-    perCh('Ads Spend', ch => [
-        { label: 'Ads Rate', from: oldData.adsData?.[ch]?.rate, to: newData.adsData?.[ch]?.rate },
-    ])
-
-    // Fixed Costs — match by name, fall back to index
-    const oldFixed = (oldData.customRows ?? []).filter(r => r.name || r.val)
-    const newFixed = (newData.customRows ?? []).filter(r => r.name || r.val)
-    const fixedRows = []
-    const maxLen = Math.max(oldFixed.length, newFixed.length)
-    for (let i = 0; i < maxLen; i++) {
-        const o = oldFixed[i], nw = newFixed[i]
-        const oVal = `${o?.name ?? ''}: ${n(o?.val)}`, nwVal = `${nw?.name ?? ''}: ${n(nw?.val)}`
-        if (oVal !== nwVal) fixedRows.push({ label: nw?.name || o?.name || `Row ${i + 1}`, from: o ? n(o.val) : '', to: nw ? n(nw.val) : '' })
+    return {
+        units_sold: salesArr.length > 1 ? String(aggUnits) : toInt(s0.units_sold),
+        actual_selling_price: salesArr.length > 1 ? String(aggAvgPrice) : toInt(s0.actual_selling_price),
+        settlement_amount: salesArr.length > 1 ? String(aggSettlement) : toInt(s0.settlement_amount),
+        voucher_amount: toInt(d.voucher_amount),
+        voucher_cofund_amount: toInt(d.voucher_cofund_amount),
+        coin_amount: toInt(d.coin_amount),
+        coin_cofund_amount: toInt(d.coin_cofund_amount),
+        actual_refund_amount: toInt(r.actual_refund_amount),
+        shipping_subsidy: toInt(sh.shipping_subsidy),
+        actual_shipping_cost: toInt(sh.actual_shipping_cost),
+        processing_fee: toInt(sh.processing_fee),
+        commission_fee_amount: toInt(sh.commission_fee_amount),
+        service_fee_amount: toInt(sh.service_fee_amount),
+        transaction_fee_amount: toInt(sh.transaction_fee_amount),
+        campaign_fee_amount: toInt(sh.campaign_fee_amount),
+        affiliate_commission_amount: toInt(sh.affiliate_commission_amount),
+        _sales: salesArr.map(s => ({
+            order_no: s.order_no ?? '',
+            units_sold: toInt(s.units_sold),
+            actual_selling_price: toInt(s.actual_selling_price),
+            seller_discount: toInt(s.seller_discount ?? '0'),
+            fee_total: toInt(s.fee_total ?? '0'),
+            net_shipping: toInt(s.net_shipping ?? '0'),
+            settlement_amount: toInt(s.settlement_amount),
+        })),
     }
-    if (fixedRows.length) sections.push({ title: 'Fixed Costs', rows: fixedRows })
-
-    return sections.length ? { skuName, sections } : null
 }
 
-export default function PlCalculator({ onBack, onSaveComplete, editId, brandOnly = false, startAtMonthly = false }) {
-    const t = useTranslations('plpage')
-    const { open: sidebarOpen } = useSidebar()
+// ─── Download Report ──────────────────────────────────────────────────────────
 
-    const DISCOUNT_LABELS = [
-        t('discountVoucher'), t('discountSubsidy'), t('discountFlash'),
-        t('discountAffiliate'), t('discountBundling'), t('discountLoyalty'),
-    ]
-
-    // ── Setup step state ─────────────────────────────────────────────────────
-    const [setupStep, setSetupStep] = useState(1)
-    const [completedSetupSteps, setCompletedSetupSteps] = useState([])
-    const [setupDone, setSetupDone] = useState(startAtMonthly)
-
-    const doneSetupStep = (n) => {
-        setCompletedSetupSteps(prev => [...new Set([...prev, n])])
-        if (n < 3) setSetupStep(n + 1)
-        else {
-            if (!selectedSku && products.length > 0) setSelectedSku(products[0].id)
-            setSetupDone(true)
-        }
-    }
-    const getStepStatus = (n) => ({
-        isDone: completedSetupSteps.includes(n),
-        isActive: setupStep === n,
-        isLocked: !completedSetupSteps.includes(n) && setupStep < n,
-    })
-    const handleStepOpen = (n) => {
-        if (!getStepStatus(n).isLocked) setSetupStep(n)
-    }
-
-    // ── Setup state ──────────────────────────────────────────────────────────
-    const [setup, setSetup] = useState({ brand_name: '', category: '', enabler: '' })
-    const setS = (field, value) => setSetup(prev => ({ ...prev, [field]: value }))
-
-    // ── Channels ─────────────────────────────────────────────────────────────
-    const [channels, setChannels] = useState([])
-    const [mallStatus, setMallStatus] = useState({})
-    const [channelActive, setChannelActive] = useState({})
-    const [tagInput, setTagInput] = useState('')
-    const addChannel = (val) => {
-        val = val.trim().replace(',', '')
-        if (!val || channels.includes(val)) return
-        setChannels(prev => [...prev, val])
-        setMallStatus(prev => ({ ...prev, [val]: false }))
-        setChannelActive(prev => ({ ...prev, [val]: true }))
-    }
-    const removeChannel = (ch) => {
-        setChannels(prev => prev.filter(c => c !== ch))
-        setMallStatus(prev => { const n = { ...prev }; delete n[ch]; return n })
-        setChannelActive(prev => { const n = { ...prev }; delete n[ch]; return n })
-    }
-
-    // ── Channel fees ─────────────────────────────────────────────────────────
-    const [channelFees, setChannelFees] = useState({})
-    const getChFee = (ch, key) =>
-        channelFees[ch]?.[key] ?? ({ comm: '5', mall: '0', pgw: '1.5' }[key])
-    const setChFee = (ch, key, value) =>
-        setChannelFees(prev => ({ ...prev, [ch]: { ...prev[ch], [key]: value } }))
-
-    // ── Enabler config ───────────────────────────────────────────────────────
-    const [enablerConfig, setEnablerConfig] = useState({
-        retainer: '', commissionRate: '',
-        sof: '', swift: '', live: '', warehouse: '',
-        fulfilRate: '12000',
-        customFixed: [],
-        customVar: [],
-    })
-    const setEC = (field, value) => setEnablerConfig(prev => ({ ...prev, [field]: value }))
-
-    // ── Products ─────────────────────────────────────────────────────────────
-    const [products, setProducts] = useState(() => [makeProduct(0)])
-    const [activeIdx, setActiveIdx] = useState(0)
-    const p = products[activeIdx]
-    const updateP = (field, value) =>
-        setProducts(prev => prev.map((item, i) => i === activeIdx ? { ...item, [field]: value } : item))
-    const addProduct = () => {
-        setProducts(prev => [...prev, makeProduct(prev.length)])
-        setActiveIdx(products.length)
-    }
-    const removeProduct = (index) => {
-        if (products.length === 1) return
-        setProducts(prev => prev.filter((_, i) => i !== index))
-        setActiveIdx(prev => Math.max(0, prev >= index ? prev - 1 : prev))
-    }
-
-    // ── SKU modal ────────────────────────────────────────────────────────────
-    const [skuModalOpen, setSkuModalOpen] = useState(false)
-    const [detailModalSku, setDetailModalSku] = useState(null)
-    const [skuList, setSkuList] = useState([])
-    const [skuSearch, setSkuSearch] = useState('')
-    const [isSkusLoading, setIsSkusLoading] = useState(false)
-
-    const openSkuModal = async () => {
-        setSkuModalOpen(true)
-        if (skuList.length === 0) {
-            setIsSkusLoading(true)
-            const res = await services.sku.getSkus()
-            setSkuList(res?.data?.data ?? res?.data ?? [])
-            setIsSkusLoading(false)
-        }
-    }
-    const selectSku = (sku) => {
-        setProducts(prev => prev.map((item, i) =>
-            i === activeIdx ? { ...item, sku, name: sku.product_name || sku.sku_code } : item
-        ))
-        setSkuModalOpen(false)
-        setSkuSearch('')
-    }
-    const usedSkuKeys = useMemo(() => {
-        const currentSku = products[activeIdx]?.sku
-        return new Set(
-            products
-                .filter((_, i) => i !== activeIdx)
-                .flatMap(p => [p.sku?.id, p.sku?.sku_code, p.sku?.name].filter(Boolean))
-                .filter(k => k !== currentSku?.id && k !== currentSku?.sku_code && k !== currentSku?.name)
-        )
-    }, [products, activeIdx])
-    const filteredSkus = useMemo(() =>
-        skuList.filter(s =>
-            !usedSkuKeys.has(s.id) &&
-            !usedSkuKeys.has(s.sku_code) &&
-            !usedSkuKeys.has(s.product_name) &&
-            (!skuSearch ||
-                s.product_name?.toLowerCase().includes(skuSearch.toLowerCase()) ||
-                s.sku_code?.toLowerCase().includes(skuSearch.toLowerCase()))
-        ), [skuList, skuSearch, usedSkuKeys])
-
-    // ── Monthly P&L state ────────────────────────────────────────────────────
-    const [monthlyId, setMonthlyId] = useState(null)
-    const [activeYear, setActiveYear] = useState(String(new Date().getFullYear()))
-    const [takenMonths, setTakenMonths] = useState([])
-    const [isMonthsLoading, setIsMonthsLoading] = useState(false)
-    const [moByYear, setMoByYear] = useState({})
-    const activeMo = moByYear[activeYear] ?? ''
-    const setActiveMo = (m) => setMoByYear(prev => ({ ...prev, [activeYear]: m }))
-    const [selectedSku, setSelectedSku] = useState('')
-    const skuInitRef = useRef(false)
-    const skuDataCacheRef = useRef({})
-    const [prefetchedSkuData, setPrefetchedSkuData] = useState({})
-    const prevSkuRef = useRef(null)
-    const formDataRef = useRef({})
-    const contextRef = useRef({})
-    const [infoData, setInfoData] = useState({})
-    const [discountData, setDiscountData] = useState({})
-    const [returnData, setReturnData] = useState({})
-    const [shippingData, setShippingData] = useState({})
-    const [adsData, setAdsData] = useState({})
-    const [claimData, setClaimData] = useState({ support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' })
-    const [varData, setVarData] = useState({})
-    const [monthlyCommissionRate, setMonthlyCommissionRate] = useState('')
-    const [customRows, setCustomRows] = useState([])
-    const [bundlingData, setBundlingData] = useState({})
-    const [orders, setOrders] = useState('')
-    const [secFilled, setSecFilled] = useState({ info: false, discount: false, ret: false, ads: false, fixed: false })
-    const [importSummary, setImportSummary] = useState(null)   // diff preview
-    const [pendingImport, setPendingImport] = useState(null)   // skuSheets waiting to be applied
-    const markFilled = (sec) => setSecFilled(prev => ({ ...prev, [sec]: true }))
-
-    // ── Active SKU for monthly ───────────────────────────────────────────────
-    const activeSku = products.find(prod => prod.id === selectedSku) || products[0] || {}
-    const cogsUnit = (parseFloat(activeSku.cogs) || 0) + (parseFloat(activeSku.pkg) || 0)
-
-    // ── Keep refs always current ─────────────────────────────────────────────
-    const currentFormData = { infoData, discountData, returnData, shippingData, adsData, claimData, varData, monthlyCommissionRate, customRows, bundlingData, orders, secFilled }
-    formDataRef.current = currentFormData
-    useEffect(() => {
-        if (selectedSku && selectedSku === prevSkuRef.current) {
-            skuDataCacheRef.current[selectedSku] = {
-                ...skuDataCacheRef.current[selectedSku],
-                data: currentFormData,
-            }
+function downloadReport(records, forms) {
+    const rows = records.map(rec => {
+        const f = forms[rec.id] ?? buildFormFromRecord(rec)
+        const cogs = (parseFloat(rec.cogs_per_unit) || 0) * n(f.units_sold)
+        const sett = n(f.settlement_amount)
+        const fees = n(f.commission_fee_amount) + n(f.service_fee_amount) + n(f.processing_fee) +
+            n(f.transaction_fee_amount) + n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
+        return {
+            'SKU': canonicalName(rec),
+            'SKU Code': rec.sku_code ?? '',
+            'Period': `${MONTHS_EN[parseInt(rec.period_month) - 1]} ${rec.period_year}`,
+            'Source': rec.source ?? '',
+            'Units Sold': n(f.units_sold),
+            'Avg Price (Rp)': n(f.actual_selling_price),
+            'Gross GMV (Rp)': n(f.units_sold) * n(f.actual_selling_price),
+            'Settlement (Rp)': sett,
+            'Seller Voucher (Rp)': n(f.voucher_amount),
+            'Seller Co-fund Voucher (Rp)': n(f.voucher_cofund_amount),
+            'Coin Cashback (Rp)': n(f.coin_amount),
+            'Coin Co-fund (Rp)': n(f.coin_cofund_amount),
+            'Return/Refund (Rp)': n(f.actual_refund_amount),
+            'Shipping Subsidy (Rp)': n(f.shipping_subsidy),
+            'Actual Shipping Cost (Rp)': n(f.actual_shipping_cost),
+            'Admin Fee / Commission (Rp)': n(f.commission_fee_amount),
+            'Service Fee (Rp)': n(f.service_fee_amount),
+            'Order Processing Fee (Rp)': n(f.processing_fee),
+            'Transaction Fee (Rp)': n(f.transaction_fee_amount),
+            'Campaign Fee (Rp)': n(f.campaign_fee_amount),
+            'Affiliate Commission (Rp)': n(f.affiliate_commission_amount),
+            'Total Channel Fees (Rp)': fees,
+            'COGS per Unit (Rp)': Math.round(parseFloat(rec.cogs_per_unit) || 0),
+            'Total COGS (Rp)': Math.round(cogs),
+            'Net P/L (Rp)': sett - Math.round(cogs),
+            'Net Margin (%)': sett > 0 ? +((sett - cogs) / sett * 100).toFixed(1) : 0,
         }
     })
-    useEffect(() => {
-        contextRef.current = { brandData, activeMo, activeYear, monthlyId }
-    })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'P&L Report')
+    const first = records[0]
+    const period = first ? `${MONTHS_EN[parseInt(first.period_month) - 1]}_${first.period_year}` : 'report'
+    XLSX.writeFile(wb, `pl_report_${period}.xlsx`)
+}
 
-    // ── Restore form fields from cached snapshot ─────────────────────────────
-    const restoreFromFormData = (d, { includeEnabler = true } = {}) => {
-        setInfoData(d.infoData ?? {})
-        setDiscountData(d.discountData ?? {})
-        setReturnData(d.returnData ?? {})
-        setShippingData(d.shippingData ?? {})
-        setAdsData(d.adsData ?? {})
-        setBundlingData(d.bundlingData ?? {})
-        setCustomRows(d.customRows ?? [])
-        setSecFilled(d.secFilled ?? { info: false, discount: false, ret: false, ads: false, fixed: false })
-        if (includeEnabler) {
-            setClaimData(d.claimData ?? { support: '', voucher: '', mpFee: '', mpAffiliate: '', campaign: '' })
-            setVarData(d.varData ?? {})
-            setMonthlyCommissionRate(d.monthlyCommissionRate ?? '')
-            setOrders(d.orders ?? '')
-        }
-    }
+// ─── Summary Tab ─────────────────────────────────────────────────────────────
 
-    // ── SKU switch effect ────────────────────────────────────────────────────
-    useEffect(() => {
-        if (!selectedSku) return
-        if (!skuInitRef.current) {
-            skuInitRef.current = true
-            prevSkuRef.current = selectedSku
-            return
-        }
-        const prevSku = prevSkuRef.current
-        prevSkuRef.current = selectedSku
+function SummaryTab({ agg }) {
+    // Formula matches import modal: GMV − Seller Discount − Channel Fees + Net Shipping − Returns
+    const calculated = agg.grossGmv - agg.totalDisc - agg.totalFees + agg.netShipping - agg.refund
+    const delta = agg.settlement - calculated
+    const isMatch = delta === 0
 
-        if (prevSku) {
-            const prevData = { ...formDataRef.current }
-            skuDataCacheRef.current[prevSku] = {
-                data: prevData,
-                recordId: contextRef.current.monthlyId ?? null,
-            }
-            setPrefetchedSkuData(prev => ({ ...prev, [prevSku]: prevData }))
-        }
-
-        const cached = skuDataCacheRef.current[selectedSku]
-        if (cached) {
-            restoreFromFormData(cached.data, { includeEnabler: false })
-            setMonthlyId(cached.recordId ?? null)
-            return
-        }
-
-        const { brandData: bd, activeMo: mo, activeYear: yr } = contextRef.current
-        if (bd?.id && mo && yr) {
-            const periodMonth = String(MONTH_LABELS.indexOf(mo) + 1).padStart(2, '0')
-            const periodYear = parseInt(yr)
-            services.pl.getMonthlyByPeriod(bd.id, selectedSku, periodMonth, periodYear)
-                .then(res => {
-                    const mr = res?.data?.data ?? res?.data ?? null
-                    if (mr && mr.id) {
-                        const chIdToName = Object.fromEntries((bd.channels ?? []).map(ch => [ch.id, ch.name]))
-                        const fd = mapMonthlyRecordToFormData(mr, chIdToName)
-                        restoreFromFormData(fd, { includeEnabler: false })
-                        setMonthlyId(mr.id)
-                        skuDataCacheRef.current[selectedSku] = { data: fd, recordId: mr.id }
-                        setPrefetchedSkuData(prev => ({ ...prev, [selectedSku]: fd }))
-                    } else {
-                        restoreFromFormData({}, { includeEnabler: false })
-                        setMonthlyId(null)
-                    }
-                })
-                .catch(() => { restoreFromFormData({}); setMonthlyId(null) })
-        } else {
-            restoreFromFormData({})
-            setMonthlyId(null)
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSku])
-
-    // ── Active channels for monthly phase ─────────────────────────────────────
-    // Existing P/L: show all channels that have data (even inactive). New P/L: only active channels.
-    const plChannels = useMemo(() => {
-        if (monthlyId) {
-            // existing record — keep channels that have any data entered, plus all active ones
-            return channels.filter(ch =>
-                channelActive[ch] !== false || parseFloat(infoData[ch]?.vol) > 0
-            )
-        }
-        return channels.filter(ch => channelActive[ch] !== false)
-    }, [channels, channelActive, monthlyId, infoData])
-
-    // ── P&L calculations ─────────────────────────────────────────────────────
-    const totalDiscountPct = (ch) =>
-        DISCOUNT_PCT_KEYS.reduce((s, k) => s + (parseFloat(discountData[ch]?.[k]) || 0), 0)
-    const totalDiscountAmt = (ch) =>
-        DISCOUNT_AMT_KEYS.reduce((s, k) => s + (parseFloat(discountData[ch]?.[k]) || 0), 0)
-
-    const grossByChannel = plChannels.map(ch => {
-        const vol = parseFloat(infoData[ch]?.vol) || 0
-        return vol * (parseFloat(activeSku.prices?.[ch]?.price) || 0)
-    })
-    const grossTotal = grossByChannel.reduce((a, b) => a + b, 0)
-    const discByChannel = plChannels.map((ch, i) => grossByChannel[i] * totalDiscountPct(ch) / 100 + totalDiscountAmt(ch))
-    const retByChannel = plChannels.map(ch => parseFloat(returnData[ch]?.actual) || 0)
-    const shipByChannel = plChannels.map(ch => (parseFloat(shippingData[ch]?.subsidy) || 0) + (parseFloat(shippingData[ch]?.processing) || 0))
-    const adsByChannel = plChannels.map((ch, i) => grossByChannel[i] * ((parseFloat(adsData[ch]?.rate) || 0) / 100))
-    const netByChannel = plChannels.map((_, i) => grossByChannel[i] - discByChannel[i] - retByChannel[i] - shipByChannel[i] - adsByChannel[i])
-    const netTotal = netByChannel.reduce((a, b) => a + b, 0)
-
-    const cogsTotal = plChannels.reduce((s, ch) => {
-        const vol = parseFloat(infoData[ch]?.vol) || 0
-        const bundCogs = parseFloat(bundlingData[ch]?.cogs) || 0
-        const unitsPerBundle = parseFloat(bundlingData[ch]?.units) || 1
-        return s + vol * (bundCogs > 0 ? bundCogs : unitsPerBundle * cogsUnit)
-    }, 0)
-    const commCost = plChannels.reduce((s, ch, i) => s + grossByChannel[i] * (parseFloat(getChFee(ch, 'comm')) / 100), 0)
-    const mallCost = plChannels.reduce((s, ch, i) => s + grossByChannel[i] * (parseFloat(getChFee(ch, 'mall')) / 100), 0)
-    const pgwCost = plChannels.reduce((s, ch, i) => s + grossByChannel[i] * (parseFloat(getChFee(ch, 'pgw')) / 100), 0)
-    const channelCost = commCost + mallCost + pgwCost
-
-    // ── All-SKU gross (enabler commission on total GMV) ──────────────────────
-    const namedProducts = products.filter(p => p.name)
-    const allSkuGrossForComm = namedProducts.reduce((sum, p) => {
-        if (p.id === selectedSku) return sum + grossTotal
-        const fd = prefetchedSkuData[p.id] ?? skuDataCacheRef.current[p.id]?.data ?? {}
-        const fi = fd.infoData ?? {}
-        return sum + plChannels.reduce((s, ch) => s + (parseFloat(fi[ch]?.vol) || 0) * (parseFloat(p.prices?.[ch]?.price) || 0), 0)
-    }, 0)
-
-    // ── Enabler cost totals ──────────────────────────────────────────────────
-    const retainerVal = parseFloat((enablerConfig.retainer || '').replace(/\./g, '')) || 0
-    const sofVal = parseFloat((enablerConfig.sof || '').replace(/\./g, '')) || 0
-    const swiftVal = parseFloat((enablerConfig.swift || '').replace(/\./g, '')) || 0
-    const liveVal = parseFloat((enablerConfig.live || '').replace(/\./g, '')) || 0
-    const warehouseVal = parseFloat((enablerConfig.warehouse || '').replace(/\./g, '')) || 0
-    const commissionVal = allSkuGrossForComm * ((parseFloat(monthlyCommissionRate) || 0) / 100)
-    const fulfilRate = parseFloat((enablerConfig.fulfilRate || '').replace(/\./g, '').replace(',', '.')) || 12000
-    const fulfilTotal = (parseFloat(orders) || 0) * fulfilRate
-    const claimTotal = Object.values(claimData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
-    const customFixedTotal = enablerConfig.customFixed.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
-    const enablerFixedTotal = retainerVal + sofVal + swiftVal + liveVal + warehouseVal + customFixedTotal
-    const customVarTotal = Object.values(varData).reduce((s, v) => s + (parseFloat(v) || 0), 0)
-    const enablerVarTotal = commissionVal + fulfilTotal + claimTotal + customVarTotal
-    const enablerTotal = enablerFixedTotal + enablerVarTotal
-    const fixedTotal = customRows.reduce((s, r) => s + (parseFloat(r.val) || 0), 0)
-
-    // ── All-SKU aggregated metrics ───────────────────────────────────────────
-    const allSkuMetrics = namedProducts.map(p => {
-        if (p.id === selectedSku) {
-            const gp = netTotal - cogsTotal
-            const op = gp - channelCost - fixedTotal
-            return {
-                sku: p, grossTotal, netTotal, cogsTotal, channelCost, fixedCost: fixedTotal,
-                grossProfit: gp, operatingProfit: op,
-                grossMarginPct: netTotal > 0 ? (gp / netTotal) * 100 : 0,
-                operatingMarginPct: netTotal > 0 ? (op / netTotal) * 100 : 0,
-                grossByCh: grossByChannel, discByCh: discByChannel, retByCh: retByChannel,
-                shipByCh: shipByChannel, adsByCh: adsByChannel, netByCh: netByChannel
-            }
-        }
-        const cachedData = prefetchedSkuData[p.id] ?? skuDataCacheRef.current[p.id]?.data ?? {}
-        return { sku: p, ...computeSkuMetrics(cachedData, p, plChannels, getChFee) }
-    })
-    const allSkuGrossTotal = allSkuMetrics.reduce((s, m) => s + m.grossTotal, 0)
-    const allSkuNetTotal = allSkuMetrics.reduce((s, m) => s + m.netTotal, 0)
-    const allSkuGrossProfit = allSkuMetrics.reduce((s, m) => s + m.grossProfit, 0)
-    const allSkuFixedTotal = allSkuMetrics.reduce((s, m) => s + m.fixedCost, 0)
-    const allSkuOpProfit = allSkuMetrics.reduce((s, m) => s + m.operatingProfit, 0)
-    const finalMonthlyPL = allSkuOpProfit - enablerTotal
-    const finalMonthlyPLPct = allSkuNetTotal > 0 ? (finalMonthlyPL / allSkuNetTotal) * 100 : 0
-    const finalPlColor = finalMonthlyPL < 0 ? 'text-red-600' : 'text-green-700'
-
-    // ── Detail modal data ────────────────────────────────────────────────────
-    const skuDetailData = detailModalSku
-        ? allSkuMetrics.find(m => m.sku.id === detailModalSku.id) ?? null
-        : null
-
-    // ── Excel export handler ─────────────────────────────────────────────────
-    const handleExportCurrent = () => {
-        const skuDataList = products.filter(p => p.name).map(p => {
-            if (p.id === selectedSku) {
-                return { name: p.name, cogs: p.cogs, pkg: p.pkg, formData: { infoData, adsData, discountData, returnData, shippingData, bundlingData, customRows } }
-            }
-            const cached = skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id] ?? {}
-            return { name: p.name, cogs: p.cogs, pkg: p.pkg, formData: cached }
-        })
-
-        const wb = exportPlToExcel(plChannels, skuDataList)
-        const periodLabel = activeMo ? `_${activeYear}_${activeMo}` : `_${activeYear}`
-        XLSX.writeFile(wb, `pl_data${periodLabel}.xlsx`)
-    }
-
-    // ── Excel import handler — preview diff, wait for confirmation ───────────
-    const handleImportExcel = ({ skuSheets }) => {
-        const namedProducts = products.filter(p => p.name)
-
-        const beforeStates = {}
-        namedProducts.forEach(p => {
-            beforeStates[p.id] = p.id === selectedSku
-                ? { infoData, adsData, discountData, returnData, shippingData, bundlingData, customRows }
-                : skuDataCacheRef.current[p.id]?.data ?? prefetchedSkuData[p.id] ?? {}
-        })
-
-        const diffs = []
-        skuSheets.forEach((sheet, idx) => {
-            const product =
-                namedProducts.find(p => p.name === sheet.sheetName) ??
-                namedProducts.find(p => p.name.toLowerCase() === sheet.sheetName.toLowerCase()) ??
-                namedProducts[idx]
-            if (!product) return
-            const d = computeSkuDiff(product.name, beforeStates[product.id] ?? {}, sheet.formData, plChannels)
-            if (d) diffs.push(d)
-        })
-
-        setPendingImport({ skuSheets })
-        setImportSummary(diffs)
-    }
-
-    const applyPendingImport = () => {
-        if (!pendingImport) return
-        const namedProducts = products.filter(p => p.name)
-        pendingImport.skuSheets.forEach((sheet, idx) => {
-            const product =
-                namedProducts.find(p => p.name === sheet.sheetName) ??
-                namedProducts.find(p => p.name.toLowerCase() === sheet.sheetName.toLowerCase()) ??
-                namedProducts[idx]
-            if (!product) return
-            const { formData } = sheet
-            if (product.id === selectedSku) {
-                setInfoData(formData.infoData)
-                setAdsData(formData.adsData)
-                setDiscountData(formData.discountData)
-                setReturnData(formData.returnData)
-                setShippingData(formData.shippingData)
-                setBundlingData(formData.bundlingData)
-                if (formData.customRows.length > 0) setCustomRows(formData.customRows)
-                setSecFilled(formData.secFilled)
-            } else {
-                skuDataCacheRef.current[product.id] = { data: formData, recordId: null }
-                setPrefetchedSkuData(prev => ({ ...prev, [product.id]: formData }))
-            }
-        })
-        toast.success(t('importSuccess'))
-        setPendingImport(null)
-        setImportSummary(null)
-    }
-
-    const cancelPendingImport = () => {
-        setPendingImport(null)
-        setImportSummary(null)
-    }
-
-    // ── Save / loading state ─────────────────────────────────────────────────
-    const [isSaving, setIsSaving] = useState(false)
-    const [isPageLoading, setIsPageLoading] = useState(!!(editId || startAtMonthly))
-    const [brandData, setBrandData] = useState(null)
-
-    const channelMap = useMemo(() => Object.fromEntries((brandData?.channels ?? []).map(ch => [ch.name, ch.id])), [brandData])
-
-    const errMsg = (msg, fallback) =>
-        typeof msg === 'string' ? msg : msg ? JSON.stringify(msg) : fallback
-
-    // ── Payload builders ─────────────────────────────────────────────────────
-    const payloadCtx = { channels: plChannels, channelMap, activeMo, activeYear, claimData, varData, monthlyCommissionRate, orders }
-
-    const buildMonthlyPayload = (resolvedBrandId, resolvedChannels) =>
-        buildMonthlyPayloadFromData(
-            { infoData, discountData, returnData, shippingData, adsData, bundlingData, customRows, claimData, varData, monthlyCommissionRate, orders },
-            activeSku, selectedSku, resolvedBrandId, resolvedChannels, payloadCtx
-        )
-
-    // ── Pre-fill on edit ─────────────────────────────────────────────────────
-    useEffect(() => {
-        if (!editId && !startAtMonthly) return
-        const load = async () => {
-            let brandId = null
-            let monthlyRecord = null
-
-            if (editId && brandOnly) {
-                brandId = editId
-            } else if (editId) {
-                const monthlyRes = await services.pl.getMonthlyById(editId)
-                const m = monthlyRes?.data?.data ?? monthlyRes?.data
-                if (!m) { setIsPageLoading(false); return }
-                monthlyRecord = m
-                setMonthlyId(m.id ?? editId)
-                const skuId = m.sku_id ?? m.sku?.id
-                if (skuId) setSelectedSku(skuId)
-                if (m.period_month && m.period_year) {
-                    const yr = String(m.period_year)
-                    const mo = MONTH_LABELS[parseInt(m.period_month) - 1] ?? ''
-                    setActiveYear(yr)
-                    setMoByYear(prev => ({ ...prev, [yr]: mo }))
-                }
-                brandId = m.brand_id ?? m.brand?.id
-            } else if (startAtMonthly) {
-                const listRes = await services.pl.getBrands()
-                const raw = listRes?.data?.data ?? listRes?.data ?? null
-                const brands = Array.isArray(raw) ? raw : (raw ? [raw] : [])
-                if (!brands.length) {
-                    // Fresh account: no brands yet. Toast and bounce back to the list.
-                    toast.error(t('errorNoBrandProfile'), { id: 'pl-no-brand-profile' })
-                    setIsPageLoading(false)
-                    onBack?.()
-                    return
-                }
-                brandId = brands[0].id
-            }
-
-            if (!brandId) { setIsPageLoading(false); return }
-            const res = await services.pl.getBrands()
-            const raw = res?.data?.data ?? res?.data ?? null
-            const brandList = Array.isArray(raw) ? raw : (raw ? [raw] : [])
-            const d = brandList.find(b => b.id === brandId) ?? brandList[0]
-            if (!d) { setIsPageLoading(false); return }
-
-            setSetup({ brand_name: d.name || '', category: d.category || '', enabler: d.enabler_name || '' })
-
-            const chs = [...(d.channels || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-            const chIdToName = Object.fromEntries(chs.map(ch => [ch.id, ch.name]))
-            setChannels(chs.map(ch => ch.name))
-            setMallStatus(Object.fromEntries(chs.map(ch => [ch.name, ch.is_mall || false])))
-            setChannelActive(Object.fromEntries(chs.map(ch => [ch.name, ch.is_active !== false])))
-            setChannelFees(Object.fromEntries(chs.map(ch => [ch.name, {
-                comm: toRate(ch.fee_config?.commission_rate),
-                mall: toRate(ch.fee_config?.mall_fee_rate),
-                pgw: toRate(ch.fee_config?.pgw_rate),
-            }])))
-
-            const ec = d.enabler_fee_config
-            if (ec) {
-                setEnablerConfig({
-                    retainer: toAmt(ec.retainer_amount),
-                    commissionRate: toRate(ec.commission_gmv_rate),
-                    sof: toAmt(ec.store_operation_fee),
-                    swift: toAmt(ec.platform_fee),
-                    live: toAmt(ec.live_commerce_cost),
-                    warehouse: toAmt(ec.warehouse_cost),
-                    fulfilRate: toAmt(ec.fulfillment_per_order) || '12000',
-                    customFixed: (ec.custom_fixed_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
-                    customVar: (ec.custom_var_components || []).map((r, i) => ({ id: i, name: r.name, val: toAmt(r.amount) })),
-                })
-            }
-
-            if (d.skus?.length) {
-                const mappedSkus = d.skus.map((sku, i) => ({
-                    id: sku.id || i,
-                    name: sku.name || '',
-                    sku,
-                    cogs: toAmt(sku.cogs_per_unit),
-                    pkg: toAmt(sku.packaging_cost),
-                    prices: Object.fromEntries(
-                        (sku.channel_prices || [])
-                            .map(cp => {
-                                const chName = cp.channel_name || chIdToName[cp.channel_id] || ''
-                                return [chName, { price: toAmt(cp.selling_price), discount: toRate(cp.default_discount_pct) }]
-                            })
-                            .filter(([k]) => k)
-                    ),
-                }))
-                setProducts(mappedSkus)
-                setActiveIdx(0)
-                if (startAtMonthly && !monthlyRecord && mappedSkus[0]?.id) {
-                    setSelectedSku(mappedSkus[0].id)
-                }
-            }
-
-            if (monthlyRecord) {
-                const fd = mapMonthlyRecordToFormData(monthlyRecord, chIdToName)
-                setInfoData(fd.infoData)
-                setAdsData(fd.adsData)
-                setDiscountData(fd.discountData)
-                setReturnData(fd.returnData)
-                setShippingData(fd.shippingData)
-                setClaimData(fd.claimData)
-                setVarData(fd.varData ?? {})
-                setMonthlyCommissionRate(fd.monthlyCommissionRate ?? '')
-                setBundlingData(fd.bundlingData ?? {})
-                if (fd.orders) setOrders(fd.orders)
-                if (fd.customRows?.length) setCustomRows(fd.customRows)
-                setSecFilled(fd.secFilled)
-            }
-
-            setBrandData(d)
-            setCompletedSetupSteps([1, 2, 3])
-            setSetupStep(1)
-            setSetupDone(startAtMonthly)
-
-            // Pre-fetch monthly data for other SKUs
-            if (monthlyRecord && d.skus?.length > 1) {
-                const periodMonth = String(parseInt(monthlyRecord.period_month)).padStart(2, '0')
-                const periodYear = Number(monthlyRecord.period_year)
-                const currentSkuId = monthlyRecord.sku_id ?? monthlyRecord.sku?.id
-                const otherSkuIds = d.skus.filter(s => s.id !== currentSkuId).map(s => s.id)
-
-                if (otherSkuIds.length) {
-                    try {
-                        const results = await Promise.allSettled(
-                            otherSkuIds.map(skuId =>
-                                services.pl.getMonthlyByPeriod(d.id, skuId, periodMonth, periodYear)
-                            )
-                        )
-                        const fetched = {}
-                        results.forEach((r, i) => {
-                            if (r.status !== 'fulfilled') return
-                            const raw = r.value
-                            const mr = raw?.data ?? raw ?? null
-                            if (!mr || !mr.id) return
-                            const fd = mapMonthlyRecordToFormData(mr, chIdToName)
-                            fetched[otherSkuIds[i]] = fd
-                            skuDataCacheRef.current[otherSkuIds[i]] = { data: fd, recordId: mr.id }
-                        })
-                        if (Object.keys(fetched).length) {
-                            setPrefetchedSkuData(prev => ({ ...prev, ...fetched }))
-                        }
-                    } catch (e) { /* best-effort */ }
-                }
-            }
-
-            setIsPageLoading(false)
-        }
-        load().catch(() => setIsPageLoading(false))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [editId, startAtMonthly])
-
-    // ── Taken months loader ──────────────────────────────────────────────────
-    useEffect(() => {
-        if (!startAtMonthly || !brandData?.id || !activeYear) return
-        const load = async () => {
-            setIsMonthsLoading(true)
-            try {
-                const res = await services.pl.getTakenMonths(brandData.id, activeYear)
-                const rows = res?.data?.data ?? res?.data ?? []
-                const currentMonthlyId = contextRef.current.monthlyId
-                const { activeMo } = contextRef.current
-                const editingMonthCode = currentMonthlyId && activeMo
-                    ? String(MONTH_LABELS.indexOf(activeMo) + 1).padStart(2, '0')
-                    : null
-                const taken = rows.filter(r =>
-                    editingMonthCode ? r.period_month !== editingMonthCode : r.id !== currentMonthlyId
-                ).map(r => r.period_month)
-                setTakenMonths(taken)
-                setMoByYear(prev => {
-                    const cur = prev[activeYear] ?? ''
-                    if (!cur) return prev
-                    const moCode = String(MONTH_LABELS.indexOf(cur) + 1).padStart(2, '0')
-                    return taken.includes(moCode) ? { ...prev, [activeYear]: '' } : prev
-                })
-            } finally {
-                setIsMonthsLoading(false)
-            }
-        }
-        load()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeYear, brandData?.id, startAtMonthly])
-
-    // ── Save handler ─────────────────────────────────────────────────────────
-    const handleSaveChanges = async () => {
-        if (!brandOnly) {
-            if (!activeMo) return toast.error(t('selectMonthFirst'))
-            if (!activeYear) return toast.error(t('selectYearFirst'))
-            if (!selectedSku) return toast.error(t('selectSkuFirst'))
-        }
-
-        setIsSaving(true)
-        try {
-            // ── Flow 1: brandOnly ────────────────────────────────────────────
-            if (brandOnly) {
-                const skusPayload = products.filter(p => p.name).map(p => ({
-                    name: p.name,
-                    cogs_per_unit: num(p.cogs),
-                    packaging_cost: num(p.pkg),
-                    is_active: true,
-                    channel_prices: channels.map(ch => ({
-                        channel_name: ch,
-                        selling_price: parseFloat(p.prices?.[ch]?.price) || 0,
-                        default_discount_pct: (parseFloat(p.prices?.[ch]?.discount) || 0) / 100,
-                    })),
-                }))
-                const brandPayload = {
-                    name: setup.brand_name, category: setup.category,
-                    ...(setup.enabler && { enabler_name: setup.enabler }),
-                    via_enabler: !!setup.enabler, ecom_model: 'MARKETPLACE', status: 'active',
-                    channels: channels.map((ch, i) => ({
-                        name: ch, is_mall: mallStatus[ch] ?? false, is_active: channelActive[ch] !== false, sort_order: i + 1,
-                        fee_config: {
-                            commission_rate: parseFloat(getChFee(ch, 'comm')) / 100,
-                            mall_fee_rate: parseFloat(getChFee(ch, 'mall')) / 100,
-                            pgw_rate: parseFloat(getChFee(ch, 'pgw')) / 100,
-                        },
-                    })),
-                    ...(skusPayload.length && { skus: skusPayload }),
-                    enabler_fee_config: {
-                        retainer_amount: retainerVal, store_operation_fee: sofVal,
-                        platform_fee: swiftVal, live_commerce_cost: liveVal, warehouse_cost: warehouseVal,
-                        commission_gmv_rate: (parseFloat(enablerConfig.commissionRate) || 0) / 100,
-                        fulfillment_per_order: fulfilRate,
-                        custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
-                        custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
-                    },
-                }
-                const bId = brandData?.id ?? editId
-                const res = bId
-                    ? await services.pl.updatePl(bId, brandPayload)
-                    : await services.pl.createPl(brandPayload)
-                if (!res?.success) return toast.error(errMsg(res?.message, t('saveBrandError')))
-                const saved = res.data?.data ?? res.data ?? null
-                setBrandData(saved)
-                toast.success(t('saveBrandSuccess'))
-                if (onSaveComplete) onSaveComplete(saved?.id ?? bId)
-                return
-            }
-
-            // ── Flow 2: startAtMonthly ───────────────────────────────────────
-            if (startAtMonthly) {
-                if (!brandData?.id) return toast.error(t('errorBrandRequired'))
-                const bId = brandData.id
-                const bChs = brandData.channels ?? []
-                const periodMonth = String(MONTH_LABELS.indexOf(activeMo) + 1).padStart(2, '0')
-                const periodYear = parseInt(activeYear)
-
-                const payload = buildMonthlyPayload(bId, bChs)
-                let resolvedMonthlyId = monthlyId
-                if (!resolvedMonthlyId) {
-                    const chk = await services.pl.getMonthlyByPeriod(bId, selectedSku, periodMonth, periodYear)
-                    const existing = chk?.data?.data ?? chk?.data ?? null
-                    if (existing?.id) { resolvedMonthlyId = existing.id; setMonthlyId(existing.id) }
-                }
-                const res = resolvedMonthlyId
-                    ? await services.pl.updateMonthly(resolvedMonthlyId, payload)
-                    : await services.pl.createMonthly(payload)
-                if (res?.success) {
-                    if (!resolvedMonthlyId) {
-                        const newId = res.data?.data?.id ?? res.data?.id
-                        if (newId) setMonthlyId(newId)
-                    }
-                } else {
-                    toast.error(errMsg(res?.message, t('saveError')))
-                    return
-                }
-
-                // Save other SKUs with cached data
-                const otherSkus = products.filter(p => p.id !== selectedSku && p.name)
-                const otherSaves = []
-                for (const op of otherSkus) {
-                    const cached = skuDataCacheRef.current[op.id]?.data ?? prefetchedSkuData[op.id]
-                    if (!cached) continue
-                    const hasVol = Object.values(cached.infoData ?? {}).some(d => parseFloat(d?.vol) > 0)
-                    if (!hasVol) continue
-                    const otherPayload = buildMonthlyPayloadFromData(cached, op, op.id, bId, bChs, payloadCtx)
-                    const cachedRecordId = skuDataCacheRef.current[op.id]?.recordId ?? null
-                    let otherId = cachedRecordId
-                    if (!otherId) {
-                        const chk = await services.pl.getMonthlyByPeriod(bId, op.id, periodMonth, periodYear)
-                        const existing = chk?.data?.data ?? chk?.data ?? null
-                        if (existing?.id) otherId = existing.id
-                    }
-                    otherSaves.push(otherId
-                        ? services.pl.updateMonthly(otherId, otherPayload)
-                        : services.pl.createMonthly(otherPayload))
-                }
-                if (otherSaves.length) await Promise.allSettled(otherSaves)
-                toast.success(t('saveSuccess'))
-                return
-            }
-
-            // ── Flow 3: Full setup (new brand + monthly) ─────────────────────
-            const skusPayload = products.filter(p => p.name).map(p => ({
-                name: p.name, cogs_per_unit: num(p.cogs), packaging_cost: num(p.pkg), is_active: true,
-                channel_prices: channels.map(ch => ({
-                    channel_name: ch,
-                    selling_price: parseFloat(p.prices?.[ch]?.price) || 0,
-                    default_discount_pct: (parseFloat(p.prices?.[ch]?.discount) || 0) / 100,
-                })),
-            }))
-            const brandPayload = {
-                name: setup.brand_name, category: setup.category,
-                ...(setup.enabler && { enabler_name: setup.enabler }),
-                via_enabler: !!setup.enabler, ecom_model: 'MARKETPLACE', status: 'active',
-                channels: channels.map((ch, i) => ({
-                    name: ch, is_mall: mallStatus[ch] ?? false, is_active: channelActive[ch] !== false, sort_order: i + 1,
-                    fee_config: {
-                        commission_rate: parseFloat(getChFee(ch, 'comm')) / 100,
-                        mall_fee_rate: parseFloat(getChFee(ch, 'mall')) / 100,
-                        pgw_rate: parseFloat(getChFee(ch, 'pgw')) / 100,
-                    },
-                })),
-                ...(skusPayload.length && { skus: skusPayload }),
-                ...(setup.enabler && {
-                    enabler_fee_config: {
-                        retainer_amount: retainerVal, store_operation_fee: sofVal,
-                        platform_fee: swiftVal, live_commerce_cost: liveVal, warehouse_cost: warehouseVal,
-                        commission_gmv_rate: (parseFloat(enablerConfig.commissionRate) || 0) / 100,
-                        fulfillment_per_order: fulfilRate,
-                        custom_fixed_components: enablerConfig.customFixed.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
-                        custom_var_components: enablerConfig.customVar.map(r => ({ name: r.name, amount: parseFloat(r.val) || 0 })),
-                    },
-                }),
-            }
-            const bIdFull = brandData?.id ?? editId
-            const brandRes = bIdFull
-                ? await services.pl.updatePl(bIdFull, brandPayload)
-                : await services.pl.createPl(brandPayload)
-            if (!brandRes?.success) return toast.error(errMsg(brandRes?.message, t('saveError')))
-            const saved = brandRes.data?.data ?? brandRes.data ?? null
-            setBrandData(saved)
-
-            const payload = buildMonthlyPayload(saved.id, saved.channels ?? [])
-            const monthlyRes = await services.pl.createMonthly(payload)
-
-            const otherSkus = products.filter(p => p.id !== selectedSku && p.name)
-            const otherSaves = []
-            for (const op of otherSkus) {
-                const cached = skuDataCacheRef.current[op.id]?.data ?? prefetchedSkuData[op.id]
-                if (!cached) continue
-                const hasVol = Object.values(cached.infoData ?? {}).some(d => parseFloat(d?.vol) > 0)
-                if (!hasVol) continue
-                otherSaves.push(services.pl.createMonthly(
-                    buildMonthlyPayloadFromData(cached, op, op.id, saved.id, saved.channels ?? [], payloadCtx)
-                ))
-            }
-            if (otherSaves.length) await Promise.allSettled(otherSaves)
-
-            if (monthlyRes?.success) toast.success(t('saveSuccess'))
-            else toast.error(errMsg(monthlyRes?.message, t('saveError')))
-        } catch {
-            toast.error(t('saveError'))
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    // ── Render ────────────────────────────────────────────────────────────────
-    if (isPageLoading) return <LoadingScreen />
+    const t = (v, positive) => positive ? (v > 0 ? 'text-blue-700' : 'text-muted-foreground/60')
+        : (v > 0 ? 'text-red-600' : 'text-muted-foreground/60')
 
     return (
-        <>
-            <div className="space-y-4">
-                <div className="flex justify-between items-center px-4 lg:px-6">
-                    <div className="flex items-center gap-3">
-                        {onBack && (
-                            <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8">
-                                <IconArrowLeft size={16} />
-                            </Button>
-                        )}
-                        <H3 className="text-xl font-bold">{brandOnly ? t('colBrand') : editId ? t('editTitle') : t('title')}</H3>
+        <div className="space-y-3">
+            <Section title="Revenue">
+                <AuditTable noBorder rows={[
+                    { label: 'Original Price (before discount)', value: agg.grossGmv, cls: 'text-blue-700' },
+                    { label: 'Platform Voucher (Shopee)', value: 0, cls: 'text-muted-foreground/60', note: 'not stored' },
+                    { label: 'Total Returns', value: agg.refund, cls: 'text-muted-foreground/60' },
+                ]} />
+            </Section>
+            <Section title="Seller Discounts">
+                <AuditTable noBorder
+                    rows={[
+                        { label: 'Seller Sponsored Voucher', value: agg.voucher, cls: t(agg.voucher, false) },
+                        { label: 'Seller Co-fund Voucher', value: agg.voucherCof, cls: t(agg.voucherCof, false) },
+                        { label: 'Seller Coin Cashback', value: agg.coin, cls: t(agg.coin, false) },
+                        { label: 'Seller Co-fund Coin Cashback', value: agg.coinCof, cls: t(agg.coinCof, false) },
+                    ]}
+                    subtotal={{ label: 'Total Seller Discount', value: agg.totalDisc, cls: 'text-muted-foreground/60' }}
+                />
+            </Section>
+            <Section title="Channel Fees">
+                <AuditTable noBorder
+                    rows={[
+                        { label: 'Admin Fee (Commission)', value: agg.commFee, cls: t(agg.commFee, false) },
+                        { label: 'Service Fee', value: agg.svcFee, cls: t(agg.svcFee, false) },
+                        { label: 'Order Processing Fee', value: agg.procFee, cls: t(agg.procFee, false) },
+                        { label: 'Transaction Fee', value: agg.txFee, cls: t(agg.txFee, false) },
+                        { label: 'Campaign Fee', value: agg.campFee, cls: t(agg.campFee, false) },
+                        { label: 'Affiliate Commission', value: agg.affFee, cls: t(agg.affFee, false) },
+                    ]}
+                    subtotal={{ label: 'Total Channel Fees', value: agg.totalFees, cls: agg.totalFees > 0 ? 'text-red-600' : 'text-muted-foreground/60' }}
+                />
+            </Section>
+            <Section title="Shipping">
+                <AuditTable noBorder
+                    rows={[
+                        { label: 'Buyer Paid Shipping', value: 0, cls: 'text-muted-foreground/60', note: agg.subsidy > 0 ? 'free shipping' : undefined },
+                        { label: 'Free Shipping Subsidy (Shopee)', value: agg.subsidy, cls: t(agg.subsidy, true) },
+                        { label: 'Shipping to Carrier', value: agg.shipCost, cls: t(agg.shipCost, false) },
+                        { label: 'Seller Shipping Promo', value: 0, cls: 'text-muted-foreground/60' },
+                    ]}
+                    subtotal={{ label: 'Net Shipping', value: agg.netShipping, cls: 'text-muted-foreground/60', note: agg.subsidy > 0 ? 'Shopee covered' : undefined }}
+                />
+            </Section>
+            <Section title="Settlement Validation">
+                <AuditTable noBorder
+                    rows={[
+                        { label: 'Total Income (Income Report)', value: agg.settlement, cls: 'text-blue-700' },
+                        { label: 'GMV − Seller Discount − Channel Fees + Net Shipping − Returns', value: calculated, cls: 'text-blue-700' },
+                    ]}
+                    subtotal={{ label: `Difference${isMatch ? ' - ✓ matched' : ''}`, value: delta, cls: isMatch ? 'text-green-700' : 'text-red-600' }}
+                />
+            </Section>
+        </div>
+    )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function PlCalculator({ editId, allIds, onBack }) {
+    const [records, setRecords] = useState([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [forms, setForms] = useState({})
+    const [orderPage, setOrderPage] = useState(0)
+
+    // ── Load ──────────────────────────────────────────────────────────────────
+    useEffect(() => {
+        const ids = allIds?.length ? allIds : [editId]
+        setIsLoading(true)
+        Promise.allSettled(ids.map(id => services.pl.getMonthlyById(id)))
+            .then(results => {
+                const loaded = results
+                    .filter(r => r.status === 'fulfilled')
+                    .map(r => r.value?.data?.data ?? r.value?.data)
+                    .filter(Boolean)
+                setRecords(loaded)
+                const init = {}
+                loaded.forEach(rec => { init[rec.id] = buildFormFromRecord(rec) })
+                setForms(init)
+                setIsLoading(false)
+            })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editId])
+
+    const active = records[0]
+
+    // ── Aggregate across ALL records (period-level) ───────────────────────────
+    const agg = useMemo(() => {
+        const sum = (fn) => records.reduce((s, rec) => {
+            const f = forms[rec.id] ?? buildFormFromRecord(rec)
+            return s + fn(f, rec)
+        }, 0)
+        const grossGmv = sum((f) => n(f.units_sold) * n(f.actual_selling_price))
+        const settlement = sum((f) => n(f.settlement_amount))
+        const voucher = sum((f) => n(f.voucher_amount))
+        const voucherCof = sum((f) => n(f.voucher_cofund_amount))
+        const coin = sum((f) => n(f.coin_amount))
+        const coinCof = sum((f) => n(f.coin_cofund_amount))
+        const totalDisc = voucher + voucherCof + coin + coinCof
+        const refund = sum((f) => n(f.actual_refund_amount))
+        const subsidy = sum((f) => n(f.shipping_subsidy))
+        const shipCost = sum((f) => n(f.actual_shipping_cost))
+        const netShipping = subsidy - shipCost
+        const commFee = sum((f) => n(f.commission_fee_amount))
+        const svcFee = sum((f) => n(f.service_fee_amount))
+        const procFee = sum((f) => n(f.processing_fee))
+        const txFee = sum((f) => n(f.transaction_fee_amount))
+        const campFee = sum((f) => n(f.campaign_fee_amount))
+        const affFee = sum((f) => n(f.affiliate_commission_amount))
+        const totalFees = commFee + svcFee + procFee + txFee + campFee + affFee
+        const totalCogs = sum((f, rec) => (parseFloat(rec.cogs_per_unit) || 0) * n(f.units_sold))
+        return {
+            grossGmv, settlement, voucher, voucherCof, coin, coinCof, totalDisc,
+            refund, subsidy, shipCost, netShipping,
+            commFee, svcFee, procFee, txFee, campFee, affFee, totalFees,
+            totalCogs,
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [records, forms])
+
+    // ── Flat list of all order rows (for Orders tab) ──────────────────────────
+    // Prefer order_report_rows (all orders from the order report, including cancelled).
+    // Fall back to _sales (income report rows) when no order report was uploaded.
+    // Deduplicate by order_no across records so the same order isn't shown per SKU.
+    const allOrderRows = useMemo(() => {
+        const seen = new Set()
+        return records.flatMap(rec => {
+            // order_report_rows from the order report Excel (all orders, inc. cancelled)
+            const reportRows = rec.order_report_rows ?? []
+            if (reportRows.length > 0) {
+                return reportRows
+                    .filter(r => {
+                        // Dedup by order_no + product_name so the same product in the
+                        // same order only appears once across all SKU records
+                        const key = `${r.order_no?.trim() ?? ''}::${r.product_name?.trim() ?? ''}`
+                        if (!key || key === '::') return true
+                        if (seen.has(key)) return false
+                        seen.add(key)
+                        return true
+                    })
+                    .map(r => ({ rec, entry: r, fromOrderReport: true }))
+            }
+            // Fall back to income-report rows stored in _sales
+            const f = forms[rec.id] ?? {}
+            const entries = f._sales ?? []
+            if (entries.length === 0) return [{ rec, entry: null }]
+            return entries
+                .filter(entry => {
+                    const key = entry.order_no?.trim()
+                    if (!key) return true
+                    if (seen.has(key)) return false
+                    seen.add(key)
+                    return true
+                })
+                .map(entry => ({ rec, entry, fromOrderReport: false }))
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [records, forms])
+
+    const totalOrderPages = Math.max(1, Math.ceil(allOrderRows.length / ORDER_PAGE_SIZE))
+    const safeOrderPage = Math.min(orderPage, totalOrderPages - 1)
+    const pagedOrders = allOrderRows.slice(safeOrderPage * ORDER_PAGE_SIZE, (safeOrderPage + 1) * ORDER_PAGE_SIZE)
+
+    useEffect(() => { setOrderPage(0) }, [records.length])
+
+    // ── Per-SKU rows (for SKU tab) - one row per Shopee product ─────────────────
+    const skuRows = useMemo(() =>
+        records.flatMap(rec => {
+            const f = forms[rec.id] ?? buildFormFromRecord(rec)
+            const cogsUnit = parseFloat(rec.cogs_per_unit) || 0
+            const reportRows = rec.order_report_rows ?? []
+            const productNames = Array.isArray(rec.product_names) ? rec.product_names : []
+
+            // When order report rows are available, break down per Shopee product
+            if (reportRows.length > 0 && productNames.length > 0) {
+                const recSettlement = n(f.settlement_amount)
+                const recFees = n(f.commission_fee_amount) + n(f.service_fee_amount) +
+                    n(f.processing_fee) + n(f.transaction_fee_amount) +
+                    n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
+                const recDisc = n(f.voucher_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
+                const recNetShipping = n(f.shipping_subsidy) - n(f.actual_shipping_cost)
+
+                // Aggregate per product from order report rows for this SKU's products
+                const productMap = {}
+                for (const r of reportRows.filter(r => !r.excluded && productNames.includes(r.product_name))) {
+                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0 }
+                    productMap[r.product_name].units += r.qty || 0
+                    productMap[r.product_name].gmv += r.gmv || 0
+                }
+
+                const totalProductGmv = Object.values(productMap).reduce((s, p) => s + p.gmv, 0)
+
+                return Object.entries(productMap).map(([productName, p]) => {
+                    const share = totalProductGmv > 0 ? p.gmv / totalProductGmv : 0
+                    const settlement = Math.round(recSettlement * share)
+                    const channelFees = Math.round(recFees * share)
+                    const discPenjual = Math.round(recDisc * share)
+                    const netOngkir = Math.round(recNetShipping * share)
+                    const cogs = cogsUnit * p.units
+                    return { rec, productName, units: p.units, grossGmv: p.gmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution: settlement - cogs }
+                })
+            }
+
+            // Fallback: single aggregate row per SKU record
+            const units = n(f.units_sold)
+            const grossGmv = units * n(f.actual_selling_price)
+            const discPenjual = n(f.voucher_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
+            const channelFees = n(f.commission_fee_amount) + n(f.service_fee_amount) + n(f.processing_fee) + n(f.transaction_fee_amount) + n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
+            const netOngkir = n(f.shipping_subsidy) - n(f.actual_shipping_cost)
+            const settlement = n(f.settlement_amount)
+            const cogs = cogsUnit * units
+            return [{ rec, productName: canonicalName(rec), units, grossGmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution: settlement - cogs }]
+        }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [records, forms])
+
+    // ── Loading ───────────────────────────────────────────────────────────────
+    if (isLoading) return (
+        <div className="px-4 lg:px-6 py-6 space-y-4">
+            {[64, 120, 160, 200, 160].map((h, i) => <Skeleton key={i} className="w-full rounded-lg" style={{ height: h }} />)}
+        </div>
+    )
+    if (!active) return (
+        <div className="px-4 lg:px-6 py-6 text-sm text-muted-foreground">
+            Record not found. <button className="underline" onClick={onBack}>Go back</button>
+        </div>
+    )
+
+    const periodMonth = active.period_month ? parseInt(active.period_month) - 1 : null
+
+    // Orders tab footer totals (matched rows)
+    const matchedRows = allOrderRows.filter(r => r.entry !== null && !r.entry?.excluded && !r.entry?.Excluded)
+    // Use highest stored matched_orders across records (income report count).
+    // Falls back to matchedRows.length (order report dedup count) for old imports.
+    const displayMatchedOrders = records.reduce((max, r) => Math.max(max, r.matched_orders ?? 0), 0) || matchedRows.length
+    // Use period-level aggregates for footer (consistent with KPI cards & Summary tab)
+    // Row-level sums vary by income-report match status and pagination, so use agg instead
+    const totalGmv      = agg.grossGmv
+    const totalDiscount = agg.totalDisc
+    const totalFees     = agg.totalFees
+    const totalShipping = agg.netShipping
+    const totalSettle   = agg.settlement
+
+
+    return (
+        <div className="space-y-4">
+
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 lg:px-6">
+                <button type="button" onClick={onBack} className="text-sm hover:opacity-70">←</button>
+                <h2 className="text-xl font-bold">P/L Detail</h2>
+                {active.source === 'shopee' && <ShopeeChip />}
+            </div>
+
+            <div className="px-4 lg:px-6"><Separator /></div>
+
+            <div className="px-4 lg:px-6 pb-20 space-y-3">
+
+                {/* Period (read-only display) */}
+                <div className="border rounded-lg p-5 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Period</p>
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-1">Year</p>
+                        <select value={active.period_year ?? ''} disabled className="h-8 rounded-md border px-2 text-sm bg-muted/50 text-muted-foreground w-24">
+                            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {MONTH_LABELS.map((m, i) => (
+                            <button key={m} type="button" disabled className={`px-3 py-1.5 text-sm rounded-lg border ${i === periodMonth ? 'bg-foreground text-background border-foreground font-medium' : 'bg-background text-muted-foreground border-input opacity-40'}`}>
+                                {m}
+                            </button>
+                        ))}
                     </div>
                 </div>
-                <div className="px-4 lg:px-6"><Separator /></div>
 
-                <div className="px-4 lg:px-6 py-4 pb-20 space-y-4">
+                {/* KPI chips */}
+                <KpiCards cards={[
+                    {
+                        label: 'Gross GMV', value: agg.grossGmv,
+                        cls: 'text-blue-700',
+                        subtitle: `${displayMatchedOrders} orders`,
+                    },
+                    {
+                        label: 'Channel Fees', value: agg.totalFees,
+                        cls: 'text-red-600',
+                        subtitle: agg.grossGmv > 0 ? `${((agg.totalFees / agg.grossGmv) * 100).toFixed(1)}% GMV` : undefined
+                    },
+                    {
+                        label: 'Settlement', value: agg.settlement,
+                        cls: 'text-green-700',
+                        subtitle: agg.grossGmv > 0 ? `${((agg.settlement / agg.grossGmv) * 100).toFixed(1)}% GMV` : undefined
+                    },
+                    {
+                        label: 'Contribution Margin', value: agg.settlement - agg.totalCogs,
+                        cls: (agg.settlement - agg.totalCogs) >= 0 ? 'text-green-700' : 'text-red-600',
+                        subtitle: agg.totalCogs > 0 ? `After COGS ${fmt(agg.totalCogs)}` : 'COGS not set'
+                    },
+                ]} />
 
-                    {/* SETUP PHASE */}
-                    {!setupDone && (
-                        <SetupPhase
-                            setupStep={setupStep} completedSetupSteps={completedSetupSteps}
-                            handleStepOpen={handleStepOpen} doneSetupStep={doneSetupStep} getStepStatus={getStepStatus}
-                            setup={setup} setS={setS}
-                            channels={channels} tagInput={tagInput} setTagInput={setTagInput}
-                            addChannel={addChannel} removeChannel={removeChannel}
-                            channelActive={channelActive} setChannelActive={setChannelActive}
-                            getChFee={getChFee} setChFee={setChFee}
-                            enablerConfig={enablerConfig} setEC={setEC}
-                            products={products} activeIdx={activeIdx} setActiveIdx={setActiveIdx}
-                            addProduct={addProduct} removeProduct={removeProduct} updateP={updateP} p={p}
-                            openSkuModal={openSkuModal}
-                            handleSaveChanges={handleSaveChanges} brandOnly={brandOnly}
-                            t={t}
-                        />
-                    )}
+                {/* ══ TABS ════════════════════════════════════════════════════════════ */}
+                <Tabs defaultValue="summary">
+                    <TabsList className="mb-3">
+                        <TabsTrigger value="summary">Summary</TabsTrigger>
+                        <TabsTrigger value="orders">Orders</TabsTrigger>
+                        <TabsTrigger value="sku">SKU</TabsTrigger>
+                    </TabsList>
 
-                    {/* MONTHLY P&L PHASE */}
-                    {setupDone && !brandOnly && (
-                        <>
-                            <MonthlyInputSection
-                                t={t}
-                                setup={setup} channels={plChannels} setSetupDone={setSetupDone}
-                                activeYear={activeYear} setActiveYear={setActiveYear}
-                                activeMo={activeMo} setActiveMo={setActiveMo}
-                                isMonthsLoading={isMonthsLoading} takenMonths={takenMonths}
-                                enablerConfig={enablerConfig} enablerFixedTotal={enablerFixedTotal}
-                                monthlyCommissionRate={monthlyCommissionRate} setMonthlyCommissionRate={setMonthlyCommissionRate}
-                                varData={varData} setVarData={setVarData} customVarTotal={customVarTotal}
-                                products={products} selectedSku={selectedSku} setSelectedSku={setSelectedSku} activeSku={activeSku}
-                                infoData={infoData} setInfoData={setInfoData}
-                                discountData={discountData} setDiscountData={setDiscountData}
-                                returnData={returnData} setReturnData={setReturnData}
-                                shippingData={shippingData} setShippingData={setShippingData}
-                                adsData={adsData} setAdsData={setAdsData}
-                                bundlingData={bundlingData} setBundlingData={setBundlingData}
-                                customRows={customRows} setCustomRows={setCustomRows}
-                                secFilled={secFilled} markFilled={markFilled}
-                                grossByChannel={grossByChannel} discByChannel={discByChannel}
-                                retByChannel={retByChannel} adsByChannel={adsByChannel}
-                                totalDiscountPct={totalDiscountPct} fixedTotal={fixedTotal}
-                                getChFee={getChFee}
-                                DISCOUNT_LABELS={DISCOUNT_LABELS}
-                                onImportExcel={handleImportExcel}
-                                onExportCurrent={handleExportCurrent}
-                            />
+                    {/* ── Summary ── */}
+                    <TabsContent value="summary" className="mt-0">
+                        <SummaryTab agg={agg} />
+                    </TabsContent>
 
-                            <ResultsSection
-                                t={t} channels={plChannels}
-                                allSkuMetrics={allSkuMetrics} namedProducts={namedProducts} selectedSku={selectedSku}
-                                allSkuGrossTotal={allSkuGrossTotal} allSkuNetTotal={allSkuNetTotal}
-                                allSkuGrossProfit={allSkuGrossProfit} allSkuFixedTotal={allSkuFixedTotal} allSkuOpProfit={allSkuOpProfit}
-                                enablerFixedTotal={enablerFixedTotal} enablerVarTotal={enablerVarTotal}
-                                finalMonthlyPL={finalMonthlyPL} finalMonthlyPLPct={finalMonthlyPLPct}
-                                finalPlColor={finalPlColor}
-                                setDetailModalSku={setDetailModalSku}
-                            />
-                        </>
-                    )}
+                    {/* ── Orders ── */}
+                    <TabsContent value="orders" className="mt-0 space-y-3">
+                        <div>
+                            <div className="overflow-x-auto">
+                                <Table className="min-w-[680px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/60 hover:bg-muted/60">
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Order No.</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Product</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Qty</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Original Price</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Seller Discount</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Channel Fees</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Net Shipping</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Settlement</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {pagedOrders.map(({ rec, entry, fromOrderReport }, i) => {
+                                            if (!entry) {
+                                                return (
+                                                    <TableRow key={i} className="opacity-50">
+                                                        <TableCell className="py-1.5 px-3 text-sm font-mono text-muted-foreground">-</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-muted-foreground">{canonicalName(rec)}</TableCell>
+                                                        <TableCell colSpan={6} className="py-1.5 px-3 text-sm text-muted-foreground text-center">no order data</TableCell>
+                                                    </TableRow>
+                                                )
+                                            }
+                                            if (fromOrderReport) {
+                                                const excluded = entry.excluded
+                                                return (
+                                                    <TableRow key={i} className={excluded ? 'opacity-40' : ''}>
+                                                        <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm">{entry.product_name}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{entry.qty}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(entry.price)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">-</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">-</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">-</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{excluded ? <span className="text-muted-foreground text-xs">{entry.status}</span> : fmt(entry.gmv)}</TableCell>
+                                                    </TableRow>
+                                                )
+                                            }
+                                            return (
+                                                <TableRow key={i}>
+                                                    <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
+                                                    <TableCell className="py-1.5 px-3 text-sm">{canonicalName(rec)}</TableCell>
+                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{n(entry.units_sold)}</TableCell>
+                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.actual_selling_price))}</TableCell>
+                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.seller_discount))}</TableCell>
+                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.fee_total))}</TableCell>
+                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.net_shipping))}</TableCell>
+                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.settlement_amount))}</TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow className="bg-muted/40">
+                                            <TableCell colSpan={3} className="py-1.5 px-3 text-sm font-semibold">Total ({displayMatchedOrders} MATCHED)</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalGmv)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalDiscount >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalDiscount)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalFees >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalFees)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalShipping >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalShipping)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalSettle >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalSettle)}</TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </div>
+                        </div>
+                        {/* Pagination */}
+                        <div className="flex items-center justify-between">
+                            <p className="text-[11px] text-muted-foreground">
+                                Only MATCHED orders are included. Cancelled and full-refund orders are excluded from the footer.
+                            </p>
+                            <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                                <span className="text-xs text-muted-foreground">Page {safeOrderPage + 1} of {totalOrderPages}</span>
+                                <div className="flex items-center gap-1">
+                                    <Button variant="outline" className="h-7 w-7 p-0" onClick={() => setOrderPage(0)} disabled={safeOrderPage === 0}><IconChevronsLeft size={13} /></Button>
+                                    <Button variant="outline" className="h-7 w-7 p-0" onClick={() => setOrderPage(p => Math.max(0, p - 1))} disabled={safeOrderPage === 0}><IconChevronLeft size={13} /></Button>
+                                    <Button variant="outline" className="h-7 w-7 p-0" onClick={() => setOrderPage(p => Math.min(totalOrderPages - 1, p + 1))} disabled={safeOrderPage >= totalOrderPages - 1}><IconChevronRight size={13} /></Button>
+                                    <Button variant="outline" className="h-7 w-7 p-0" onClick={() => setOrderPage(totalOrderPages - 1)} disabled={safeOrderPage >= totalOrderPages - 1}><IconChevronsRight size={13} /></Button>
+                                </div>
+                            </div>
+                        </div>
+                    </TabsContent>
 
+                    {/* ── SKU ── */}
+                    <TabsContent value="sku" className="mt-0 space-y-3">
+                        <div>
+                            <div className="overflow-x-auto">
+                                <Table className="min-w-[780px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/60 hover:bg-muted/60">
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">SKU</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Qty Sold</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Gross GMV</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Seller Discount</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Channel Fees</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Net Shipping</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Settlement</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">COGS</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Contribution</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {skuRows.map(({ rec, productName, units, grossGmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution }, idx) => (
+                                            <TableRow key={`${rec.id}-${idx}`}>
+                                                <TableCell className="py-1.5 px-3">
+                                                    <p className="font-medium text-sm">{productName}</p>
+                                                    <p className="text-[11px] text-muted-foreground mt-0.5">↳ {rec.sku_code ?? canonicalName(rec)}</p>
+                                                </TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{units}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(grossGmv)}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(discPenjual)}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(channelFees)}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(netOngkir)}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(settlement)}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(cogs)}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">
+                                                    {fmt(contribution)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow className="bg-muted/40">
+                                            <TableCell className="py-1.5 px-3 text-sm font-semibold" colSpan={2}>Total</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.grossGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.grossGmv)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.totalDisc >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.totalDisc)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.totalFees >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.totalFees)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.netShipping >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.netShipping)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.settlement >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.settlement)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.totalCogs >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.totalCogs)}</TableCell>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-bold ${(agg.settlement - agg.totalCogs) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                                {fmt(agg.settlement - agg.totalCogs)}
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </div>
+                        </div>
+                    </TabsContent>
+                </Tabs>
+
+            </div>
+
+            {/* ── Bottom bar - download only ── */}
+            <div className="fixed bottom-0 left-0 right-0 bg-background border-t z-20">
+                <div className="px-4 lg:px-6 py-3 flex items-center justify-end">
+                    <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => downloadReport(records, forms)}>
+                        <IconDownload size={13} />
+                        Download Report
+                    </Button>
                 </div>
             </div>
 
-            {/* Fixed Footer */}
-            {setupDone && !brandOnly && (
-                <div
-                    className="fixed bottom-0 right-0 z-10 border-t bg-background transition-[left] duration-200 ease-linear"
-                    style={{ left: sidebarOpen ? 'var(--sidebar-width)' : '0' }}
-                >
-                    <div className="flex justify-end px-4 lg:px-6 py-3">
-                        <Button size="lg" onClick={handleSaveChanges} disabled={isSaving}>
-                            {isSaving ? t('saving') : t('saveChanges')}
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            {/* Import Confirmation Modal */}
-            <Dialog open={!!pendingImport} onOpenChange={cancelPendingImport}>
-                <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-                    <DialogHeader className="pb-4">
-                        <DialogTitle>{t('importSummaryTitle')}</DialogTitle>
-                        <p className="text-sm text-muted-foreground">{t('importSummarySubtitle')}</p>
-                    </DialogHeader>
-                    <Separator />
-                    <div className="overflow-y-auto flex-1 space-y-5 pr-1 pt-2">
-                        {importSummary?.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-6">{t('importNoChanges')}</p>
-                        )}
-                        {(importSummary ?? []).map((skuDiff, skuIdx) => (
-                            <div key={skuDiff.skuName}>
-                                {skuIdx > 0 && <Separator className="mb-5" />}
-                                <p className="text-sm font-semibold mb-2">{skuDiff.skuName}</p>
-                                <div className="space-y-3">
-                                    {skuDiff.sections.map((section) => (
-                                        <div key={section.title}>
-                                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">{section.title}</p>
-                                            <div className="rounded border divide-y text-xs">
-                                                {section.rows.map((row, i) => (
-                                                    <div key={i} className="flex items-center gap-2 px-3 py-2">
-                                                        <span className="flex-1 text-muted-foreground">{row.label}</span>
-                                                        {row.from ? <span className="text-red-500 line-through whitespace-nowrap">{row.from}</span> : <span className="text-muted-foreground whitespace-nowrap">-</span>}
-                                                        <span className="text-muted-foreground">→</span>
-                                                        <span className="text-green-600 font-medium whitespace-nowrap">{row.to || '-'}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={cancelPendingImport}>{t('cancel')}</Button>
-                        {importSummary?.length > 0 && <Button onClick={applyPendingImport}>{t('importProceed')}</Button>}
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Modals */}
-            <SkuDetailModal
-                t={t} channels={plChannels}
-                detailModalSku={detailModalSku} setDetailModalSku={setDetailModalSku}
-                skuDetailData={skuDetailData}
-            />
-            <SkuSelectionModal
-                t={t}
-                skuModalOpen={skuModalOpen} setSkuModalOpen={setSkuModalOpen}
-                skuSearch={skuSearch} setSkuSearch={setSkuSearch}
-                isSkusLoading={isSkusLoading} filteredSkus={filteredSkus}
-                currentSku={p.sku} selectSku={selectSku}
-            />
-        </>
+        </div>
     )
 }
