@@ -182,8 +182,9 @@ function parseIncomeReport(rawRows) {
             if (ci[key] >= 0) totals[key] += n(row[ci[key]])
         }
 
-        const rowDiscount = ci.totalDiscount >= 0 ? n(row[ci.totalDiscount])
-            : (ci.voucher >= 0 ? n(row[ci.voucher]) : 0)
+        // Seller Discount per order = sum of seller-funded discount columns only.
+        const rowDiscount = ['voucher','voucherCofund','coin','coinCofund']
+            .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
         const rowFeeTotal = ['commissionFee','serviceFee','processingFee','transactionFee','programFee','campaignFee','affiliateFee']
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
         const rowShippingSubsidy  = ci.shippingSubsidy >= 0 ? n(row[ci.shippingSubsidy]) : 0
@@ -280,9 +281,10 @@ export function parseShopeeReports(incomeFile, orderFile) {
             }]
         }
 
-        const voucherDetail  = totals.voucher + totals.voucherCofund + totals.coin + totals.coinCofund
-        const effectiveVouch = voucherDetail > 0 ? totals.voucher    : totals.totalDiscount
-        const effectiveTotal = voucherDetail > 0 ? voucherDetail     : totals.totalDiscount
+        // Seller Discount = sum of seller-funded discount columns only (excludes Shopee-funded
+        // discounts that may be embedded in "Total Diskon Produk").
+        const effectiveVouch = totals.voucher
+        const effectiveTotal = totals.voucher + totals.voucherCofund + totals.coin + totals.coinCofund
 
         const feeTotal = totals.commissionFee + totals.serviceFee + totals.processingFee +
             totals.transactionFee + totals.programFee + totals.campaignFee + totals.affiliateFee
