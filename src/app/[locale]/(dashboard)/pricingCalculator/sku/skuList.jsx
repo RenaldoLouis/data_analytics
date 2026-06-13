@@ -11,6 +11,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import LoadingScreen from "@/components/ui/loadingScreen"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -29,9 +30,14 @@ import {
     IconChevronRight,
     IconChevronsLeft,
     IconChevronsRight,
+    IconArrowsSort,
+    IconSortAscending,
+    IconSortDescending,
     IconPencil,
     IconPlus,
+    IconSearch,
     IconTrash,
+    IconX,
 } from "@tabler/icons-react"
 import {
     flexRender,
@@ -42,11 +48,30 @@ import {
     useReactTable,
 } from "@tanstack/react-table"
 import { useTranslations } from "next-intl"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 const SKELETON_ROWS = 5
 const SKELETON_COLS = 10
+
+// Clickable column header that toggles sorting (asc → desc → none)
+function SortableHeader({ column, label }) {
+    const sorted = column.getIsSorted()
+    return (
+        <button
+            type="button"
+            className="flex items-center gap-1.5 select-none hover:text-foreground transition-colors"
+            onClick={() => column.toggleSorting(sorted === 'asc')}
+        >
+            {label}
+            {sorted === 'asc'
+                ? <IconSortAscending size={15} className="text-foreground" />
+                : sorted === 'desc'
+                    ? <IconSortDescending size={15} className="text-foreground" />
+                    : <IconArrowsSort size={15} className="text-muted-foreground/50" />}
+        </button>
+    )
+}
 
 export default function SkuList() {
     const t = useTranslations('skupage')
@@ -60,6 +85,11 @@ export default function SkuList() {
     const [isFetch, setIsFetch] = useState(false)
     const [deletingSku, setDeletingSku] = useState(null)
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+    const [globalFilter, setGlobalFilter] = useState('')
+    const [isSearchOpen, setIsSearchOpen] = useState(false)
+    const [sorting, setSorting] = useState([])
+    const searchInputRef = useRef(null)
+    const mobileSearchInputRef = useRef(null)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -88,6 +118,40 @@ export default function SkuList() {
     )
 
     const categoryOptions = useMemo(() => categories, [categories])
+
+    // Reset to first page whenever the search query changes
+    useEffect(() => {
+        setPagination(p => ({ ...p, pageIndex: 0 }))
+    }, [globalFilter])
+
+    // Focus the visible search input when it's opened (desktop inline or mobile row)
+    useEffect(() => {
+        if (!isSearchOpen) return
+        const el = window.matchMedia('(min-width: 640px)').matches
+            ? searchInputRef.current
+            : mobileSearchInputRef.current
+        el?.focus()
+    }, [isSearchOpen])
+
+    const toggleSearch = () => {
+        if (isSearchOpen) {
+            setIsSearchOpen(false)
+            setGlobalFilter('')
+        } else {
+            setIsSearchOpen(true)
+        }
+    }
+
+    const globalFilterFn = useCallback((row, _columnId, filterValue) => {
+        const q = String(filterValue ?? '').trim().toLowerCase()
+        if (!q) return true
+        const r = row.original
+        const haystack = [
+            r.sku_code,
+            r.product_name,
+        ].filter(Boolean).join(' ').toLowerCase()
+        return haystack.includes(q)
+    }, [])
 
     const handleSkuSubmit = async (data) => {
         const payload = {
@@ -152,14 +216,14 @@ export default function SkuList() {
     const columns = useMemo(() => [
         {
             accessorKey: 'sku_code',
-            header: t('skuCode'),
+            header: ({ column }) => <SortableHeader column={column} label={t('skuCode')} />,
             cell: ({ row }) => (
                 <span className="font-medium">{row.original.sku_code}</span>
             ),
         },
         {
             accessorKey: 'sku_type',
-            header: t('skuType'),
+            header: ({ column }) => <SortableHeader column={column} label={t('skuType')} />,
             cell: ({ row }) => {
                 const type = row.original.sku_type ?? 'single'
                 return (
@@ -171,37 +235,39 @@ export default function SkuList() {
         },
         {
             accessorKey: 'product_name',
-            header: t('productName'),
+            header: ({ column }) => <SortableHeader column={column} label={t('productName')} />,
             cell: ({ row }) => row.original.product_name || '-',
         },
         {
-            accessorKey: 'category_id',
-            header: t('category'),
+            id: 'category_id',
+            accessorFn: (row) => categoryMap[row.category_id] || '',
+            header: ({ column }) => <SortableHeader column={column} label={t('category')} />,
             cell: ({ row }) => categoryMap[row.original.category_id] || '-',
         },
         {
-            accessorKey: 'subcategory_id',
-            header: t('subCategory'),
+            id: 'subcategory_id',
+            accessorFn: (row) => subCategoryMap[row.subcategory_id] || '',
+            header: ({ column }) => <SortableHeader column={column} label={t('subCategory')} />,
             cell: ({ row }) => subCategoryMap[row.original.subcategory_id] || '-',
         },
         {
             accessorKey: 'brand',
-            header: t('brand'),
+            header: ({ column }) => <SortableHeader column={column} label={t('brand')} />,
             cell: ({ row }) => row.original.brand || '-',
         },
         {
             accessorKey: 'variant',
-            header: t('variant'),
+            header: ({ column }) => <SortableHeader column={column} label={t('variant')} />,
             cell: ({ row }) => row.original.variant || '-',
         },
         {
             accessorKey: 'size',
-            header: t('size'),
+            header: ({ column }) => <SortableHeader column={column} label={t('size')} />,
             cell: ({ row }) => row.original.size || '-',
         },
         {
             accessorKey: 'status',
-            header: t('status'),
+            header: ({ column }) => <SortableHeader column={column} label={t('status')} />,
             cell: ({ row }) => (
                 <Badge variant={row.original.status === 'active' ? 'default' : 'secondary'}>
                     {row.original.status}
@@ -235,8 +301,11 @@ export default function SkuList() {
     const table = useReactTable({
         data: skus,
         columns,
-        state: { pagination },
+        state: { pagination, globalFilter, sorting },
         onPaginationChange: setPagination,
+        onGlobalFilterChange: setGlobalFilter,
+        onSortingChange: setSorting,
+        globalFilterFn,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -248,15 +317,65 @@ export default function SkuList() {
             {isMutating && <LoadingScreen />}
 
             <div className="space-y-4">
-                <div className="flex justify-between items-center px-4 lg:px-6">
-                    <H3 className="text-xl font-bold">{t("title")}</H3>
-                    <Button
-                        onClick={() => { setEditingSku(null); setIsModalOpen(true) }}
-                        disabled={isPageLoading}
-                    >
-                        <IconPlus size={16} />
-                        {t('addNew')}
-                    </Button>
+                <div className="flex justify-between items-center px-4 lg:px-6 gap-2">
+                    <H3 className="text-xl font-bold truncate">{t("title")}</H3>
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* Desktop: inline expanding search (smooth fixed-width animation) */}
+                        <div
+                            className={`hidden sm:block overflow-hidden transition-all duration-200 ${
+                                isSearchOpen ? 'w-80 opacity-100' : 'w-0 opacity-0'
+                            }`}
+                        >
+                            <div className="relative">
+                                <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                                <Input
+                                    ref={searchInputRef}
+                                    className="pl-9"
+                                    placeholder={t('searchPlaceholder')}
+                                    value={globalFilter}
+                                    onChange={(e) => setGlobalFilter(e.target.value)}
+                                    disabled={isPageLoading}
+                                />
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="shrink-0"
+                            onClick={toggleSearch}
+                            disabled={isPageLoading}
+                        >
+                            {isSearchOpen ? <IconX size={16} /> : <IconSearch size={16} />}
+                        </Button>
+                        <Button
+                            className="shrink-0"
+                            onClick={() => { setEditingSku(null); setIsModalOpen(true) }}
+                            disabled={isPageLoading}
+                        >
+                            <IconPlus size={16} />
+                            <span className="hidden sm:inline">{t('addNew')}</span>
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Mobile: full-width search row that slides down (smooth max-height animation) */}
+                <div
+                    className={`sm:hidden px-4 overflow-hidden transition-all duration-200 ${
+                        isSearchOpen ? 'max-h-16 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                    }`}
+                >
+                    <div className="relative">
+                        <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                        <Input
+                            ref={mobileSearchInputRef}
+                            className="pl-9"
+                            placeholder={t('searchPlaceholder')}
+                            value={globalFilter}
+                            onChange={(e) => setGlobalFilter(e.target.value)}
+                            disabled={isPageLoading}
+                        />
+                    </div>
                 </div>
 
                 <div className="px-4 lg:px-6">
@@ -317,7 +436,7 @@ export default function SkuList() {
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground text-sm">
-                                                {t('noData')}
+                                                {globalFilter ? t('noSearchResults') : t('noData')}
                                             </TableCell>
                                         </TableRow>
                                     )}

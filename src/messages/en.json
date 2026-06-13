@@ -220,7 +220,9 @@
   "skupage": {
     "title": "SKU",
     "addNew": "Add New SKU",
+    "searchPlaceholder": "Search SKU code or product name...",
     "noData": "No SKUs yet. Add your first SKU.",
+    "noSearchResults": "No SKUs match your search.",
     "skuCode": "SKU Code",
     "skuCodePlaceholder": "e.g. SKU-001",
     "skuCodeRequired": "SKU Code is required",
