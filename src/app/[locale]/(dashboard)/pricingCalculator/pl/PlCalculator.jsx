@@ -191,7 +191,14 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             const f = forms[rec.id] ?? buildFormFromRecord(rec)
             return s + fn(f, rec)
         }, 0)
-        const grossGmv = sum((f) => n(f.units_sold) * n(f.actual_selling_price))
+        // Prefer summing r.gmv from order_report_rows (exact, avoids avg-price rounding drift).
+        // All records for the same import period share identical order_report_rows.
+        const firstOrderRows = records[0]?.order_report_rows ?? []
+        const grossGmv = firstOrderRows.length > 0
+            ? firstOrderRows
+                .filter(r => !r.excluded || r.refunded)
+                .reduce((s, r) => s + (r.gmv || 0), 0)
+            : sum((f) => n(f.units_sold) * n(f.actual_selling_price))
         const settlement = sum((f) => n(f.settlement_amount))
         const voucher = sum((f) => n(f.voucher_amount))
         const voucherCof = sum((f) => n(f.voucher_cofund_amount))

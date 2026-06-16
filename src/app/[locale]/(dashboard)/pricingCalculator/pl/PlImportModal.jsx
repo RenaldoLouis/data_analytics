@@ -71,6 +71,24 @@ function UploadZone({ label, hint, file, onFile }) {
     )
 }
 
+// Split an integer `total` across `weights` so the parts sum EXACTLY to round(total)
+// (largest-remainder method). Used when distributing period totals across SKU records
+// so the stored slices reconcile to the import totals with no rounding drift.
+function allocateInt(total, weights) {
+    const T = Math.round(total)
+    const buckets = weights.length
+    if (buckets === 0) return []
+    const W = weights.reduce((s, w) => s + (w > 0 ? w : 0), 0)
+    const raw = W > 0
+        ? weights.map(w => (T * (w > 0 ? w : 0)) / W)
+        : weights.map(() => T / buckets)
+    const out = raw.map(v => Math.floor(v))
+    let rem = T - out.reduce((s, v) => s + v, 0)
+    const order = raw.map((v, i) => [i, v - Math.floor(v)]).sort((a, b) => b[1] - a[1])
+    for (let k = 0; rem > 0 && k < order.length; k++) { out[order[k][0]]++; rem-- }
+    return out
+}
+
 // ─── Step 1 ───────────────────────────────────────────────────────────────────
 function Step1({ t, year, setYear, monthIdx, setMonthIdx, incomeFile, setIncomeFile, orderFile, setOrderFile, locale, takenPeriods }) {
     const months = locale === 'id' ? MONTHS_ID : MONTHS_EN
@@ -166,27 +184,39 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
     const settlement = d.settlement_report
     const isMatch = d.delta === 0
 
-    // Proportional allocation of aggregate values + COGS lookup from mapped SKU
+    // Proportional allocation of aggregate values + COGS lookup from mapped SKU.
+    // Uses allocateInt with the same per-product GMV weights as handleImport so the
+    // preview exactly matches what will be stored (no Math.round vs allocateInt drift).
     const enrichedSales = useMemo(() => {
-        const totalGmv = d.sales.reduce((s, p) => s + p.gross_gmv, 0)
-        return d.sales.map(p => {
-            const share = totalGmv > 0 ? p.gross_gmv / totalGmv : 0
+        // Weights: mapped products keep their GMV; skipped products get 0 (excluded from pool).
+        const gmvWeights = d.sales.map(p => {
+            const mapping = skuMapping?.[p.sku]
+            return (mapping && mapping !== 'skip') ? (p.gross_gmv || 0) : 0
+        })
+        const settle = d.settlement_report ?? d.settlement_calc ?? 0
+        const allocDisc   = allocateInt(d.discount_total ?? 0,      gmvWeights)
+        const allocFees   = allocateInt(d.channel_fees_total ?? 0,   gmvWeights)
+        const allocShip   = allocateInt(d.net_shipping ?? 0,         gmvWeights)
+        const allocSettle = allocateInt(settle,                       gmvWeights)
+
+        return d.sales.map((p, idx) => {
             const mapping = skuMapping?.[p.sku]
             const mappedSku = (mapping && mapping !== 'skip')
                 ? skuList.find(s => s.id === mapping.id)
                 : null
             const cogsPerUnit = parseFloat(mappedSku?.cogs_per_unit) || 0
             const totalCogs = cogsPerUnit * (p.units_sold || 0)
-            const contribution = cogsPerUnit > 0 ? (p.settlement - totalCogs) : null
+            const alloc_settlement = allocSettle[idx]
+            const contribution = cogsPerUnit > 0 ? (alloc_settlement - totalCogs) : null
             return {
                 ...p,
-                alloc_seller_discount: Math.round(d.discount_total * share),
-                alloc_channel_fees: Math.round(d.channel_fees_total * share),
-                alloc_net_shipping: Math.round((d.net_shipping ?? 0) * share),
+                alloc_seller_discount: allocDisc[idx],
+                alloc_channel_fees:    allocFees[idx],
+                alloc_net_shipping:    allocShip[idx],
+                alloc_settlement,
                 cogs_per_unit: cogsPerUnit,
                 total_cogs: totalCogs,
                 contribution,
-                // CM% = Contribution ÷ Gross GMV (Improv. B)
                 cm_percent: (contribution != null && p.gross_gmv > 0)
                     ? (contribution / p.gross_gmv) * 100
                     : null,
@@ -430,7 +460,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                             <TableCell className="text-right tabular-nums">{fmt(s.alloc_seller_discount)}</TableCell>
                                             <TableCell className="text-right tabular-nums">{fmt(s.alloc_channel_fees)}</TableCell>
                                             <TableCell className="text-right tabular-nums">{fmt(s.alloc_net_shipping)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">{fmt(s.settlement)}</TableCell>
+                                            <TableCell className="text-right tabular-nums">{fmt(s.alloc_settlement)}</TableCell>
                                             <TableCell className="text-right tabular-nums">
                                                 {s.cogs_per_unit > 0 ? fmt(s.total_cogs) : <span className="text-muted-foreground/40">-</span>}
                                             </TableCell>
@@ -602,13 +632,42 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                 g.settlement += item.settlement
             }
 
-            for (const g of Object.values(bySkuId)) {
-                const ratio = totalSettlement > 0 ? g.settlement / totalSettlement : 1 / Object.keys(bySkuId).length
+            const groups = Object.values(bySkuId)
+            // Weight per record = its gross GMV share (same basis the Confirm modal uses
+            // for per-SKU allocation). Largest-remainder so every column's slices sum
+            // EXACTLY to the import total — no per-record rounding drift.
+            const weights = groups.map(g => g.grossGmv)
+            const alloc = {
+                voucher:         allocateInt(getDisc('shopeeImportDiscountVoucher'),       weights),
+                voucherCofund:   allocateInt(getDisc('shopeeImportDiscountVoucherCofund'), weights),
+                coin:            allocateInt(getDisc('shopeeImportDiscountCoin'),          weights),
+                coinCofund:      allocateInt(getDisc('shopeeImportDiscountCoinCofund'),    weights),
+                discountTotal:   allocateInt(parsedData.discount_total ?? 0,               weights),
+                platformVoucher: allocateInt(parsedData.platform_discount ?? 0,            weights),
+                processingFee:   allocateInt(getFee('processing_fee'),       weights),
+                commissionFee:   allocateInt(getFee('commission_fee'),       weights),
+                serviceFee:      allocateInt(getFee('service_fee'),          weights),
+                transactionFee:  allocateInt(getFee('transaction_fee'),      weights),
+                campaignFee:     allocateInt(getFee('campaign_fee'),         weights),
+                affiliateFee:    allocateInt(getFee('affiliate_commission'), weights),
+                buyerShipping:   allocateInt(parsedData.buyer_shipping_paid  ?? 0, weights),
+                shippingSubsidy: allocateInt(parsedData.shipping_subsidy     ?? 0, weights),
+                actualShipping:  allocateInt(parsedData.actual_shipping_cost ?? 0, weights),
+                refund:          allocateInt(parsedData.refund_amount        ?? 0, weights),
+                settlement:      allocateInt(parsedData.settlement_report ?? totalSettlement, weights),
+            }
+
+            const matchedOrdersCount = (parsedData.order_report_rows?.length > 0
+                ? (parsedData.order_report_rows ?? []).filter(r => !r.excluded).length
+                : parsedData.matched_orders) ?? 0
+
+            for (let idx = 0; idx < groups.length; idx++) {
+                const g = groups[idx]
 
                 const salesEntries = [{
                     units_sold: g.unitsSold || 1,
                     actual_selling_price: Math.round(g.grossGmv / Math.max(1, g.unitsSold)),
-                    settlement_amount: Math.round(g.settlement),
+                    settlement_amount: alloc.settlement[idx],
                 }]
 
                 await services.pl.createMonthly({
@@ -617,35 +676,33 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                     period_year: periodYear,
                     source: 'shopee',
                     product_names: g.productNames,
-                    matched_orders: (parsedData.order_report_rows?.length > 0
-                        ? (parsedData.order_report_rows ?? []).filter(r => !r.excluded).length
-                        : parsedData.matched_orders) ?? 0,
+                    matched_orders: matchedOrdersCount,
                     excluded_orders: parsedData.excluded_orders ?? 0,
                     order_report_rows: parsedData.order_report_rows ?? [],
                     sales: salesEntries,
                     discounts: [{
-                        voucher_amount:       Math.round(getDisc('shopeeImportDiscountVoucher')       * ratio),
-                        voucher_cofund_amount: Math.round(getDisc('shopeeImportDiscountVoucherCofund') * ratio),
-                        coin_amount:          Math.round(getDisc('shopeeImportDiscountCoin')          * ratio),
-                        coin_cofund_amount:   Math.round(getDisc('shopeeImportDiscountCoinCofund')    * ratio),
-                        discount_amount:      Math.round((parsedData.discount_total ?? 0)             * ratio),
-                        platform_voucher_amount: Math.round((parsedData.platform_discount ?? 0)       * ratio),
+                        voucher_amount:          alloc.voucher[idx],
+                        voucher_cofund_amount:   alloc.voucherCofund[idx],
+                        coin_amount:             alloc.coin[idx],
+                        coin_cofund_amount:      alloc.coinCofund[idx],
+                        discount_amount:         alloc.discountTotal[idx],
+                        platform_voucher_amount: alloc.platformVoucher[idx],
                     }],
                     shippings: [{
                         // Stored separately so the P/L detail shows Buyer / Subsidy / Carrier like
                         // the import modal. Net shipping = buyer-paid (+) − courier cost (−) ≈ 0 (Bug #2).
-                        buyer_shipping_paid: Math.round((parsedData.buyer_shipping_paid ?? 0) * ratio),
-                        shipping_subsidy: Math.round((parsedData.shipping_subsidy ?? 0) * ratio),
-                        actual_shipping_cost: Math.round((parsedData.actual_shipping_cost ?? 0) * ratio),
-                        processing_fee: Math.round(getFee('processing_fee') * ratio),
-                        commission_fee_amount: Math.round(getFee('commission_fee') * ratio),
-                        service_fee_amount: Math.round(getFee('service_fee') * ratio),
-                        transaction_fee_amount: Math.round(getFee('transaction_fee') * ratio),
-                        campaign_fee_amount: Math.round(getFee('campaign_fee') * ratio),
-                        affiliate_commission_amount: Math.round(getFee('affiliate_commission') * ratio),
+                        buyer_shipping_paid:         alloc.buyerShipping[idx],
+                        shipping_subsidy:            alloc.shippingSubsidy[idx],
+                        actual_shipping_cost:        alloc.actualShipping[idx],
+                        processing_fee:              alloc.processingFee[idx],
+                        commission_fee_amount:       alloc.commissionFee[idx],
+                        service_fee_amount:          alloc.serviceFee[idx],
+                        transaction_fee_amount:      alloc.transactionFee[idx],
+                        campaign_fee_amount:         alloc.campaignFee[idx],
+                        affiliate_commission_amount: alloc.affiliateFee[idx],
                     }],
                     returns: [{
-                        actual_refund_amount: Math.round((parsedData.refund_amount ?? 0) * ratio),
+                        actual_refund_amount: alloc.refund[idx],
                     }],
                 })
             }
