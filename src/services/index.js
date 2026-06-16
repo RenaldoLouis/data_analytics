@@ -56,6 +56,7 @@ export default {
     pl: {
         getPls:             ()               => get('/next-api/pl'),
         getMonthlyById:     (updateId)       => get(`/next-api/pl/monthly/${updateId}`),
+        getMonthlyByIds:    (ids)            => post('/next-api/pl/monthly/batch', { ids }),
         getTakenMonths:     (year)           => get(`/next-api/pl/monthly/taken-months?periodYear=${year}`),
         getMonthlyByPeriod: (skuId, periodMonth, periodYear) => get(`/next-api/pl/monthly/by-period?skuId=${skuId}&periodMonth=${periodMonth}&periodYear=${periodYear}`),
         createMonthly:      (payload)        => post('/next-api/pl/monthly', payload),

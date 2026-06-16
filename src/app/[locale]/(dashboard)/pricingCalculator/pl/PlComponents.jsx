@@ -321,15 +321,21 @@ export function AuditTable({ rows, subtotal, noBorder = false }) {
 
 // ─── KpiCards - flexible metric summary grid (3 or 4 columns) ────────────────
 export function KpiCards({ cards }) {
-    // cards: [{ label, value, cls, subtitle? }]
+    // cards: [{ label, value, cls, subtitle?, extra?: [{ label, value, cls? }] }]
     const cols = cards.length >= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
     return (
         <div className={`grid ${cols} gap-2`}>
-            {cards.map(({ label, value, cls, subtitle }) => (
+            {cards.map(({ label, value, cls, subtitle, extra }) => (
                 <div key={label} className="rounded-lg border bg-muted/30 px-3 py-2">
                     <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
                     <p className={`text-sm font-semibold tabular-nums ${cls ?? ''}`}>{fmt(value)}</p>
                     {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>}
+                    {extra?.map((e) => (
+                        <p key={e.label} className="text-[10px] text-muted-foreground mt-0.5 flex justify-between gap-2">
+                            <span>{e.label}</span>
+                            <span className={`tabular-nums font-medium ${e.cls ?? 'text-foreground'}`}>{fmt(e.value)}</span>
+                        </p>
+                    ))}
                 </div>
             ))}
         </div>

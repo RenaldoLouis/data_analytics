@@ -32,8 +32,10 @@ const COL_INCOME = {
     affiliateFee:   ['biaya komisi ams', 'komisi afiliasi', 'affiliate commission', 'biaya afiliasi'],
     // Shipping
     shippingSubsidy: ['gratis ongkir dari shopee', 'gratis ongkir', 'subsidi ongkir', 'shipping subsidy'],
-    actualShipping:  ['ongkir yang diteruskan', 'diteruskan oleh shopee', 'biaya ongkir yang ditanggung penjual', 'ongkos kirim aktual', 'actual shipping'],
-    buyerShipping:   ['ongkir dibayar pembeli', 'ongkos kirim dibayar pembeli', 'buyer shipping'],
+    // Courier cost (col S "Biaya Pengiriman ke Kurir" / "Ongkir yang diteruskan ke jasa kirim").
+    actualShipping:  ['biaya pengiriman ke kurir', 'pengiriman ke kurir', 'ongkir ke kurir', 'ongkir yang diteruskan', 'diteruskan oleh shopee', 'biaya ongkir yang ditanggung penjual', 'ongkos kirim aktual', 'actual shipping'],
+    // Buyer-paid shipping (col P "Ongkos Kirim Dibayar Pembeli").
+    buyerShipping:   ['ongkos kirim dibayar pembeli', 'ongkir dibayar pembeli', 'ongkos kirim yang dibayar pembeli', 'buyer shipping'],
     // Settlement — "Total Penghasilan" is the net payout to the seller
     settlement:      ['total penghasilan', 'total pemasukan', 'jumlah pemasukan', 'settlement amount', 'total diterima'],
 }
@@ -65,14 +67,36 @@ function findHeaderRow(rows, identifiers) {
     return 0
 }
 
+// Magnitude parser — always positive (for discounts/fees that are inherently positive).
 function n(v) {
     return Math.abs(parseFloat(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0)
 }
 
-function isExcluded(status) {
+// Signed parser — preserves the sign from the report (for settlement & shipping,
+// where Shopee uses negatives for refund payouts / courier costs). See Bug #3.
+function ns(v) {
+    return parseFloat(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0
+}
+
+// Cancelled order: never completed, no money moved → excluded from everything.
+function isCancelled(status) {
     const s = String(status ?? '').toLowerCase()
-    return s.includes('batal') || s.includes('cancel') || s.includes('kembali') ||
-        s.includes('refund') || s.includes('retur')
+    return s.includes('batal') || s.includes('cancel')
+}
+
+// Refunded order ("Pengembalian Dana"): completed then returned. Goods go back to
+// warehouse (no QTY/COGS) but settlement keeps the negative platform-fee loss.
+// NOTE: "pengembalian" does NOT contain the substring "kembali", so it must be
+// matched explicitly — this was the root cause of Bug #1.
+function isRefund(status) {
+    const s = String(status ?? '').toLowerCase()
+    return s.includes('pengembalian') || s.includes('dikembalikan') ||
+        s.includes('kembali') || s.includes('refund') || s.includes('retur')
+}
+
+// Excluded from sales (QTY / COGS / Net GMV): cancelled or refunded.
+function isExcluded(status) {
+    return isCancelled(status) || isRefund(status)
 }
 
 // ─── Parse order report ──────────────────────────────────────────────────────
@@ -100,7 +124,10 @@ function parseOrderReport(rawRows) {
         const qty   = ci.quantity >= 0 ? (n(row[ci.quantity]) || 1) : 1
         const price = ci.originalPrice >= 0 ? n(row[ci.originalPrice])
             : ci.sellingPrice  >= 0 ? n(row[ci.sellingPrice]) : 0
-        const excluded = status != null && isExcluded(status)
+        const cancelled = status != null && isCancelled(status)
+        const refunded  = status != null && isRefund(status)
+        // "excluded" drives QTY/COGS downstream — true for both cancelled and refunded.
+        const excluded  = cancelled || refunded
 
         // Collect every order line (all statuses)
         orderRows.push({
@@ -111,19 +138,26 @@ function parseOrderReport(rawRows) {
             gmv:          qty * price,
             status:       status ? String(status) : '',
             excluded,
+            refunded,
         })
 
-        if (excluded) continue   // excluded orders don't count toward productMap
+        if (cancelled) continue   // cancelled orders contribute nothing at all
 
         if (!productMap.has(name)) {
-            productMap.set(name, { units_sold: 0, price_sum: 0, gross_gmv: 0 })
+            productMap.set(name, { units_sold: 0, price_sum: 0, gross_gmv: 0, refund_gmv: 0 })
         }
         const p = productMap.get(name)
-        p.units_sold += qty
-        p.price_sum  += price
-        p.gross_gmv  += qty * price
-
-        if (ci.platformVoucher >= 0) platformVoucher += n(row[ci.platformVoucher])
+        // Gross GMV = all non-cancelled (Selesai + refund) — "semua status".
+        p.gross_gmv += qty * price
+        if (refunded) {
+            // Refunded value tracked separately; no QTY/COGS (goods returned). Bug #1.
+            p.refund_gmv += qty * price
+        } else {
+            // Completed sale → counts toward QTY/COGS.
+            p.units_sold += qty
+            p.price_sum  += price
+            if (ci.platformVoucher >= 0) platformVoucher += n(row[ci.platformVoucher])
+        }
     }
 
     return { productMap, platformVoucher, orderRows }
@@ -156,7 +190,10 @@ function parseIncomeReport(rawRows) {
         if (firstCell === 'no.' || firstCell === 'no') continue
 
         const status = ci.orderStatus >= 0 ? row[ci.orderStatus] : null
-        if (status != null && isExcluded(status)) {
+        // Only truly cancelled orders are dropped from the income report. Refunded
+        // ("Pengembalian Dana") orders are KEPT so their negative settlement (platform
+        // fee loss) is included — see Bug #3.
+        if (status != null && isCancelled(status)) {
             excludedOrders++
             orderRows.push({
                 orderNo:       ci.orderNo >= 0 ? String(row[ci.orderNo] ?? '').trim() : '',
@@ -173,8 +210,11 @@ function parseIncomeReport(rawRows) {
             : ci.sellingPrice  >= 0 ? n(row[ci.sellingPrice]) : 0
 
         totals.grossGmv += price
-        if (ci.settlement >= 0) totals.settlement += n(row[ci.settlement])
+        // Settlement is SIGNED — refund orders have a negative payout (Bug #3).
+        if (ci.settlement >= 0) totals.settlement += ns(row[ci.settlement])
 
+        // All accumulated as magnitudes. Net shipping = buyer (+) − courier (−) is computed
+        // from these magnitudes below, matching the per-order calculation (Bug #2).
         for (const key of ['voucher','voucherCofund','totalDiscount','coin','coinCofund',
                            'refundAmount','commissionFee','serviceFee','processingFee',
                            'transactionFee','programFee','campaignFee','affiliateFee',
@@ -187,16 +227,17 @@ function parseIncomeReport(rawRows) {
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
         const rowFeeTotal = ['commissionFee','serviceFee','processingFee','transactionFee','programFee','campaignFee','affiliateFee']
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
-        const rowShippingSubsidy  = ci.shippingSubsidy >= 0 ? n(row[ci.shippingSubsidy]) : 0
-        const rowActualShipping   = ci.actualShipping  >= 0 ? n(row[ci.actualShipping])  : 0
+        // Net shipping per order = buyer-paid shipping (+) + courier cost (−) ≈ 0 (Bug #2).
+        const rowBuyerShipping   = ci.buyerShipping  >= 0 ? n(row[ci.buyerShipping])  : 0
+        const rowActualShipping  = ci.actualShipping  >= 0 ? n(row[ci.actualShipping])  : 0
         orderRows.push({
             orderNo:       ci.orderNo >= 0 ? String(row[ci.orderNo] ?? '').trim() : '',
             status:        status ? String(status) : 'Selesai',
             grossGmv:      price,
             sellerDiscount: rowDiscount,
             feeTotal:      rowFeeTotal,
-            netShipping:   rowShippingSubsidy - rowActualShipping,
-            settlement:    ci.settlement >= 0 ? n(row[ci.settlement]) : 0,
+            netShipping:   rowBuyerShipping - rowActualShipping,
+            settlement:    ci.settlement >= 0 ? ns(row[ci.settlement]) : 0,
             excluded:      false,
         })
         matchedOrders++
@@ -244,6 +285,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 gmv:             r.gmv,
                 status:          r.status,
                 excluded:        r.excluded,
+                refunded:        r.refunded ?? false,    // refund order ("Pengembalian Dana")
                 income_matched:  inc !== null,          // flag: was income report row found?
                 seller_discount: inc !== null ? (inc.sellerDiscount ?? 0) : null,
                 fee_total:       inc !== null ? (inc.feeTotal       ?? 0) : null,
@@ -258,9 +300,10 @@ export function parseShopeeReports(incomeFile, orderFile) {
         if (order.productMap.size > 0) {
             sales = Array.from(order.productMap.entries()).map(([name, p]) => ({
                 sku:                  name,
-                units_sold:           Math.round(p.units_sold),
+                units_sold:           Math.round(p.units_sold),          // Selesai only (Bug #1)
                 actual_selling_price: p.units_sold > 0 ? Math.round(p.price_sum / p.units_sold) : 0,
-                gross_gmv:            Math.round(p.gross_gmv),
+                gross_gmv:            Math.round(p.gross_gmv),            // all status (Selesai + refund)
+                refund_gmv:           Math.round(p.refund_gmv ?? 0),      // refunded value (Improv. B)
                 settlement:           0, // settlement is aggregate, not per-product from order report
             }))
             // distribute aggregate settlement proportionally by GMV
@@ -277,6 +320,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 units_sold:           matchedOrders,
                 actual_selling_price: matchedOrders > 0 ? Math.round(totals.grossGmv / matchedOrders) : 0,
                 gross_gmv:            Math.round(totals.grossGmv),
+                refund_gmv:           0,
                 settlement:           Math.round(totals.settlement),
             }]
         }
@@ -289,10 +333,14 @@ export function parseShopeeReports(incomeFile, orderFile) {
         const feeTotal = totals.commissionFee + totals.serviceFee + totals.processingFee +
             totals.transactionFee + totals.programFee + totals.campaignFee + totals.affiliateFee
 
-        const grossGmv = sales.reduce((s, p) => s + p.gross_gmv, 0)
+        // Gross GMV = all non-cancelled orders (Selesai + refund). Net GMV = Selesai only.
+        const grossGmv  = sales.reduce((s, p) => s + p.gross_gmv, 0)
+        const refundGmv = sales.reduce((s, p) => s + (p.refund_gmv ?? 0), 0)
+        const netGmv    = grossGmv - refundGmv
+        const refundRate = grossGmv > 0 ? refundGmv / grossGmv : 0
 
-        // settlement_calc = GMV − seller discounts − channel fees + net shipping − refunds
-        const netShipping   = totals.shippingSubsidy - totals.actualShipping
+        // Net shipping = buyer-paid shipping (+) + courier cost (−) ≈ 0 (Bug #2).
+        const netShipping   = totals.buyerShipping - totals.actualShipping
         const settlementCalc = grossGmv - effectiveTotal - feeTotal + netShipping - totals.refundAmount
 
         return {
@@ -300,6 +348,10 @@ export function parseShopeeReports(incomeFile, orderFile) {
             matched_orders:   matchedOrders,
             excluded_orders:  excludedOrders,
             sales,
+            gross_gmv_all:    Math.round(grossGmv),     // all orders (Selesai + refund)
+            net_gmv:          Math.round(netGmv),        // Selesai only
+            refund_gmv:       Math.round(refundGmv),     // refunded value
+            refund_rate:      refundRate,                // refund_gmv / gross_gmv_all
             platform_discount: Math.round(order.platformVoucher),
             discounts: [
                 { tKey: 'shopeeImportDiscountVoucher',       value: Math.round(effectiveVouch) },

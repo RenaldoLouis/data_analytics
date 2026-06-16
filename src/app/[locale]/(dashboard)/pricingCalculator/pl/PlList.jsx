@@ -48,15 +48,26 @@ import { toast } from "sonner"
 import { fmt } from "./plLib"
 import PlImportModal from "./PlImportModal"
 
-// P/L per record = settlement - COGS
+// P/L per record = settlement - COGS.
+// Reads the denormalized `summary` stored on the record (units/gross/settlement),
+// so the list never needs to fetch each record's full child rows. COGS is derived
+// live from the SKU's current cogs_per_unit. Falls back to `sales` if present.
 function computeRecordPL(pl) {
-    const sales    = pl.sales ?? []
     const cogsUnit = parseFloat(pl.cogs_per_unit) || 0
+    const s = pl.summary
+    if (s && typeof s === 'object') {
+        const unitsSold  = parseInt(s.units_sold) || 0
+        const grossGmv   = parseFloat(s.gross_gmv) || 0
+        const settlement = parseFloat(s.settlement) || 0
+        return { settlement, grossGmv, cogs: cogsUnit * unitsSold, netPL: settlement - cogsUnit * unitsSold }
+    }
+    // Fallback (records without a stored summary)
+    const sales = pl.sales ?? []
     let settlement = 0, unitsSold = 0, grossGmv = 0
-    sales.forEach(s => {
-        const units = parseInt(s.units_sold) || 0
-        const price = parseFloat(s.actual_selling_price) || 0
-        settlement += parseFloat(s.settlement_amount) || 0
+    sales.forEach(sl => {
+        const units = parseInt(sl.units_sold) || 0
+        const price = parseFloat(sl.actual_selling_price) || 0
+        settlement += parseFloat(sl.settlement_amount) || 0
         unitsSold  += units
         grossGmv   += units * price
     })
@@ -129,21 +140,11 @@ export default function PlList({ onEdit }) {
     useEffect(() => {
         const fetchData = async () => {
             setIsPageLoading(true)
+            // The list endpoint now returns the denormalized `summary` per record,
+            // so we no longer fetch each record's full detail (was an N+1 burst).
             const listRes = await services.pl.getPls()
             const list = listRes?.data?.data ?? listRes?.data ?? []
-
-            // Fetch full detail for each record to get sales/cogs
-            const details = await Promise.allSettled(
-                list.map(pl => services.pl.getMonthlyById(pl.id))
-            )
-            const enriched = list.map((pl, i) => {
-                if (details[i].status === 'fulfilled') {
-                    const full = details[i].value?.data?.data ?? details[i].value?.data ?? null
-                    if (full) return { ...pl, ...full }
-                }
-                return pl
-            })
-            setPls(enriched)
+            setPls(list)
             setIsPageLoading(false)
         }
         fetchData()

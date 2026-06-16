@@ -8,16 +8,15 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import services from "@/services"
-import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconDownload } from "@tabler/icons-react"
+import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
+import { useLocale } from "next-intl"
 import { useEffect, useState, useMemo } from "react"
-import * as XLSX from "xlsx"
 import { fmt } from "./plLib"
 import { AuditTable, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 3 + i))
 const ORDER_PAGE_SIZE = 10
 
@@ -59,7 +58,9 @@ function buildFormFromRecord(rec) {
         coin_amount: toInt(d.coin_amount),
         coin_cofund_amount: toInt(d.coin_cofund_amount),
         actual_refund_amount: toInt(r.actual_refund_amount),
+        platform_voucher_amount: toInt(d.platform_voucher_amount),
         shipping_subsidy: toInt(sh.shipping_subsidy),
+        buyer_shipping_paid: toInt(sh.buyer_shipping_paid),
         actual_shipping_cost: toInt(sh.actual_shipping_cost),
         processing_fee: toInt(sh.processing_fee),
         commission_fee_amount: toInt(sh.commission_fee_amount),
@@ -79,52 +80,6 @@ function buildFormFromRecord(rec) {
     }
 }
 
-// ─── Download Report ──────────────────────────────────────────────────────────
-
-function downloadReport(records, forms) {
-    const rows = records.map(rec => {
-        const f = forms[rec.id] ?? buildFormFromRecord(rec)
-        const cogs = (parseFloat(rec.cogs_per_unit) || 0) * n(f.units_sold)
-        const sett = n(f.settlement_amount)
-        const fees = n(f.commission_fee_amount) + n(f.service_fee_amount) + n(f.processing_fee) +
-            n(f.transaction_fee_amount) + n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
-        return {
-            'SKU': canonicalName(rec),
-            'SKU Code': rec.sku_code ?? '',
-            'Period': `${MONTHS_EN[parseInt(rec.period_month) - 1]} ${rec.period_year}`,
-            'Source': rec.source ?? '',
-            'Units Sold': n(f.units_sold),
-            'Avg Price (Rp)': n(f.actual_selling_price),
-            'Gross GMV (Rp)': n(f.units_sold) * n(f.actual_selling_price),
-            'Settlement (Rp)': sett,
-            'Seller Voucher (Rp)': n(f.voucher_amount),
-            'Seller Co-fund Voucher (Rp)': n(f.voucher_cofund_amount),
-            'Coin Cashback (Rp)': n(f.coin_amount),
-            'Coin Co-fund (Rp)': n(f.coin_cofund_amount),
-            'Return/Refund (Rp)': n(f.actual_refund_amount),
-            'Shipping Subsidy (Rp)': n(f.shipping_subsidy),
-            'Actual Shipping Cost (Rp)': n(f.actual_shipping_cost),
-            'Admin Fee / Commission (Rp)': n(f.commission_fee_amount),
-            'Service Fee (Rp)': n(f.service_fee_amount),
-            'Order Processing Fee (Rp)': n(f.processing_fee),
-            'Transaction Fee (Rp)': n(f.transaction_fee_amount),
-            'Campaign Fee (Rp)': n(f.campaign_fee_amount),
-            'Affiliate Commission (Rp)': n(f.affiliate_commission_amount),
-            'Total Channel Fees (Rp)': fees,
-            'COGS per Unit (Rp)': Math.round(parseFloat(rec.cogs_per_unit) || 0),
-            'Total COGS (Rp)': Math.round(cogs),
-            'Net P/L (Rp)': sett - Math.round(cogs),
-            'Net Margin (%)': sett > 0 ? +((sett - cogs) / sett * 100).toFixed(1) : 0,
-        }
-    })
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'P&L Report')
-    const first = records[0]
-    const period = first ? `${MONTHS_EN[parseInt(first.period_month) - 1]}_${first.period_year}` : 'report'
-    XLSX.writeFile(wb, `pl_report_${period}.xlsx`)
-}
-
 // ─── Summary Tab ─────────────────────────────────────────────────────────────
 
 function SummaryTab({ agg }) {
@@ -141,7 +96,7 @@ function SummaryTab({ agg }) {
             <Section title="Revenue">
                 <AuditTable noBorder rows={[
                     { label: 'Original Price (before discount)', value: agg.grossGmv, cls: 'text-blue-700' },
-                    { label: 'Platform Voucher (Shopee)', value: 0, cls: 'text-muted-foreground/60', note: 'not stored' },
+                    { label: 'Shopee-funded Voucher', value: agg.platformVoucher, cls: 'text-muted-foreground/60', note: agg.platformVoucher ? undefined : 'optional' },
                     { label: 'Total Returns', value: agg.refund, cls: 'text-muted-foreground/60' },
                 ]} />
             </Section>
@@ -172,12 +127,11 @@ function SummaryTab({ agg }) {
             <Section title="Shipping">
                 <AuditTable noBorder
                     rows={[
-                        { label: 'Buyer Paid Shipping', value: 0, cls: 'text-muted-foreground/60', note: agg.subsidy > 0 ? 'free shipping' : undefined },
-                        { label: 'Free Shipping Subsidy (Shopee)', value: agg.subsidy, cls: t(agg.subsidy, true) },
+                        { label: 'Shipping Paid by Buyer', value: agg.buyerShipping, cls: 'text-muted-foreground/60', note: agg.buyerShipping === 0 ? 'free shipping' : undefined },
+                        { label: 'Shopee Shipping Subsidy', value: agg.subsidy, cls: t(agg.subsidy, true) },
                         { label: 'Shipping to Carrier', value: agg.shipCost, cls: t(agg.shipCost, false) },
-                        { label: 'Seller Shipping Promo', value: 0, cls: 'text-muted-foreground/60' },
                     ]}
-                    subtotal={{ label: 'Net Shipping', value: agg.netShipping, cls: 'text-muted-foreground/60', note: agg.subsidy > 0 ? 'Shopee covered' : undefined }}
+                    subtotal={{ label: 'Net Shipping', value: agg.netShipping, cls: 'text-muted-foreground/60' }}
                 />
             </Section>
             <Section title="Settlement Validation">
@@ -196,27 +150,36 @@ function SummaryTab({ agg }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function PlCalculator({ editId, allIds, onBack }) {
+    const locale = useLocale()
     const [records, setRecords] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [forms, setForms] = useState({})
     const [orderPage, setOrderPage] = useState(0)
 
+    // Localized order status label (raw Shopee status → Returned / Cancelled)
+    const orderStatusLabel = (entry) => {
+        const s = String(entry?.status ?? '').toLowerCase()
+        const isRefund = entry?.refunded || s.includes('pengembalian') || s.includes('dikembalikan') ||
+            s.includes('kembali') || s.includes('refund') || s.includes('retur')
+        if (isRefund)                                        return locale === 'id' ? 'DIKEMBALIKAN' : 'RETURNED'
+        if (s.includes('batal') || s.includes('cancel'))     return locale === 'id' ? 'DIBATALKAN'   : 'CANCELLED'
+        return entry?.status ?? ''
+    }
+
     // ── Load ──────────────────────────────────────────────────────────────────
     useEffect(() => {
         const ids = allIds?.length ? allIds : [editId]
         setIsLoading(true)
-        Promise.allSettled(ids.map(id => services.pl.getMonthlyById(id)))
-            .then(results => {
-                const loaded = results
-                    .filter(r => r.status === 'fulfilled')
-                    .map(r => r.value?.data?.data ?? r.value?.data)
-                    .filter(Boolean)
+        // Single batched request for all of the period's records (was one per record).
+        services.pl.getMonthlyByIds(ids)
+            .then(res => {
+                const loaded = (res?.data?.data ?? res?.data ?? []).filter(Boolean)
                 setRecords(loaded)
                 const init = {}
                 loaded.forEach(rec => { init[rec.id] = buildFormFromRecord(rec) })
                 setForms(init)
-                setIsLoading(false)
             })
+            .finally(() => setIsLoading(false))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editId])
 
@@ -236,9 +199,12 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const coinCof = sum((f) => n(f.coin_cofund_amount))
         const totalDisc = voucher + voucherCof + coin + coinCof
         const refund = sum((f) => n(f.actual_refund_amount))
+        const platformVoucher = sum((f) => n(f.platform_voucher_amount))
         const subsidy = sum((f) => n(f.shipping_subsidy))
+        const buyerShipping = sum((f) => n(f.buyer_shipping_paid))
         const shipCost = sum((f) => n(f.actual_shipping_cost))
-        const netShipping = subsidy - shipCost
+        // Net shipping = buyer-paid (+) − courier cost (−) ≈ 0 (Bug #2)
+        const netShipping = buyerShipping - shipCost
         const commFee = sum((f) => n(f.commission_fee_amount))
         const svcFee = sum((f) => n(f.service_fee_amount))
         const procFee = sum((f) => n(f.processing_fee))
@@ -249,7 +215,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const totalCogs = sum((f, rec) => (parseFloat(rec.cogs_per_unit) || 0) * n(f.units_sold))
         return {
             grossGmv, settlement, voucher, voucherCof, coin, coinCof, totalDisc,
-            refund, subsidy, shipCost, netShipping,
+            refund, platformVoucher, subsidy, buyerShipping, shipCost, netShipping,
             commFee, svcFee, procFee, txFee, campFee, affFee, totalFees,
             totalCogs,
         }
@@ -316,14 +282,20 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     n(f.processing_fee) + n(f.transaction_fee_amount) +
                     n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
                 const recDisc = n(f.voucher_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
-                const recNetShipping = n(f.shipping_subsidy) - n(f.actual_shipping_cost)
+                const recNetShipping = n(f.buyer_shipping_paid) - n(f.actual_shipping_cost)
 
-                // Aggregate per product from order report rows for this SKU's products
+                // Aggregate per product from order report rows for this SKU's products.
+                // Gross GMV = all non-cancelled (Selesai + refund); QTY/COGS = Selesai only;
+                // refund tracked separately for the Pengembalian Dana column (Improv. B / Bug #1).
                 const productMap = {}
-                for (const r of reportRows.filter(r => !r.excluded && productNames.includes(r.product_name))) {
-                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0 }
-                    productMap[r.product_name].units += r.qty || 0
-                    productMap[r.product_name].gmv += r.gmv || 0
+                for (const r of reportRows.filter(r => productNames.includes(r.product_name))) {
+                    const cancelled = r.excluded && !r.refunded
+                    if (cancelled) continue
+                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0 }
+                    const pm = productMap[r.product_name]
+                    pm.gmv += r.gmv || 0                        // all non-cancelled
+                    if (r.refunded) pm.refund += r.gmv || 0     // refunded value
+                    else            pm.units  += r.qty || 0     // completed → QTY/COGS
                 }
 
                 const totalProductGmv = Object.values(productMap).reduce((s, p) => s + p.gmv, 0)
@@ -335,7 +307,9 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     const discPenjual = Math.round(recDisc * share)
                     const netOngkir = Math.round(recNetShipping * share)
                     const cogs = cogsUnit * p.units
-                    return { rec, productName, units: p.units, grossGmv: p.gmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution: settlement - cogs }
+                    const contribution = settlement - cogs
+                    return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, netOngkir, settlement, cogs, contribution,
+                        cmPercent: p.gmv > 0 ? (contribution / p.gmv) * 100 : null }
                 })
             }
 
@@ -344,10 +318,12 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             const grossGmv = units * n(f.actual_selling_price)
             const discPenjual = n(f.voucher_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
             const channelFees = n(f.commission_fee_amount) + n(f.service_fee_amount) + n(f.processing_fee) + n(f.transaction_fee_amount) + n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
-            const netOngkir = n(f.shipping_subsidy) - n(f.actual_shipping_cost)
+            const netOngkir = n(f.buyer_shipping_paid) - n(f.actual_shipping_cost)
             const settlement = n(f.settlement_amount)
             const cogs = cogsUnit * units
-            return [{ rec, productName: canonicalName(rec), units, grossGmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution: settlement - cogs }]
+            const contribution = settlement - cogs
+            return [{ rec, productName: canonicalName(rec), units, grossGmv, refundGmv: 0, discPenjual, channelFees, netOngkir, settlement, cogs, contribution,
+                cmPercent: grossGmv > 0 ? (contribution / grossGmv) * 100 : null }]
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [records, forms])
@@ -378,6 +354,11 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     const totalFees     = agg.totalFees
     const totalShipping = agg.netShipping
     const totalSettle   = agg.settlement
+
+    // Gross GMV = all orders; Refund = returned value; Net GMV = Selesai only (Improv. A)
+    const refundGmv  = allOrderRows.reduce((s, r) => s + (r.entry?.refunded ? (r.entry.gmv || 0) : 0), 0)
+    const netGmv     = agg.grossGmv - refundGmv
+    const refundRate = agg.grossGmv > 0 ? (refundGmv / agg.grossGmv) * 100 : 0
 
 
     return (
@@ -417,7 +398,10 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     {
                         label: 'Gross GMV', value: agg.grossGmv,
                         cls: 'text-blue-700',
-                        subtitle: `${displayMatchedOrders} orders`,
+                        extra: [
+                            { label: `Refund (${refundRate.toFixed(1)}%)`, value: refundGmv, cls: 'text-amber-700' },
+                            { label: 'Net (Completed)', value: netGmv, cls: 'text-foreground' },
+                        ],
                     },
                     {
                         label: 'Channel Fees', value: agg.totalFees,
@@ -453,11 +437,12 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     <TabsContent value="orders" className="mt-0 space-y-3">
                         <div>
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[680px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
+                                <Table className="min-w-[760px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
                                     <TableHeader>
                                         <TableRow className="bg-muted/60 hover:bg-muted/60">
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Order No.</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Product</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Qty</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Original Price</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Seller Discount</TableHead>
@@ -473,22 +458,28 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                     <TableRow key={i} className="opacity-50">
                                                         <TableCell className="py-1.5 px-3 text-sm font-mono text-muted-foreground">-</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-muted-foreground">{canonicalName(rec)}</TableCell>
-                                                        <TableCell colSpan={6} className="py-1.5 px-3 text-sm text-muted-foreground text-center">no order data</TableCell>
+                                                        <TableCell colSpan={7} className="py-1.5 px-3 text-sm text-muted-foreground text-center">no order data</TableCell>
                                                     </TableRow>
                                                 )
                                             }
+                                            const statusBadge = (
+                                                <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium ${entry.excluded ? 'bg-muted text-muted-foreground' : 'bg-green-50 text-green-700'}`}>
+                                                    {entry.excluded ? orderStatusLabel(entry) : 'MATCHED'}
+                                                </span>
+                                            )
                                             if (fromOrderReport) {
                                                 const excluded = entry.excluded
                                                 return (
                                                     <TableRow key={i} className={excluded ? 'opacity-40' : ''}>
                                                         <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm">{entry.product_name}</TableCell>
+                                                        <TableCell className="py-1.5 px-3">{statusBadge}</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{entry.qty}</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(entry.price)}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">-</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">-</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">-</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{excluded ? <span className="text-muted-foreground text-xs">{entry.status}</span> : fmt(entry.gmv)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.seller_discount))}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.fee_total))}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.net_shipping))}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.settlement))}</TableCell>
                                                     </TableRow>
                                                 )
                                             }
@@ -496,6 +487,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                 <TableRow key={i}>
                                                     <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
                                                     <TableCell className="py-1.5 px-3 text-sm">{canonicalName(rec)}</TableCell>
+                                                    <TableCell className="py-1.5 px-3">{statusBadge}</TableCell>
                                                     <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{n(entry.units_sold)}</TableCell>
                                                     <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.actual_selling_price))}</TableCell>
                                                     <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.seller_discount))}</TableCell>
@@ -509,6 +501,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                     <TableFooter>
                                         <TableRow className="bg-muted/40">
                                             <TableCell colSpan={3} className="py-1.5 px-3 text-sm font-semibold">Total ({displayMatchedOrders} MATCHED)</TableCell>
+                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums font-semibold">{matchedRows.reduce((s, r) => s + n(r.entry?.qty ?? r.entry?.units_sold ?? 0), 0)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalGmv)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalDiscount >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalDiscount)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalFees >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalFees)}</TableCell>
@@ -540,22 +533,24 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     <TabsContent value="sku" className="mt-0 space-y-3">
                         <div>
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[780px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
+                                <Table className="min-w-[940px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
                                     <TableHeader>
                                         <TableRow className="bg-muted/60 hover:bg-muted/60">
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">SKU</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Qty Sold</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Gross GMV</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Refund</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Seller Discount</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Channel Fees</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Net Shipping</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Settlement</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">COGS</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Contribution</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">CM %</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {skuRows.map(({ rec, productName, units, grossGmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution }, idx) => (
+                                        {skuRows.map(({ rec, productName, units, grossGmv, refundGmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution, cmPercent }, idx) => (
                                             <TableRow key={`${rec.id}-${idx}`}>
                                                 <TableCell className="py-1.5 px-3">
                                                     <p className="font-medium text-sm">{productName}</p>
@@ -563,6 +558,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                 </TableCell>
                                                 <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{units}</TableCell>
                                                 <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(grossGmv)}</TableCell>
+                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(refundGmv ?? 0)}</TableCell>
                                                 <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(discPenjual)}</TableCell>
                                                 <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(channelFees)}</TableCell>
                                                 <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(netOngkir)}</TableCell>
@@ -571,21 +567,28 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                 <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">
                                                     {fmt(contribution)}
                                                 </TableCell>
+                                                <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${cmPercent != null && cmPercent < 20 ? 'text-red-600' : ''}`}>
+                                                    {cmPercent != null ? `${cmPercent.toFixed(1)}%` : '-'}
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                     <TableFooter>
                                         <TableRow className="bg-muted/40">
-                                            <TableCell className="py-1.5 px-3 text-sm font-semibold" colSpan={2}>Total</TableCell>
+                                            <TableCell className="py-1.5 px-3 text-sm font-semibold">Total</TableCell>
+                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums font-semibold">{skuRows.reduce((s, r) => s + (r.units || 0), 0)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.grossGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.grossGmv)}</TableCell>
+                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums font-semibold text-amber-700">{fmt(refundGmv)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.totalDisc >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.totalDisc)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.totalFees >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.totalFees)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.netShipping >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.netShipping)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.settlement >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.settlement)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.totalCogs >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.totalCogs)}</TableCell>
-                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-bold ${(agg.settlement - agg.totalCogs) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${(agg.settlement - agg.totalCogs) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
                                                 {fmt(agg.settlement - agg.totalCogs)}
                                             </TableCell>
+                                            {/* CM% total intentionally omitted — not meaningful as an aggregate */}
+                                            <TableCell className="py-1.5 px-3" />
                                         </TableRow>
                                     </TableFooter>
                                 </Table>
@@ -594,16 +597,6 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     </TabsContent>
                 </Tabs>
 
-            </div>
-
-            {/* ── Bottom bar - download only ── */}
-            <div className="fixed bottom-0 left-0 right-0 bg-background border-t z-20">
-                <div className="px-4 lg:px-6 py-3 flex items-center justify-end">
-                    <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => downloadReport(records, forms)}>
-                        <IconDownload size={13} />
-                        Download Report
-                    </Button>
-                </div>
             </div>
 
         </div>

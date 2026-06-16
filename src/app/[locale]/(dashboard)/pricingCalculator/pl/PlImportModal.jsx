@@ -20,8 +20,8 @@ import { fmt } from "./plLib"
 import { parseShopeeReports } from "./plShopeeParser"
 import { AuditTable, KpiCards, Section, SectionHeader } from "./PlComponents"
 
-const MONTHS_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-const MONTHS_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"]
+const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+const MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 const now = new Date().getFullYear()
 const YEARS = Array.from({ length: 5 }, (_, i) => String(now - 3 + i))
 
@@ -139,7 +139,7 @@ function Step1({ t, year, setYear, monthIdx, setMonthIdx, incomeFile, setIncomeF
 
 // ─── Step 2 ───────────────────────────────────────────────────────────────────
 function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] }) {
-    const d      = data
+    const d = data
     const months = locale === 'id' ? MONTHS_ID : MONTHS_EN
     if (!d) return <p className="text-sm text-muted-foreground py-8 text-center">{t('shopeeImportParseError')}</p>
 
@@ -149,40 +149,57 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
         return m.sku_code ?? null
     }
 
-    const grossGmv     = d.sales.reduce((s, p) => s + p.gross_gmv, 0)
-    const feeTotal     = d.channel_fees_total
-    const settlement   = d.settlement_report
-    const isMatch      = d.delta === 0
+    // Localized order status label (raw Shopee status → RETURNED / CANCELLED / MATCHED)
+    const isRefundStatus = (s) => {
+        const x = String(s ?? '').toLowerCase()
+        return x.includes('pengembalian') || x.includes('dikembalikan') ||
+            x.includes('kembali') || x.includes('refund') || x.includes('retur')
+    }
+    const orderStatusLabel = (r) => {
+        if (!r.excluded) return t('shopeeImportStatusMatched')
+        if (r.refunded || isRefundStatus(r.status)) return t('shopeeImportStatusReturned')
+        return t('shopeeImportStatusCancelled')
+    }
+
+    const grossGmv = d.sales.reduce((s, p) => s + p.gross_gmv, 0)
+    const feeTotal = d.channel_fees_total
+    const settlement = d.settlement_report
+    const isMatch = d.delta === 0
 
     // Proportional allocation of aggregate values + COGS lookup from mapped SKU
     const enrichedSales = useMemo(() => {
         const totalGmv = d.sales.reduce((s, p) => s + p.gross_gmv, 0)
         return d.sales.map(p => {
-            const share       = totalGmv > 0 ? p.gross_gmv / totalGmv : 0
-            const mapping     = skuMapping?.[p.sku]
-            const mappedSku   = (mapping && mapping !== 'skip')
+            const share = totalGmv > 0 ? p.gross_gmv / totalGmv : 0
+            const mapping = skuMapping?.[p.sku]
+            const mappedSku = (mapping && mapping !== 'skip')
                 ? skuList.find(s => s.id === mapping.id)
                 : null
             const cogsPerUnit = parseFloat(mappedSku?.cogs_per_unit) || 0
-            const totalCogs   = cogsPerUnit * (p.units_sold || 0)
+            const totalCogs = cogsPerUnit * (p.units_sold || 0)
+            const contribution = cogsPerUnit > 0 ? (p.settlement - totalCogs) : null
             return {
                 ...p,
-                alloc_seller_discount: Math.round(d.discount_total      * share),
-                alloc_channel_fees:    Math.round(d.channel_fees_total   * share),
-                alloc_net_shipping:    Math.round((d.net_shipping ?? 0)  * share),
-                cogs_per_unit:         cogsPerUnit,
-                total_cogs:            totalCogs,
-                contribution:          cogsPerUnit > 0 ? (p.settlement - totalCogs) : null,
+                alloc_seller_discount: Math.round(d.discount_total * share),
+                alloc_channel_fees: Math.round(d.channel_fees_total * share),
+                alloc_net_shipping: Math.round((d.net_shipping ?? 0) * share),
+                cogs_per_unit: cogsPerUnit,
+                total_cogs: totalCogs,
+                contribution,
+                // CM% = Contribution ÷ Gross GMV (Improv. B)
+                cm_percent: (contribution != null && p.gross_gmv > 0)
+                    ? (contribution / p.gross_gmv) * 100
+                    : null,
             }
         })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [d, skuList, skuMapping])
 
     // Prefer order_report_rows (has product names + qty from order report, enriched with financial data)
     const orderReportRows = d.order_report_rows ?? []
-    const useOrderReport  = orderReportRows.length > 0
-    const orderRows       = useOrderReport ? orderReportRows : (d.order_rows ?? [])
-    const matchedRows  = orderRows.filter(r => !r.excluded)
+    const useOrderReport = orderReportRows.length > 0
+    const orderRows = useOrderReport ? orderReportRows : (d.order_rows ?? [])
+    const matchedRows = orderRows.filter(r => !r.excluded)
     // "Orders matched" = income report non-excluded rows (one per order×product line, includes duplicates
     // for multi-product orders). Income report is the source of financial data, so this is the correct count.
     // Order report rows (479) represent unique orders; income report rows (1807) represent transaction lines.
@@ -204,26 +221,41 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
 
             {/* Contribution = settlement − COGS (from Per SKU tab enrichedSales) */}
             {(() => {
-                const totalCogs         = enrichedSales.reduce((s, p) => s + (p.total_cogs ?? 0), 0)
-                const hasAnyCogs        = enrichedSales.some(p => (p.cogs_per_unit ?? 0) > 0)
+                const totalCogs = enrichedSales.reduce((s, p) => s + (p.total_cogs ?? 0), 0)
+                const hasAnyCogs = enrichedSales.some(p => (p.cogs_per_unit ?? 0) > 0)
                 // Products with no COGS set (cogsPerUnit=0) contribute their full settlement
                 // This matches P/L detail where COGS=0 → contribution = settlement
                 const totalContribution = enrichedSales.reduce((s, p) => s + (p.contribution ?? p.settlement ?? 0), 0)
-                const contribCls        = totalContribution >= 0 ? 'text-green-700' : 'text-red-600'
-                const contribSubtitle   = hasAnyCogs
+                const contribCls = totalContribution >= 0 ? 'text-green-700' : 'text-red-600'
+                const contribSubtitle = hasAnyCogs
                     ? `${t('shopeeImportColCogs')} ${fmt(totalCogs)}`
                     : t('shopeeImportContributionNote')
 
+                const refundGmv = d.refund_gmv ?? 0
+                const netGmv = d.net_gmv ?? (grossGmv - refundGmv)
+                const refundRate = grossGmv > 0 ? (refundGmv / grossGmv) * 100 : 0
+
                 return (
                     <KpiCards cards={[
-                        { label: t('shopeeColGmv'),            value: grossGmv,          cls: 'text-blue-700',
-                          subtitle: `${matchedCount} ${t('shopeeImportTabPerOrder').toLowerCase()}` },
-                        { label: t('shopeeImportFeesTotal'),   value: feeTotal,           cls: 'text-red-600',
-                          subtitle: grossGmv > 0 ? `${((feeTotal / grossGmv) * 100).toFixed(1)}% GMV` : undefined },
-                        { label: t('shopeeColSettlement'),     value: settlement,         cls: 'text-green-700',
-                          subtitle: grossGmv > 0 ? `${((settlement / grossGmv) * 100).toFixed(1)}% GMV` : undefined },
-                        { label: t('shopeeImportContribution'), value: totalContribution, cls: contribCls,
-                          subtitle: contribSubtitle },
+                        {
+                            label: t('shopeeColGmv'), value: grossGmv, cls: 'text-blue-700',
+                            extra: [
+                                { label: `${t('shopeeImportGmvRefund')} (${refundRate.toFixed(1)}%)`, value: refundGmv, cls: 'text-amber-700' },
+                                { label: t('shopeeImportGmvNet'), value: netGmv, cls: 'text-foreground' },
+                            ]
+                        },
+                        {
+                            label: t('shopeeImportFeesTotal'), value: feeTotal, cls: 'text-red-600',
+                            subtitle: grossGmv > 0 ? `${((feeTotal / grossGmv) * 100).toFixed(1)}% GMV` : undefined
+                        },
+                        {
+                            label: t('shopeeColSettlement'), value: settlement, cls: 'text-green-700',
+                            subtitle: grossGmv > 0 ? `${((settlement / grossGmv) * 100).toFixed(1)}% GMV` : undefined
+                        },
+                        {
+                            label: t('shopeeImportContribution'), value: totalContribution, cls: contribCls,
+                            subtitle: contribSubtitle
+                        },
                     ]} />
                 )
             })()}
@@ -241,9 +273,9 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                     {/* SKU / Sales table */}
                     <Section title={t('shopeeImportSectionRevenue')}>
                         <AuditTable noBorder rows={[
-                            { label: t('shopeeImportRevenueGross'),        value: grossGmv,                  cls: 'text-blue-700' },
-                            { label: t('shopeeImportRevenuePlatformDisc'), value: d.platform_discount ?? 0,  cls: 'text-muted-foreground', note: d.platform_discount ? undefined : t('shopeeImportOptional') },
-                            { label: t('shopeeImportReturnsTotal'),        value: d.refund_amount,           cls: 'text-muted-foreground' },
+                            { label: t('shopeeImportRevenueGross'), value: grossGmv, cls: 'text-blue-700' },
+                            { label: t('shopeeImportRevenuePlatformDisc'), value: d.platform_discount ?? 0, cls: 'text-muted-foreground', note: d.platform_discount ? undefined : t('shopeeImportOptional') },
+                            { label: t('shopeeImportReturnsTotal'), value: d.refund_amount, cls: 'text-muted-foreground' },
                         ]} />
                     </Section>
 
@@ -264,9 +296,9 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                     <Section title={t('shopeeImportSectionShipping')}>
                         <AuditTable noBorder
                             rows={[
-                                { label: t('shopeeImportShippingBuyer'),   value: d.buyer_shipping_paid ?? 0, cls: 'text-muted-foreground', note: d.buyer_shipping_paid === 0 ? t('shopeeImportShippingFree') : undefined },
-                                { label: t('shopeeImportShippingSubsidy'), value: d.shipping_subsidy,         cls: 'text-blue-700' },
-                                { label: t('shopeeImportShippingCarrier'), value: d.actual_shipping_cost,     cls: 'text-red-600' },
+                                { label: t('shopeeImportShippingBuyer'), value: d.buyer_shipping_paid ?? 0, cls: 'text-muted-foreground', note: d.buyer_shipping_paid === 0 ? t('shopeeImportShippingFree') : undefined },
+                                { label: t('shopeeImportShippingSubsidy'), value: d.shipping_subsidy, cls: 'text-blue-700' },
+                                { label: t('shopeeImportShippingCarrier'), value: d.actual_shipping_cost, cls: 'text-red-600' },
                             ]}
                             subtotal={{ label: t('shopeeImportShippingNet'), value: d.net_shipping, cls: 'text-muted-foreground' }}
                         />
@@ -275,8 +307,8 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                     <Section title={t('shopeeImportSectionSettlement')}>
                         <AuditTable noBorder
                             rows={[
-                                { label: t('shopeeImportSettlementReport'),                                   value: d.settlement_report, cls: 'text-blue-700' },
-                                { label: 'GMV − Seller Discount − Channel Fees + Net Shipping − Returns',    value: d.settlement_calc,   cls: 'text-blue-700' },
+                                { label: t('shopeeImportSettlementReport'), value: d.settlement_report, cls: 'text-blue-700' },
+                                { label: 'GMV − Seller Discount − Channel Fees + Net Shipping − Returns', value: d.settlement_calc, cls: 'text-blue-700' },
                             ]}
                             subtotal={{ label: `${t('shopeeImportSettlementDiff')}${isMatch ? ' - ✓ ' + t('shopeeImportSettlementMatch') : ''}`, value: d.delta, cls: isMatch ? 'text-green-700' : 'text-red-600' }}
                         />
@@ -313,17 +345,16 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                 </TableHeader>
                                 <TableBody>
                                     {orderRows.map((r, i) => {
-                                        const excl     = r.excluded
-                                        const matched  = r.income_matched !== false  // true unless explicitly false
-                                        const orderNo  = r.order_no  ?? r.orderNo  ?? '-'
-                                        const product  = r.product_name ?? '-'
-                                        const qty      = r.qty       ?? r.units_sold ?? '-'
-                                        const price    = r.price     ?? r.grossGmv  ?? 0
+                                        const excl = r.excluded
+                                        const matched = r.income_matched !== false  // true unless explicitly false
+                                        const orderNo = r.order_no ?? r.orderNo ?? '-'
+                                        const product = r.product_name ?? '-'
+                                        const qty = r.qty ?? r.units_sold ?? '-'
+                                        const price = r.price ?? r.grossGmv ?? 0
                                         const discount = r.seller_discount ?? r.sellerDiscount
-                                        const fees     = r.fee_total ?? r.feeTotal
+                                        const fees = r.fee_total ?? r.feeTotal
                                         const shipping = r.net_shipping ?? r.netShipping
-                                        const settle   = r.settlement
-                                        const status   = r.status ?? ''
+                                        const settle = r.settlement
                                         const fmtOrDash = (v) => v != null ? fmt(v) : <span className="text-muted-foreground/40">-</span>
                                         return (
                                             <TableRow key={i} className={excl ? 'opacity-40' : ''}>
@@ -331,7 +362,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                                 <TableCell className="max-w-[160px] truncate">{product}</TableCell>
                                                 <TableCell>
                                                     <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium ${excl ? 'bg-muted text-muted-foreground' : 'bg-green-50 text-green-700'}`}>
-                                                        {excl ? (status || t('shopeeImportExcluded')) : t('shopeeImportStatusMatched')}
+                                                        {orderStatusLabel(r)}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums">{qty}</TableCell>
@@ -346,9 +377,10 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                 </TableBody>
                                 <TableFooter>
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-xs text-muted-foreground">
+                                        <TableCell colSpan={3} className="text-xs text-muted-foreground">
                                             {t('shopeeImportTotalMatched', { count: matchedCount })}
                                         </TableCell>
+                                        <TableCell className="text-right tabular-nums font-medium">{matchedRows.reduce((s, r) => s + (r.qty ?? r.units_sold ?? 0), 0)}</TableCell>
                                         <TableCell className={`text-right tabular-nums font-medium ${grossGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(grossGmv)}</TableCell>
                                         <TableCell className={`text-right tabular-nums font-medium ${d.discount_total >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(d.discount_total)}</TableCell>
                                         <TableCell className={`text-right tabular-nums font-medium ${feeTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(feeTotal)}</TableCell>
@@ -367,18 +399,20 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                 {/* ── Per SKU ── */}
                 <TabsContent value="per-sku" className="mt-0">
                     <div className="overflow-x-auto rounded-lg border">
-                        <Table className="min-w-[780px] [&_th]:text-[11px] [&_td]:text-xs">
+                        <Table className="min-w-[920px] [&_th]:text-[11px] [&_td]:text-xs">
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-[200px]">SKU</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColUnitsSold')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColGrossGmv')}</TableHead>
+                                    <TableHead className="text-right">{t('shopeeImportColRefund')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColSellerDiscount')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportSectionFees')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColNetShipping')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColSettlement')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColCogs')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColContribution')}</TableHead>
+                                    <TableHead className="text-right">{t('shopeeImportColCmPercent')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -392,6 +426,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                             </TableCell>
                                             <TableCell className="text-right tabular-nums">{s.units_sold}</TableCell>
                                             <TableCell className="text-right tabular-nums">{fmt(s.gross_gmv)}</TableCell>
+                                            <TableCell className="text-right tabular-nums">{fmt(s.refund_gmv ?? 0)}</TableCell>
                                             <TableCell className="text-right tabular-nums">{fmt(s.alloc_seller_discount)}</TableCell>
                                             <TableCell className="text-right tabular-nums">{fmt(s.alloc_channel_fees)}</TableCell>
                                             <TableCell className="text-right tabular-nums">{fmt(s.alloc_net_shipping)}</TableCell>
@@ -402,14 +437,19 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                             <TableCell className="text-right tabular-nums">
                                                 {s.contribution != null ? fmt(s.contribution) : <span className="text-muted-foreground/40">-</span>}
                                             </TableCell>
+                                            <TableCell className={`text-right tabular-nums ${s.cm_percent != null && s.cm_percent < 20 ? 'text-red-600' : ''}`}>
+                                                {s.cm_percent != null ? `${s.cm_percent.toFixed(1)}%` : <span className="text-muted-foreground/40">-</span>}
+                                            </TableCell>
                                         </TableRow>
                                     )
                                 })}
                             </TableBody>
                             <TableFooter>
                                 <TableRow>
-                                    <TableCell colSpan={2} className="text-xs text-muted-foreground">{t('shopeeImportTotal')}</TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">{t('shopeeImportTotal')}</TableCell>
+                                    <TableCell className="text-right tabular-nums font-medium">{enrichedSales.reduce((s, p) => s + (p.units_sold || 0), 0)}</TableCell>
                                     <TableCell className={`text-right tabular-nums font-medium ${grossGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(grossGmv)}</TableCell>
+                                    <TableCell className="text-right tabular-nums font-medium text-amber-700">{fmt(d.refund_gmv ?? 0)}</TableCell>
                                     <TableCell className={`text-right tabular-nums font-medium ${d.discount_total >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(d.discount_total)}</TableCell>
                                     <TableCell className={`text-right tabular-nums font-medium ${feeTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(feeTotal)}</TableCell>
                                     <TableCell className={`text-right tabular-nums font-medium ${(d.net_shipping ?? 0) >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(d.net_shipping ?? 0)}</TableCell>
@@ -427,9 +467,13 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                         const hasContrib = enrichedSales.some(s => s.contribution != null)
                                         const totalContrib = enrichedSales.reduce((s, p) => s + (p.contribution ?? p.settlement ?? 0), 0)
                                         return (
-                                            <TableCell className={`text-right tabular-nums font-medium ${hasContrib ? (totalContrib >= 0 ? 'text-green-700' : 'text-red-600') : ''}`}>
-                                                {hasContrib ? fmt(totalContrib) : <span className="text-muted-foreground/40">-</span>}
-                                            </TableCell>
+                                            <>
+                                                <TableCell className={`text-right tabular-nums font-medium ${hasContrib ? (totalContrib >= 0 ? 'text-green-700' : 'text-red-600') : ''}`}>
+                                                    {hasContrib ? fmt(totalContrib) : <span className="text-muted-foreground/40">-</span>}
+                                                </TableCell>
+                                                {/* CM% total intentionally omitted — not meaningful as an aggregate */}
+                                                <TableCell />
+                                            </>
                                         )
                                     })()}
                                 </TableRow>
@@ -445,20 +489,20 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods, onImported }) {
-    const t      = useTranslations('plpage')
+    const t = useTranslations('plpage')
     const locale = useLocale()
-    const [step,           setStep]          = useState(1)
-    const [year,           setYear]          = useState(String(new Date().getFullYear()))
-    const [monthIdx,       setMonthIdx]      = useState(null)
-    const [incomeFile,     setIncomeFile]    = useState(null)
-    const [orderFile,      setOrderFile]     = useState(null)
-    const [parsedData,     setParsedData]    = useState(null)
-    const [isParsing,      setIsParsing]     = useState(false)
-    const [isSaving,       setIsSaving]      = useState(false)
-    const [parseError,     setParseError]    = useState(null)
-    const [skuList,        setSkuList]       = useState([])
-    const [skuMapping,     setSkuMapping]    = useState({})
-    const [isSkusLoading,  setIsSkusLoading] = useState(false)
+    const [step, setStep] = useState(1)
+    const [year, setYear] = useState(String(new Date().getFullYear()))
+    const [monthIdx, setMonthIdx] = useState(null)
+    const [incomeFile, setIncomeFile] = useState(null)
+    const [orderFile, setOrderFile] = useState(null)
+    const [parsedData, setParsedData] = useState(null)
+    const [isParsing, setIsParsing] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [parseError, setParseError] = useState(null)
+    const [skuList, setSkuList] = useState([])
+    const [skuMapping, setSkuMapping] = useState({})
+    const [isSkusLoading, setIsSkusLoading] = useState(false)
 
     function handleClose() {
         setStep(1)
@@ -480,11 +524,11 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
             if (!mapping || mapping === 'skip') return []
             return [{
                 productName: sale.sku,
-                skuId:       mapping.id,
-                unitsSold:   sale.units_sold ?? 0,
-                avgPrice:    sale.actual_selling_price ?? 0,
-                grossGmv:    sale.gross_gmv ?? 0,
-                settlement:  sale.settlement ?? 0,
+                skuId: mapping.id,
+                unitsSold: sale.units_sold ?? 0,
+                avgPrice: sale.actual_selling_price ?? 0,
+                grossGmv: sale.gross_gmv ?? 0,
+                settlement: sale.settlement ?? 0,
             }]
         })
     }, [parsedData, skuMapping])
@@ -530,13 +574,13 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
     async function handleImport() {
         if (!parsedData || mappedItems.length === 0) return
         const periodMonth = String(monthIdx + 1).padStart(2, '0')
-        const periodYear  = parseInt(year)
+        const periodYear = parseInt(year)
         const totalSettlement = mappedItems.reduce((s, i) => s + i.settlement, 0)
 
         setIsSaving(true)
         try {
-            const getFee  = (field) => (parsedData.channel_fees ?? []).find(f => f.field === field)?.value ?? 0
-            const getDisc = (tKey)  => (parsedData.discounts ?? []).find(x => x.tKey === tKey)?.value ?? 0
+            const getFee = (field) => (parsedData.channel_fees ?? []).find(f => f.field === field)?.value ?? 0
+            const getDisc = (tKey) => (parsedData.discounts ?? []).find(x => x.tKey === tKey)?.value ?? 0
 
             // Group by skuId - pl_monthly_updates has unique(brand_id, sku_id, period).
             // Multiple Shopee products mapped to the same SKU must be merged into one record.
@@ -544,17 +588,17 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
             for (const item of mappedItems) {
                 if (!bySkuId[item.skuId]) {
                     bySkuId[item.skuId] = {
-                        skuId:        item.skuId,
+                        skuId: item.skuId,
                         productNames: [],
-                        unitsSold:    0,
-                        grossGmv:     0,
-                        settlement:   0,
+                        unitsSold: 0,
+                        grossGmv: 0,
+                        settlement: 0,
                     }
                 }
                 const g = bySkuId[item.skuId]
                 g.productNames.push(item.productName)
-                g.unitsSold  += item.unitsSold
-                g.grossGmv   += item.grossGmv
+                g.unitsSold += item.unitsSold
+                g.grossGmv += item.grossGmv
                 g.settlement += item.settlement
             }
 
@@ -562,42 +606,46 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                 const ratio = totalSettlement > 0 ? g.settlement / totalSettlement : 1 / Object.keys(bySkuId).length
 
                 const salesEntries = [{
-                    units_sold:           g.unitsSold || 1,
+                    units_sold: g.unitsSold || 1,
                     actual_selling_price: Math.round(g.grossGmv / Math.max(1, g.unitsSold)),
-                    settlement_amount:    Math.round(g.settlement),
+                    settlement_amount: Math.round(g.settlement),
                 }]
 
                 await services.pl.createMonthly({
-                    sku_id:            g.skuId,
-                    period_month:      periodMonth,
-                    period_year:       periodYear,
-                    source:            'shopee',
-                    product_names:     g.productNames,
-                    matched_orders:    (parsedData.order_report_rows?.length > 0
+                    sku_id: g.skuId,
+                    period_month: periodMonth,
+                    period_year: periodYear,
+                    source: 'shopee',
+                    product_names: g.productNames,
+                    matched_orders: (parsedData.order_report_rows?.length > 0
                         ? (parsedData.order_report_rows ?? []).filter(r => !r.excluded).length
                         : parsedData.matched_orders) ?? 0,
-                    excluded_orders:   parsedData.excluded_orders ?? 0,
+                    excluded_orders: parsedData.excluded_orders ?? 0,
                     order_report_rows: parsedData.order_report_rows ?? [],
                     sales: salesEntries,
                     discounts: [{
-                        voucher_amount:       getDisc('shopeeImportDiscountVoucher')       * ratio,
-                        voucher_cofund_amount: getDisc('shopeeImportDiscountVoucherCofund') * ratio,
-                        coin_amount:          getDisc('shopeeImportDiscountCoin')          * ratio,
-                        coin_cofund_amount:   getDisc('shopeeImportDiscountCoinCofund')    * ratio,
-                        discount_amount:      (parsedData.discount_total ?? 0)             * ratio,
+                        voucher_amount:       Math.round(getDisc('shopeeImportDiscountVoucher')       * ratio),
+                        voucher_cofund_amount: Math.round(getDisc('shopeeImportDiscountVoucherCofund') * ratio),
+                        coin_amount:          Math.round(getDisc('shopeeImportDiscountCoin')          * ratio),
+                        coin_cofund_amount:   Math.round(getDisc('shopeeImportDiscountCoinCofund')    * ratio),
+                        discount_amount:      Math.round((parsedData.discount_total ?? 0)             * ratio),
+                        platform_voucher_amount: Math.round((parsedData.platform_discount ?? 0)       * ratio),
                     }],
                     shippings: [{
-                        shipping_subsidy:           (parsedData.shipping_subsidy     ?? 0) * ratio,
-                        actual_shipping_cost:        (parsedData.actual_shipping_cost ?? 0) * ratio,
-                        processing_fee:             getFee('processing_fee')              * ratio,
-                        commission_fee_amount:       getFee('commission_fee')              * ratio,
-                        service_fee_amount:          getFee('service_fee')                * ratio,
-                        transaction_fee_amount:      getFee('transaction_fee')            * ratio,
-                        campaign_fee_amount:         getFee('campaign_fee')               * ratio,
-                        affiliate_commission_amount: getFee('affiliate_commission')        * ratio,
+                        // Stored separately so the P/L detail shows Buyer / Subsidy / Carrier like
+                        // the import modal. Net shipping = buyer-paid (+) − courier cost (−) ≈ 0 (Bug #2).
+                        buyer_shipping_paid: Math.round((parsedData.buyer_shipping_paid ?? 0) * ratio),
+                        shipping_subsidy: Math.round((parsedData.shipping_subsidy ?? 0) * ratio),
+                        actual_shipping_cost: Math.round((parsedData.actual_shipping_cost ?? 0) * ratio),
+                        processing_fee: Math.round(getFee('processing_fee') * ratio),
+                        commission_fee_amount: Math.round(getFee('commission_fee') * ratio),
+                        service_fee_amount: Math.round(getFee('service_fee') * ratio),
+                        transaction_fee_amount: Math.round(getFee('transaction_fee') * ratio),
+                        campaign_fee_amount: Math.round(getFee('campaign_fee') * ratio),
+                        affiliate_commission_amount: Math.round(getFee('affiliate_commission') * ratio),
                     }],
                     returns: [{
-                        actual_refund_amount: (parsedData.refund_amount ?? 0) * ratio,
+                        actual_refund_amount: Math.round((parsedData.refund_amount ?? 0) * ratio),
                     }],
                 })
             }
@@ -617,7 +665,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                 if (toAdd.length > 0) {
                     services.sku.updateSku(skuId, {
                         channel_aliases: { shopee: [...existing, ...toAdd] }
-                    }).catch(() => {})
+                    }).catch(() => { })
                 }
             }
 
@@ -639,7 +687,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
     }
 
     const stepTitles = [t('shopeeImportTitle'), t('skuMappingTitle'), t('shopeeImportConfirmTitle')]
-    const stepDescs  = [t('shopeeImportDesc1'), t('skuMappingSubtitle'), t('shopeeImportDesc2')]
+    const stepDescs = [t('shopeeImportDesc1'), t('skuMappingSubtitle'), t('shopeeImportDesc2')]
 
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
@@ -660,10 +708,10 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                     {step === 1 && (
                         <Step1
                             t={t} locale={locale}
-                            year={year}         setYear={setYear}
+                            year={year} setYear={setYear}
                             monthIdx={monthIdx} setMonthIdx={setMonthIdx}
                             incomeFile={incomeFile} setIncomeFile={setIncomeFile}
-                            orderFile={orderFile}   setOrderFile={setOrderFile}
+                            orderFile={orderFile} setOrderFile={setOrderFile}
                             takenPeriods={takenPeriods}
                         />
                     )}
@@ -671,7 +719,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                     {step === 2 && (
                         <div className="space-y-2">
                             {importProductNames.map(productName => {
-                                const mappedSku    = getMatchedSku(productName)
+                                const mappedSku = getMatchedSku(productName)
                                 const mappingValue = skuMapping?.[productName]
                                 const isAutoMatched = mappedSku &&
                                     mappedSku.channel_aliases?.shopee?.some(
@@ -680,7 +728,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
 
                                 return (
                                     <div key={productName}
-                                         className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-md border px-4 py-3">
+                                        className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-md border px-4 py-3">
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium line-clamp-2 break-words">{productName}</p>
                                             <p className="text-xs text-muted-foreground">{t('skuMappingFromImport')}</p>
@@ -701,18 +749,18 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                                                         <span className="block text-xs text-muted-foreground">{mappedSku.sku_code}</span>
                                                     </div>
                                                     <button type="button"
-                                                            onClick={() => setSkuMapping(prev => ({ ...prev, [productName]: null }))}
-                                                            className="flex-shrink-0 text-muted-foreground hover:text-destructive text-sm leading-none">×</button>
+                                                        onClick={() => setSkuMapping(prev => ({ ...prev, [productName]: null }))}
+                                                        className="flex-shrink-0 text-muted-foreground hover:text-destructive text-sm leading-none">×</button>
                                                 </div>
                                             ) : isSkusLoading ? (
                                                 <Skeleton className="h-8 w-full" />
                                             ) : (
                                                 <div className="flex gap-1.5">
                                                     <Select value=""
-                                                            onValueChange={v => {
-                                                        const selected = skuList.find(s => s.id === v)
-                                                        setSkuMapping(prev => ({ ...prev, [productName]: selected ? { id: selected.id, sku_code: selected.sku_code } : null }))
-                                                    }}>
+                                                        onValueChange={v => {
+                                                            const selected = skuList.find(s => s.id === v)
+                                                            setSkuMapping(prev => ({ ...prev, [productName]: selected ? { id: selected.id, sku_code: selected.sku_code } : null }))
+                                                        }}>
                                                         <SelectTrigger className="h-8 text-xs flex-1">
                                                             <SelectValue placeholder={t('skuMappingSelectSku')} />
                                                         </SelectTrigger>
@@ -763,7 +811,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                                 if (unmapped.length > 0) return
                                 setStep(3)
                             }}
-                            disabled={importProductNames.some(n => skuMapping?.[n] == null)}>
+                                disabled={importProductNames.some(n => skuMapping?.[n] == null)}>
                                 {t('shopeeImportNext')}
                             </Button>
                         </>
