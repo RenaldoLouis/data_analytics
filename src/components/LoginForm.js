@@ -2,7 +2,7 @@
 
 import client from "@/lib/apiClient";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff } from "lucide-react";
+import { AlertCircle, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -50,6 +50,20 @@ const languages = [
     { code: 'en', name: 'English', flag: '/images/img_gb.svg' },
     { code: 'id', name: 'Bahasa', flag: '/images/img_id.svg' }
 ];
+
+// Inline error alert — same style as the registration form.
+function ErrorAlert({ message }) {
+    if (!message) return null;
+    return (
+        <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+        >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+            <span className="leading-snug">{message}</span>
+        </div>
+    );
+}
 
 
 export default function LoginForm() {
@@ -282,7 +296,7 @@ export default function LoginForm() {
                                 </FormItem>
                             )}
                         />
-                        <div className="text-left mb-11">
+                        <div className="text-left">
                             <a
                                 href="#"
                                 onClick={(e) => {
@@ -294,11 +308,7 @@ export default function LoginForm() {
                                 {t("forgotPassword")}
                             </a>
                         </div>
-                        {loginForm.formState.errors.root?.message && (
-                            <p className="text-red-500 font-semibold text-center">
-                                {loginForm.formState.errors.root.message}
-                            </p>
-                        )}
+                        <ErrorAlert message={loginForm.formState.errors.root?.message} />
                         <Button type="submit" className="w-full bg-gray-500 text-white mb-0">
                             Login
                         </Button>
@@ -342,11 +352,7 @@ export default function LoginForm() {
                                     </FormItem>
                                 )}
                             />
-                            {forgotEmailForm.formState.errors.root?.message && (
-                                <p className="text-red-500 font-semibold text-center">
-                                    {forgotEmailForm.formState.errors.root.message}
-                                </p>
-                            )}
+                            <ErrorAlert message={forgotEmailForm.formState.errors.root?.message} />
                             <Button type="submit" className="w-full bg-blue-600 text-white">
                                 {t("sendOTP")}
                             </Button>
@@ -373,11 +379,7 @@ export default function LoginForm() {
                                     </FormItem>
                                 )}
                             />
-                            {forgotOTPForm.formState.errors.root?.message && (
-                                <p className="text-red-500 font-semibold text-center">
-                                    {forgotOTPForm.formState.errors.root.message}
-                                </p>
-                            )}
+                            <ErrorAlert message={forgotOTPForm.formState.errors.root?.message} />
                             <Button type="submit" className="w-full bg-blue-600 text-white">
                                 {t("verifyOTP")}
                             </Button>
@@ -448,11 +450,7 @@ export default function LoginForm() {
                                 )}
                             />
 
-                            {newPasswordForm.formState.errors.root?.message && (
-                                <p className="text-red-500 font-semibold text-center">
-                                    {newPasswordForm.formState.errors.root.message}
-                                </p>
-                            )}
+                            <ErrorAlert message={newPasswordForm.formState.errors.root?.message} />
                             <Button type="submit" className="w-full bg-blue-600 text-white">
                                 {t("setNewPassword")}
                             </Button>
