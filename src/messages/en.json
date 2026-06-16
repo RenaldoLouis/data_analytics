@@ -666,6 +666,12 @@
     "shopeeImportAllocNote": "Fees & discounts allocated proportionally by GMV share per SKU.",
     "shopeeImportPerOrderNote": "Only MATCHED orders are included in P/L calculation. Cancelled/refunded orders are excluded.",
     "shopeeImportTotal": "Total",
-    "shopeeImportPerSkuNote": "Settlement is distributed proportionally by GMV per SKU from the order report."
+    "shopeeImportPerSkuNote": "Settlement is distributed proportionally by GMV per SKU from the order report.",
+    "shopeeImportSettlementFormula": "GMV − Seller Discount − Channel Fees + Net Shipping − Returns",
+    "plDetailTitle": "P/L Detail",
+    "plDetailNotFound": "Record not found.",
+    "plDetailGoBack": "Go back",
+    "plDetailNoOrderData": "no order data",
+    "plDetailPage": "Page {page} of {total}"
   }
 }

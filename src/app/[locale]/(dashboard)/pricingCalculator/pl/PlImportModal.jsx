@@ -338,7 +338,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                         <AuditTable noBorder
                             rows={[
                                 { label: t('shopeeImportSettlementReport'), value: d.settlement_report, cls: 'text-blue-700' },
-                                { label: 'GMV − Seller Discount − Channel Fees + Net Shipping − Returns', value: d.settlement_calc, cls: 'text-blue-700' },
+                                { label: t('shopeeImportSettlementFormula'), value: d.settlement_calc, cls: 'text-blue-700' },
                             ]}
                             subtotal={{ label: `${t('shopeeImportSettlementDiff')}${isMatch ? ' - ✓ ' + t('shopeeImportSettlementMatch') : ''}`, value: d.delta, cls: isMatch ? 'text-green-700' : 'text-red-600' }}
                         />

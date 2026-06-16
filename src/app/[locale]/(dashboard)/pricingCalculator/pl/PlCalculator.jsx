@@ -9,14 +9,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import services from "@/services"
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
-import { useLocale } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { useEffect, useState, useMemo } from "react"
 import { fmt } from "./plLib"
 import { AuditTable, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_LABELS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_LABELS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const YEARS = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 3 + i))
 const ORDER_PAGE_SIZE = 10
 
@@ -83,64 +84,65 @@ function buildFormFromRecord(rec) {
 // ─── Summary Tab ─────────────────────────────────────────────────────────────
 
 function SummaryTab({ agg }) {
+    const t = useTranslations('plpage')
     // Formula matches import modal: GMV − Seller Discount − Channel Fees + Net Shipping − Returns
     const calculated = agg.grossGmv - agg.totalDisc - agg.totalFees + agg.netShipping - agg.refund
     const delta = agg.settlement - calculated
     const isMatch = delta === 0
 
-    const t = (v, positive) => positive ? (v > 0 ? 'text-blue-700' : 'text-muted-foreground/60')
+    const cl = (v, positive) => positive ? (v > 0 ? 'text-blue-700' : 'text-muted-foreground/60')
         : (v > 0 ? 'text-red-600' : 'text-muted-foreground/60')
 
     return (
         <div className="space-y-3">
-            <Section title="Revenue">
+            <Section title={t('shopeeImportSectionRevenue')}>
                 <AuditTable noBorder rows={[
-                    { label: 'Original Price (before discount)', value: agg.grossGmv, cls: 'text-blue-700' },
-                    { label: 'Shopee-funded Voucher', value: agg.platformVoucher, cls: 'text-muted-foreground/60', note: agg.platformVoucher ? undefined : 'optional' },
-                    { label: 'Total Returns', value: agg.refund, cls: 'text-muted-foreground/60' },
+                    { label: t('shopeeImportRevenueGross'), value: agg.grossGmv, cls: 'text-blue-700' },
+                    { label: t('shopeeImportRevenuePlatformDisc'), value: agg.platformVoucher, cls: 'text-muted-foreground/60', note: agg.platformVoucher ? undefined : t('shopeeImportOptional') },
+                    { label: t('shopeeImportReturnsTotal'), value: agg.refund, cls: 'text-muted-foreground/60' },
                 ]} />
             </Section>
-            <Section title="Seller Discounts">
+            <Section title={t('shopeeImportSectionDiscounts')}>
                 <AuditTable noBorder
                     rows={[
-                        { label: 'Seller Sponsored Voucher', value: agg.voucher, cls: t(agg.voucher, false) },
-                        { label: 'Seller Co-fund Voucher', value: agg.voucherCof, cls: t(agg.voucherCof, false) },
-                        { label: 'Seller Coin Cashback', value: agg.coin, cls: t(agg.coin, false) },
-                        { label: 'Seller Co-fund Coin Cashback', value: agg.coinCof, cls: t(agg.coinCof, false) },
+                        { label: t('shopeeImportDiscountVoucher'), value: agg.voucher, cls: cl(agg.voucher, false) },
+                        { label: t('shopeeImportDiscountVoucherCofund'), value: agg.voucherCof, cls: cl(agg.voucherCof, false) },
+                        { label: t('shopeeImportDiscountCoin'), value: agg.coin, cls: cl(agg.coin, false) },
+                        { label: t('shopeeImportDiscountCoinCofund'), value: agg.coinCof, cls: cl(agg.coinCof, false) },
                     ]}
-                    subtotal={{ label: 'Total Seller Discount', value: agg.totalDisc, cls: 'text-muted-foreground/60' }}
+                    subtotal={{ label: t('shopeeImportDiscountTotal'), value: agg.totalDisc, cls: 'text-muted-foreground/60' }}
                 />
             </Section>
-            <Section title="Channel Fees">
+            <Section title={t('shopeeImportSectionFees')}>
                 <AuditTable noBorder
                     rows={[
-                        { label: 'Admin Fee (Commission)', value: agg.commFee, cls: t(agg.commFee, false) },
-                        { label: 'Service Fee', value: agg.svcFee, cls: t(agg.svcFee, false) },
-                        { label: 'Order Processing Fee', value: agg.procFee, cls: t(agg.procFee, false) },
-                        { label: 'Transaction Fee', value: agg.txFee, cls: t(agg.txFee, false) },
-                        { label: 'Campaign Fee', value: agg.campFee, cls: t(agg.campFee, false) },
-                        { label: 'Affiliate Commission', value: agg.affFee, cls: t(agg.affFee, false) },
+                        { label: t('shopeeImportFeeCommission'), value: agg.commFee, cls: cl(agg.commFee, false) },
+                        { label: t('shopeeImportFeeService'), value: agg.svcFee, cls: cl(agg.svcFee, false) },
+                        { label: t('shopeeImportFeeProcessing'), value: agg.procFee, cls: cl(agg.procFee, false) },
+                        { label: t('shopeeImportFeeTransaction'), value: agg.txFee, cls: cl(agg.txFee, false) },
+                        { label: t('shopeeImportFeeCampaign'), value: agg.campFee, cls: cl(agg.campFee, false) },
+                        { label: t('shopeeImportFeeAffiliate'), value: agg.affFee, cls: cl(agg.affFee, false) },
                     ]}
-                    subtotal={{ label: 'Total Channel Fees', value: agg.totalFees, cls: agg.totalFees > 0 ? 'text-red-600' : 'text-muted-foreground/60' }}
+                    subtotal={{ label: t('shopeeImportFeesTotal'), value: agg.totalFees, cls: agg.totalFees > 0 ? 'text-red-600' : 'text-muted-foreground/60' }}
                 />
             </Section>
-            <Section title="Shipping">
+            <Section title={t('shopeeImportSectionShipping')}>
                 <AuditTable noBorder
                     rows={[
-                        { label: 'Shipping Paid by Buyer', value: agg.buyerShipping, cls: 'text-muted-foreground/60', note: agg.buyerShipping === 0 ? 'free shipping' : undefined },
-                        { label: 'Shopee Shipping Subsidy', value: agg.subsidy, cls: t(agg.subsidy, true) },
-                        { label: 'Shipping to Carrier', value: agg.shipCost, cls: t(agg.shipCost, false) },
+                        { label: t('shopeeImportShippingBuyer'), value: agg.buyerShipping, cls: 'text-muted-foreground/60', note: agg.buyerShipping === 0 ? t('shopeeImportShippingFree') : undefined },
+                        { label: t('shopeeImportShippingSubsidy'), value: agg.subsidy, cls: cl(agg.subsidy, true) },
+                        { label: t('shopeeImportShippingCarrier'), value: agg.shipCost, cls: cl(agg.shipCost, false) },
                     ]}
-                    subtotal={{ label: 'Net Shipping', value: agg.netShipping, cls: 'text-muted-foreground/60' }}
+                    subtotal={{ label: t('shopeeImportShippingNet'), value: agg.netShipping, cls: 'text-muted-foreground/60' }}
                 />
             </Section>
-            <Section title="Settlement Validation">
+            <Section title={t('shopeeImportSectionSettlement')}>
                 <AuditTable noBorder
                     rows={[
-                        { label: 'Total Income (Income Report)', value: agg.settlement, cls: 'text-blue-700' },
-                        { label: 'GMV − Seller Discount − Channel Fees + Net Shipping − Returns', value: calculated, cls: 'text-blue-700' },
+                        { label: t('shopeeImportSettlementReport'), value: agg.settlement, cls: 'text-blue-700' },
+                        { label: t('shopeeImportSettlementFormula'), value: calculated, cls: 'text-blue-700' },
                     ]}
-                    subtotal={{ label: `Difference${isMatch ? ' - ✓ matched' : ''}`, value: delta, cls: isMatch ? 'text-green-700' : 'text-red-600' }}
+                    subtotal={{ label: `${t('shopeeImportSettlementDiff')}${isMatch ? ' - ✓ ' + t('shopeeImportSettlementMatch') : ''}`, value: delta, cls: isMatch ? 'text-green-700' : 'text-red-600' }}
                 />
             </Section>
         </div>
@@ -151,6 +153,8 @@ function SummaryTab({ agg }) {
 
 export default function PlCalculator({ editId, allIds, onBack }) {
     const locale = useLocale()
+    const t = useTranslations('plpage')
+    const MONTH_LABELS = locale === 'id' ? MONTH_LABELS_ID : MONTH_LABELS_EN
     const [records, setRecords] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [forms, setForms] = useState({})
@@ -161,8 +165,8 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const s = String(entry?.status ?? '').toLowerCase()
         const isRefund = entry?.refunded || s.includes('pengembalian') || s.includes('dikembalikan') ||
             s.includes('kembali') || s.includes('refund') || s.includes('retur')
-        if (isRefund)                                        return locale === 'id' ? 'DIKEMBALIKAN' : 'RETURNED'
-        if (s.includes('batal') || s.includes('cancel'))     return locale === 'id' ? 'DIBATALKAN'   : 'CANCELLED'
+        if (isRefund)                                        return t('shopeeImportStatusReturned')
+        if (s.includes('batal') || s.includes('cancel'))     return t('shopeeImportStatusCancelled')
         return entry?.status ?? ''
     }
 
@@ -343,7 +347,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     )
     if (!active) return (
         <div className="px-4 lg:px-6 py-6 text-sm text-muted-foreground">
-            Record not found. <button className="underline" onClick={onBack}>Go back</button>
+            {t('plDetailNotFound')} <button className="underline" onClick={onBack}>{t('plDetailGoBack')}</button>
         </div>
     )
 
@@ -374,7 +378,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             {/* Header */}
             <div className="flex items-center gap-3 px-4 lg:px-6">
                 <button type="button" onClick={onBack} className="text-sm hover:opacity-70">←</button>
-                <h2 className="text-xl font-bold">P/L Detail</h2>
+                <h2 className="text-xl font-bold">{t('plDetailTitle')}</h2>
                 {active.source === 'shopee' && <ShopeeChip />}
             </div>
 
@@ -384,9 +388,9 @@ export default function PlCalculator({ editId, allIds, onBack }) {
 
                 {/* Period (read-only display) */}
                 <div className="border rounded-lg p-5 space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Period</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{t('shopeeImportPeriod')}</p>
                     <div>
-                        <p className="text-xs text-muted-foreground mb-1">Year</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t('yearLabel')}</p>
                         <select value={active.period_year ?? ''} disabled className="h-8 rounded-md border px-2 text-sm bg-muted/50 text-muted-foreground w-24">
                             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
@@ -403,36 +407,36 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 {/* KPI chips */}
                 <KpiCards cards={[
                     {
-                        label: 'Gross GMV', value: agg.grossGmv,
+                        label: t('shopeeColGmv'), value: agg.grossGmv,
                         cls: 'text-blue-700',
                         extra: [
-                            { label: `Refund (${refundRate.toFixed(1)}%)`, value: refundGmv, cls: 'text-amber-700' },
-                            { label: 'Net (Completed)', value: netGmv, cls: 'text-foreground' },
+                            { label: `${t('shopeeImportGmvRefund')} (${refundRate.toFixed(1)}%)`, value: refundGmv, cls: 'text-amber-700' },
+                            { label: t('shopeeImportGmvNet'), value: netGmv, cls: 'text-foreground' },
                         ],
                     },
                     {
-                        label: 'Channel Fees', value: agg.totalFees,
+                        label: t('shopeeImportFeesTotal'), value: agg.totalFees,
                         cls: 'text-red-600',
                         subtitle: agg.grossGmv > 0 ? `${((agg.totalFees / agg.grossGmv) * 100).toFixed(1)}% GMV` : undefined
                     },
                     {
-                        label: 'Settlement', value: agg.settlement,
+                        label: t('shopeeColSettlement'), value: agg.settlement,
                         cls: 'text-green-700',
                         subtitle: agg.grossGmv > 0 ? `${((agg.settlement / agg.grossGmv) * 100).toFixed(1)}% GMV` : undefined
                     },
                     {
-                        label: 'Contribution Margin', value: agg.settlement - agg.totalCogs,
+                        label: t('shopeeImportContribution'), value: agg.settlement - agg.totalCogs,
                         cls: (agg.settlement - agg.totalCogs) >= 0 ? 'text-green-700' : 'text-red-600',
-                        subtitle: agg.totalCogs > 0 ? `After COGS ${fmt(agg.totalCogs)}` : 'COGS not set'
+                        subtitle: agg.totalCogs > 0 ? `${t('shopeeImportColCogs')} ${fmt(agg.totalCogs)}` : t('shopeeImportContributionNote')
                     },
                 ]} />
 
                 {/* ══ TABS ════════════════════════════════════════════════════════════ */}
                 <Tabs defaultValue="summary">
                     <TabsList className="mb-3">
-                        <TabsTrigger value="summary">Summary</TabsTrigger>
-                        <TabsTrigger value="orders">Orders</TabsTrigger>
-                        <TabsTrigger value="sku">SKU</TabsTrigger>
+                        <TabsTrigger value="summary">{t('shopeeImportTabPreview')}</TabsTrigger>
+                        <TabsTrigger value="orders">{t('shopeeImportOrders')}</TabsTrigger>
+                        <TabsTrigger value="sku">{t('shopeeImportTabPerSku')}</TabsTrigger>
                     </TabsList>
 
                     {/* ── Summary ── */}
@@ -447,15 +451,15 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                 <Table className="min-w-[760px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
                                     <TableHeader>
                                         <TableRow className="bg-muted/60 hover:bg-muted/60">
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Order No.</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Product</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Qty</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Original Price</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Seller Discount</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Channel Fees</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Net Shipping</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Settlement</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('shopeeImportColOrderNo')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('shopeeImportColProduct')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('shopeeImportColStatus')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColQty')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColOriginalPrice')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColSellerDiscount')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportSectionFees')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColNetShipping')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColSettlement')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -465,13 +469,13 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                     <TableRow key={i} className="opacity-50">
                                                         <TableCell className="py-1.5 px-3 text-sm font-mono text-muted-foreground">-</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-muted-foreground">{canonicalName(rec)}</TableCell>
-                                                        <TableCell colSpan={7} className="py-1.5 px-3 text-sm text-muted-foreground text-center">no order data</TableCell>
+                                                        <TableCell colSpan={7} className="py-1.5 px-3 text-sm text-muted-foreground text-center">{t('plDetailNoOrderData')}</TableCell>
                                                     </TableRow>
                                                 )
                                             }
                                             const statusBadge = (
                                                 <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium ${entry.excluded ? 'bg-muted text-muted-foreground' : 'bg-green-50 text-green-700'}`}>
-                                                    {entry.excluded ? orderStatusLabel(entry) : 'MATCHED'}
+                                                    {entry.excluded ? orderStatusLabel(entry) : t('shopeeImportStatusMatched')}
                                                 </span>
                                             )
                                             if (fromOrderReport) {
@@ -507,7 +511,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                     </TableBody>
                                     <TableFooter>
                                         <TableRow className="bg-muted/40">
-                                            <TableCell colSpan={3} className="py-1.5 px-3 text-sm font-semibold">Total ({displayMatchedOrders} MATCHED)</TableCell>
+                                            <TableCell colSpan={3} className="py-1.5 px-3 text-sm font-semibold">{t('shopeeImportTotalMatched', { count: displayMatchedOrders })}</TableCell>
                                             <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums font-semibold">{matchedRows.reduce((s, r) => s + n(r.entry?.qty ?? r.entry?.units_sold ?? 0), 0)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalGmv)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalDiscount >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalDiscount)}</TableCell>
@@ -522,10 +526,10 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                         {/* Pagination */}
                         <div className="flex items-center justify-between">
                             <p className="text-[11px] text-muted-foreground">
-                                Only MATCHED orders are included. Cancelled and full-refund orders are excluded from the footer.
+                                {t('shopeeImportPerOrderNote')}
                             </p>
                             <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                                <span className="text-xs text-muted-foreground">Page {safeOrderPage + 1} of {totalOrderPages}</span>
+                                <span className="text-xs text-muted-foreground">{t('plDetailPage', { page: safeOrderPage + 1, total: totalOrderPages })}</span>
                                 <div className="flex items-center gap-1">
                                     <Button variant="outline" className="h-7 w-7 p-0" onClick={() => setOrderPage(0)} disabled={safeOrderPage === 0}><IconChevronsLeft size={13} /></Button>
                                     <Button variant="outline" className="h-7 w-7 p-0" onClick={() => setOrderPage(p => Math.max(0, p - 1))} disabled={safeOrderPage === 0}><IconChevronLeft size={13} /></Button>
@@ -543,17 +547,17 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                 <Table className="min-w-[940px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
                                     <TableHeader>
                                         <TableRow className="bg-muted/60 hover:bg-muted/60">
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">SKU</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Qty Sold</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Gross GMV</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Refund</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Seller Discount</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Channel Fees</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Net Shipping</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Settlement</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">COGS</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Contribution</TableHead>
-                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">CM %</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('shopeeImportTabPerSku')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColUnitsSold')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColGrossGmv')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColRefund')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColSellerDiscount')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportSectionFees')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColNetShipping')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColSettlement')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCogs')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColContribution')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCmPercent')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -582,7 +586,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                     </TableBody>
                                     <TableFooter>
                                         <TableRow className="bg-muted/40">
-                                            <TableCell className="py-1.5 px-3 text-sm font-semibold">Total</TableCell>
+                                            <TableCell className="py-1.5 px-3 text-sm font-semibold">{t('shopeeImportTotal')}</TableCell>
                                             <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums font-semibold">{skuRows.reduce((s, r) => s + (r.units || 0), 0)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.grossGmv >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.grossGmv)}</TableCell>
                                             <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums font-semibold text-amber-700">{fmt(refundGmv)}</TableCell>
