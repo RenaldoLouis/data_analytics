@@ -370,7 +370,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                         <Table className="min-w-[780px] [&_th]:text-[11px] [&_td]:text-xs">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>SKU</TableHead>
+                                    <TableHead className="w-[200px]">SKU</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColUnitsSold')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColGrossGmv')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColSellerDiscount')}</TableHead>
@@ -386,8 +386,8 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                     const mappedCode = getMappedSkuCode(s.sku)
                                     return (
                                         <TableRow key={s.sku}>
-                                            <TableCell>
-                                                <p className="font-medium">{s.sku}</p>
+                                            <TableCell className="w-[200px] max-w-[200px] whitespace-normal">
+                                                <p className="font-medium leading-snug">{s.sku}</p>
                                                 {mappedCode && <p className="text-[10px] text-primary font-medium mt-0.5">→ {mappedCode}</p>}
                                             </TableCell>
                                             <TableCell className="text-right tabular-nums">{s.units_sold}</TableCell>
@@ -682,25 +682,27 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                                     <div key={productName}
                                          className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-md border px-4 py-3">
                                         <div className="min-w-0">
-                                            <p className="text-sm font-medium truncate">{productName}</p>
+                                            <p className="text-sm font-medium line-clamp-2 break-words">{productName}</p>
                                             <p className="text-xs text-muted-foreground">{t('skuMappingFromImport')}</p>
                                         </div>
                                         <IconArrowRight size={14} className="text-muted-foreground flex-shrink-0" />
                                         <div className="min-w-0">
                                             {mappedSku ? (
-                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                <div className="flex items-center gap-3">
                                                     {isAutoMatched && (
-                                                        <Badge variant="secondary" className="text-[10px] py-0 gap-0.5 h-4">
+                                                        <Badge variant="secondary" className="text-[10px] py-0 gap-0.5 h-4 flex-shrink-0">
                                                             <IconCheck size={9} />{t('skuMappingAutoMatched')}
                                                         </Badge>
                                                     )}
-                                                    <span className="text-xs font-medium text-primary truncate">
-                                                        {mappedSku.product_name || mappedSku.sku_code}
-                                                    </span>
-                                                    <span className="text-xs text-muted-foreground">· {mappedSku.sku_code}</span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className="block text-xs font-medium text-primary break-words">
+                                                            {mappedSku.product_name || mappedSku.sku_code}
+                                                        </span>
+                                                        <span className="block text-xs text-muted-foreground">{mappedSku.sku_code}</span>
+                                                    </div>
                                                     <button type="button"
                                                             onClick={() => setSkuMapping(prev => ({ ...prev, [productName]: null }))}
-                                                            className="ml-auto text-muted-foreground hover:text-destructive text-sm">×</button>
+                                                            className="flex-shrink-0 text-muted-foreground hover:text-destructive text-sm leading-none">×</button>
                                                 </div>
                                             ) : isSkusLoading ? (
                                                 <Skeleton className="h-8 w-full" />

@@ -495,7 +495,7 @@ function BundleComponentsField({ value = [], onChange, currentSkuId }) {
         <div className="space-y-2 rounded-lg border p-4">
             <p className="text-sm font-medium">{t('bundleComponents')}</p>
             {value.length > 0 && (
-                <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 90px 32px' }}>
+                <div className="grid gap-2" style={{ gridTemplateColumns: 'minmax(0, 1fr) 90px 32px' }}>
                     <span className="text-xs font-medium text-muted-foreground">{t('bundleProduct')}</span>
                     <span className="text-xs font-medium text-muted-foreground">{t('bundleQty')}</span>
                     <span />
@@ -562,7 +562,7 @@ function BundleRow({ row, allSelected, currentSkuId, onUpdate, onRemove }) {
     }
 
     return (
-        <div className="grid gap-2 items-center" style={{ gridTemplateColumns: '1fr 90px 32px' }}>
+        <div className="grid gap-2 items-center" style={{ gridTemplateColumns: 'minmax(0, 1fr) 90px 32px' }}>
             {isSelected ? (
                 <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 h-9">
                     <div className="flex-1 min-w-0">
