@@ -55,10 +55,13 @@
     "minimumFirstName": "First Name must be at least 4 characters",
     "minimumLastName": "Last Name must be at least 4 characters",
     "minimumPhone": "Phone Number must be at least 4 characters",
-    "verifyYourEmail": "verify Your Email",
-    "verifyEmailDesc": "Thank you for registering! We have sent a verification link to",
+    "verifyYourEmail": "Verify your email",
+    "verifyEmailDesc": "We've sent a verification link to",
+    "verifyEmailHint": "Click the link in the email to activate your account. Didn't get it? Check your spam folder.",
+    "verifyEmailResent": "Verification link resent to {email}",
+    "verifyEmailResendFailed": "Couldn't resend the link. Please try again.",
     "resendVerification": "Resend Verification Link",
-    "changeEmail": "change Email",
+    "changeEmail": "Change Email",
     "confirmationTitle": "Thank you for Signing Up!",
     "confirmationSubtitle": "We will contact you through your registered email.",
     "backToHome": "Back to Home",
@@ -74,7 +77,9 @@
     "passwordsDoNotMatch": "Passwords do not match",
     "agreePrefix": "I agree to the",
     "termsAndConditions": "Terms & Conditions and Privacy Policy",
-    "agreeToTermsRequired": "You must agree to the Terms & Conditions to continue"
+    "agreeToTermsRequired": "You must agree to the Terms & Conditions to continue",
+    "accountAlreadyRegistered": "This email is already registered. Try logging in instead.",
+    "registrationFailedRetry": "Registration failed. Please try again."
   },
   "dashboardpage": {
     "addDataset": "Add Data set",

@@ -17,8 +17,8 @@ export default function RegisterPage() {
                 )}
 
                 {/* Right Side (Form) */}
-                <div className="w-1/2 bg-white flex flex-col overflow-y-auto">
-                    <div className="flex-1 flex items-center justify-center px-12 py-8">
+                <div className="w-full lg:w-1/2 bg-white flex flex-col overflow-y-auto">
+                    <div className="flex-1 flex items-start justify-center px-6 sm:px-10 lg:px-12 py-8">
                         <RegistrationForm />
                     </div>
                 </div>

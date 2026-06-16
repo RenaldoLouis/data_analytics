@@ -28,7 +28,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import services from "@/services";
-import { ArrowLeft, Eye, EyeOff, Mail, RefreshCw } from "lucide-react"; // Added icons
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Mail, RefreshCw } from "lucide-react"; // Added icons
 import LoadingScreen from "./ui/loadingScreen";
 import PrivacyPolicyModal from "./PrivacyPolicyModal";
 
@@ -121,42 +121,52 @@ export default function RegistrationForm() {
                 setRegistrationStep("verification");
             }
             else {
-                let errorMessage = "Registration failed. Try again.";
-
-                // Safely handle different error formats
-                if (res?.message) {
-                    if (typeof res.message === 'string') {
-                        errorMessage = res.message;
-                    } else if (typeof res.message === 'object') {
-                        // If message is an object (validation errors), flatten it to a string
-                        // e.g. { lastName: "Required", pricingPlan: "Invalid" }
-                        errorMessage = Object.values(res.message).flat().join(", ");
-                    }
-                }
-
-                form.setError("root", {
-                    message: errorMessage,
-                });
+                applyApiError(extractApiError(res));
             }
         } catch (err) {
-            setIsLoading(false);
-            form.setError("root", {
-                message: err.message || "An unexpected error occurred.",
-            });
+            applyApiError(extractApiError(err));
         }
         setIsLoading(false);
+    };
+
+    // Pull the human-readable message out of the various shapes the API/axios can return.
+    // services.auth.register resolves to { error: <axios response> } on failure, so the
+    // real message lives at res.error.data.message.
+    const extractApiError = (res) => {
+        const data = res?.error?.data ?? res?.response?.data ?? res?.error ?? res?.data ?? res;
+        let msg = data?.message ?? data?.error;
+        if (msg && typeof msg === "object") {
+            // Validation map e.g. { email: "Required", pricingPlan: "Invalid" }
+            msg = Object.values(msg).flat().join(", ");
+        }
+        return typeof msg === "string" && msg.trim() ? msg.trim() : null;
+    };
+
+    // Localize known cases, surface the real message otherwise, and highlight the
+    // relevant field when we can identify it.
+    const applyApiError = (rawMessage) => {
+        const lower = (rawMessage || "").toLowerCase();
+        const isDuplicate = lower.includes("already registered") || lower.includes("already exist") || lower.includes("sudah terdaftar");
+
+        const message = isDuplicate
+            ? (t("accountAlreadyRegistered") || "This email is already registered. Try logging in instead.")
+            : (rawMessage || t("registrationFailedRetry") || "Registration failed. Please try again.");
+
+        if (isDuplicate) {
+            form.setError("email", { message }, { shouldFocus: true });
+        }
+        form.setError("root", { message });
     };
 
     const handleResendEmail = async () => {
         setIsLoading(true);
         const email = form.getValues("email");
         try {
-            // Placeholder for your resend service
             await services.auth.resendVerification(email);
-
-            toast(t(`Verification email resent to ${email}`));
+            toast.success(t("verifyEmailResent", { email }));
         } catch (error) {
             console.error(error);
+            toast.error(t("verifyEmailResendFailed"));
         }
         setIsLoading(false);
     };
@@ -176,7 +186,7 @@ export default function RegistrationForm() {
             {/* --- STEP 1: REGISTRATION FORM --- */}
             {registrationStep === "form" && (
                 <>
-                    <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 pt-6 lg:pt-0 hover:text-gray-900 transition-colors flex items-center gap-1">
+                    <button onClick={() => router.replace("/login")} className="text-sm text-gray-500 mb-4 pt-0 hover:text-gray-900 transition-colors flex items-center gap-1">
                         &larr; {t("back")}
                     </button>
                     <h2 className="text-2xl font-bold">{t("tryFree")}</h2>
@@ -394,7 +404,13 @@ export default function RegistrationForm() {
                             />
 
                             {form.formState.errors.root?.message && (
-                                <p className="text-red-500 font-bold text-center">{form.formState.errors.root.message}</p>
+                                <div
+                                    role="alert"
+                                    className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+                                >
+                                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                                    <span className="leading-snug">{form.formState.errors.root.message}</span>
+                                </div>
                             )}
 
                             <Button
@@ -416,32 +432,43 @@ export default function RegistrationForm() {
             {/* --- STEP 2: VERIFICATION MESSAGE --- */}
             {registrationStep === "verification" && (
                 <div className="flex flex-col items-center text-center justify-center h-full animate-in fade-in duration-500">
-                    <div className="h-20 w-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
-                        <Mail className="h-10 w-10 text-blue-600" />
+                    <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 ring-8 ring-blue-50/40">
+                        <Mail className="h-9 w-9 text-blue-600" />
                     </div>
 
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">
                         {t("verifyYourEmail") || "Verify your email"}
                     </h2>
 
-                    <p className="text-gray-500 mb-8 max-w-sm">
-                        {t("verifyEmailDesc", { email: form.getValues("email") }) ||
-                            `Thank you for registering! We have sent a verification link to ${form.getValues("email")}. Please check your inbox.`}
+                    <p className="text-gray-500 max-w-sm">
+                        {t("verifyEmailDesc") || "We've sent a verification link to"}
                     </p>
 
-                    <div className="w-full space-y-3">
+                    {/* Email chip */}
+                    <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2">
+                        <Mail className="h-4 w-4 shrink-0 text-gray-400" />
+                        <span className="truncate text-sm font-semibold text-gray-900">
+                            {form.getValues("email")}
+                        </span>
+                    </div>
+
+                    <p className="mt-4 mb-8 max-w-sm text-xs leading-relaxed text-gray-400">
+                        {t("verifyEmailHint") || "Click the link in the email to activate your account. Didn't get it? Check your spam folder."}
+                    </p>
+
+                    <div className="w-full max-w-sm space-y-3">
                         <Button
                             onClick={handleResendEmail}
-                            className="w-full bg-gray-900 hover:bg-gray-800 text-white flex items-center justify-center gap-2"
+                            className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white flex items-center justify-center gap-2"
                         >
                             <RefreshCw className="h-4 w-4" />
                             {t("resendVerification") || "Resend Verification Link"}
                         </Button>
 
                         <Button
-                            variant="outline"
+                            variant="ghost"
                             onClick={handleBackToForm}
-                            className="w-full border-gray-300 hover:bg-gray-50 flex items-center justify-center gap-2"
+                            className="w-full h-11 text-gray-600 hover:text-gray-900 hover:bg-gray-50 flex items-center justify-center gap-2"
                         >
                             <ArrowLeft className="h-4 w-4" />
                             {t("changeEmail") || "Change Email Address"}
@@ -449,7 +476,7 @@ export default function RegistrationForm() {
                     </div>
 
                     <div className="pt-12 flex justify-center">
-                        <Image src="/logo.svg" alt="Sirius" width={120} height={22} className="opacity-50" />
+                        <Image src="/logo.svg" alt="Sirius" width={120} height={22} />
                     </div>
                 </div>
             )}
