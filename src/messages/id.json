@@ -71,7 +71,10 @@
     "enterCompanyName": "Nama perusahaan dibutuhkan",
     "selectPackage": "Mohon pilih paket",
     "confirmPasswordRequired": "Moho konfirmasi password anda",
-    "passwordsDoNotMatch": "Passwords do not match"
+    "passwordsDoNotMatch": "Passwords do not match",
+    "agreePrefix": "Saya menyetujui",
+    "termsAndConditions": "Syarat & Ketentuan dan Kebijakan Privasi",
+    "agreeToTermsRequired": "Anda harus menyetujui Syarat & Ketentuan untuk melanjutkan"
   },
   "dashboardpage": {
     "addDataset": "Tambahkan Dataset",

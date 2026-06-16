@@ -18,6 +18,7 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -29,6 +30,7 @@ import {
 import services from "@/services";
 import { ArrowLeft, Eye, EyeOff, Mail, RefreshCw } from "lucide-react"; // Added icons
 import LoadingScreen from "./ui/loadingScreen";
+import PrivacyPolicyModal from "./PrivacyPolicyModal";
 
 const registrationSchema = (t) => z.object({
     firstName: z.string().min(4, t("minimumFirstName")),
@@ -40,6 +42,9 @@ const registrationSchema = (t) => z.object({
     package: z.string().min(1, t("selectPackage") || "Please select a package"),
     password: z.string().min(6, t("minimumPassword")),
     confirmPassword: z.string().min(1, t("confirmPasswordRequired") || "Please confirm your password"),
+    agreeToTerms: z.boolean().refine((val) => val === true, {
+        message: t("agreeToTermsRequired") || "You must agree to the Terms & Conditions",
+    }),
 }).refine((data) => data.password === data.confirmPassword, {
     message: t("passwordsDoNotMatch") || "Passwords do not match",
     path: ["confirmPassword"],
@@ -58,6 +63,7 @@ export default function RegistrationForm() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [pricingPlans, setPricingPlans] = useState(null);
+    const [termsOpen, setTermsOpen] = useState(false);
 
     const form = useForm({
         resolver: zodResolver(registrationSchema(t)),
@@ -71,8 +77,11 @@ export default function RegistrationForm() {
             package: "",
             password: "",
             confirmPassword: "",
+            agreeToTerms: false,
         },
     });
+
+    const agreedToTerms = form.watch("agreeToTerms");
 
     useEffect(() => {
         const fetchPricingPlans = async () => {
@@ -157,10 +166,12 @@ export default function RegistrationForm() {
     };
 
     return (
-        <div className="h-full w-full max-w-md py-8">
+        <div className="h-full w-full max-w-md pt-2 pb-2">
             {isLoading && (
                 <LoadingScreen />
             )}
+
+            <PrivacyPolicyModal open={termsOpen} onOpenChange={setTermsOpen} />
 
             {/* --- STEP 1: REGISTRATION FORM --- */}
             {registrationStep === "form" && (
@@ -171,14 +182,14 @@ export default function RegistrationForm() {
                     <h2 className="text-2xl font-bold">{t("tryFree")}</h2>
 
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 mt-8">
                             {/* First Name & Last Name */}
-                            <div className="lg:flex gap-4 mb-3 lg:mb-6">
+                            <div className="flex flex-col lg:flex-row gap-5">
                                 <FormField
                                     control={form.control}
                                     name="firstName"
                                     render={({ field }) => (
-                                        <FormItem className="w-full lg:w-1/2 mb-3 lg:mb-0">
+                                        <FormItem className="w-full lg:flex-1">
                                             <FormLabel>{t("firstName")}</FormLabel>
                                             <FormControl>
                                                 <Input placeholder={t("firstNamePlaceholder")} {...field} />
@@ -191,7 +202,7 @@ export default function RegistrationForm() {
                                     control={form.control}
                                     name="lastName"
                                     render={({ field }) => (
-                                        <FormItem className="w-full lg:w-1/2 ">
+                                        <FormItem className="w-full lg:flex-1">
                                             <FormLabel>{t("lastName")}</FormLabel>
                                             <FormControl>
                                                 <Input placeholder={t("lastNamePlaceholder")} {...field} />
@@ -207,7 +218,7 @@ export default function RegistrationForm() {
                                 control={form.control}
                                 name="phone"
                                 render={({ field }) => (
-                                    <FormItem className="mb-3 lg:mb-6">
+                                    <FormItem>
                                         <FormLabel>{t("mobilePhone")}</FormLabel>
                                         <FormControl>
                                             <div className="flex">
@@ -231,7 +242,7 @@ export default function RegistrationForm() {
                                 control={form.control}
                                 name="email"
                                 render={({ field }) => (
-                                    <FormItem className="mb-3 lg:mb-6">
+                                    <FormItem>
                                         <FormLabel>{t("email")}</FormLabel>
                                         <FormControl>
                                             <Input placeholder={t("emailPlaceholder")} {...field} />
@@ -246,7 +257,7 @@ export default function RegistrationForm() {
                                 control={form.control}
                                 name="username"
                                 render={({ field }) => (
-                                    <FormItem className="mb-3 lg:mb-6">
+                                    <FormItem>
                                         <FormLabel>{t("createUsername")}</FormLabel>
                                         <FormControl>
                                             <Input placeholder={t("usernamePlaceholder")} {...field} />
@@ -261,7 +272,7 @@ export default function RegistrationForm() {
                                 control={form.control}
                                 name="companyName"
                                 render={({ field }) => (
-                                    <FormItem className="mb-3 lg:mb-6">
+                                    <FormItem>
                                         <FormLabel>{t("companyName") || "Company Name"}</FormLabel>
                                         <FormControl>
                                             <Input placeholder={t("companyNamePlaceholder") || "Enter your company name"} {...field} />
@@ -276,7 +287,7 @@ export default function RegistrationForm() {
                                 control={form.control}
                                 name="package"
                                 render={({ field }) => (
-                                    <FormItem className="mb-3 lg:mb-6">
+                                    <FormItem>
                                         <FormLabel>{t("package") || "Select Package"}</FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl>
@@ -300,7 +311,7 @@ export default function RegistrationForm() {
                                 control={form.control}
                                 name="password"
                                 render={({ field }) => (
-                                    <FormItem className="mb-3 lg:mb-6">
+                                    <FormItem>
                                         <FormLabel>{t("createPassword")}</FormLabel>
                                         <FormControl>
                                             <div className="relative">
@@ -328,7 +339,7 @@ export default function RegistrationForm() {
                                 control={form.control}
                                 name="confirmPassword"
                                 render={({ field }) => (
-                                    <FormItem className="mb-12">
+                                    <FormItem>
                                         <FormLabel>{t("confirmPassword") || "Re-enter Password"}</FormLabel>
                                         <FormControl>
                                             <div className="relative">
@@ -351,15 +362,50 @@ export default function RegistrationForm() {
                                 )}
                             />
 
+                            {/* Agree to Terms & Conditions */}
+                            <FormField
+                                control={form.control}
+                                name="agreeToTerms"
+                                render={({ field }) => (
+                                    <FormItem className="pt-2">
+                                        <div className="flex items-start gap-2.5">
+                                            <FormControl>
+                                                <Checkbox
+                                                    id="agreeToTerms"
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                    className="mt-0.5"
+                                                />
+                                            </FormControl>
+                                            <label htmlFor="agreeToTerms" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
+                                                {t("agreePrefix") || "I agree to the"}{" "}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTermsOpen(true)}
+                                                    className="text-blue-600 font-medium underline hover:text-blue-700"
+                                                >
+                                                    {t("termsAndConditions") || "Terms & Conditions"}
+                                                </button>
+                                            </label>
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
                             {form.formState.errors.root?.message && (
                                 <p className="text-red-500 font-bold text-center">{form.formState.errors.root.message}</p>
                             )}
 
-                            <Button type="submit" className="w-full bg-gray-500 text-white">
+                            <Button
+                                type="submit"
+                                disabled={!agreedToTerms}
+                                className="w-full h-11 mt-1 bg-gray-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
                                 {t("submitForm")}
                             </Button>
 
-                            <div className="pt-3 lg:pt-8 flex justify-center pb-6">
+                            <div className="pt-6 flex justify-center">
                                 <Image src="/logo.svg" alt="Sirius" width={120} height={28} />
                             </div>
                         </form>

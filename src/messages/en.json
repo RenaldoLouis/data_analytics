@@ -71,7 +71,10 @@
     "enterCompanyName": "Company Name is required",
     "selectPackage": "Please select a package",
     "confirmPasswordRequired": "Please confirm your password",
-    "passwordsDoNotMatch": "Passwords do not match"
+    "passwordsDoNotMatch": "Passwords do not match",
+    "agreePrefix": "I agree to the",
+    "termsAndConditions": "Terms & Conditions and Privacy Policy",
+    "agreeToTermsRequired": "You must agree to the Terms & Conditions to continue"
   },
   "dashboardpage": {
     "addDataset": "Add Data set",
