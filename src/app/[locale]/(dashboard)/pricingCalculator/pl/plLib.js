@@ -28,6 +28,28 @@ export const parseCurrency = (v) => String(v).replace(/\D/g, '')
 export const toAmt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v))) : ''
 export const toRate = (v, scale = 100) => v != null ? String(parseFloat((parseFloat(v) * scale).toFixed(4))) : '0'
 
+// ─── Improvement A: order classification ──────────────────────────────────────
+// Order still in transit (shipped) — outcome not final yet.
+function isShipped(status) {
+    const s = String(status ?? '').toLowerCase()
+    return s.includes('dikirim') || s.includes('pengiriman') || s.includes('dalam perjalanan') ||
+        s.includes('sedang dikirim') || s.includes('shipped') || s.includes('in transit')
+}
+
+// Classify an order line into one bucket:
+//   SETTLED      — appears in this period's Income report (full P&L)
+//   CANCELLED    — cancelled, no money moved (excluded from everything)
+//   PENDING      — still shipping, not yet in Income (info only)
+//   CROSS_PERIOD — completed/returned but missing from Income; settles a later period (info only)
+// Works on both the parser's enriched rows and the stored rows (same field names).
+export function classifyOrderRow(row) {
+    if (row?.income_matched) return 'SETTLED'
+    const cancelled = row?.excluded && !row?.refunded
+    if (cancelled) return 'CANCELLED'
+    if (isShipped(row?.status)) return 'PENDING'
+    return 'CROSS_PERIOD'
+}
+
 export function getChColor(code, label) {
     const key = (label || code || "").toLowerCase()
     if (key.includes("shopee")) return { bg: "#fff7f0", color: "#c83200" }

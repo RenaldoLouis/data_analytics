@@ -80,9 +80,9 @@ const POLICY = {
                     {
                         type: "list",
                         items: [
-                            "Data akun — Autentikasi, pengelolaan akun, dan komunikasi layanan.",
-                            "File Laporan yang Anda unggah — Menjalankan kalkulasi P/L dan menampilkan hasilnya kepada Anda.",
-                            "Data teknis — Keamanan sistem, analisis performa, dan perbaikan layanan.",
+                            "Data akun - Autentikasi, pengelolaan akun, dan komunikasi layanan.",
+                            "File Laporan yang Anda unggah - Menjalankan kalkulasi P/L dan menampilkan hasilnya kepada Anda.",
+                            "Data teknis - Keamanan sistem, analisis performa, dan perbaikan layanan.",
                         ],
                     },
                     { type: "subheading", text: "Kami tidak menggunakan data Anda untuk:" },
@@ -128,9 +128,9 @@ const POLICY = {
                     {
                         type: "list",
                         items: [
-                            "Penyedia layanan teknis (misalnya: layanan hosting/cloud) yang kami gunakan untuk menjalankan infrastruktur — mereka terikat perjanjian kerahasiaan.",
-                            "Kewajiban hukum — jika diwajibkan oleh hukum, putusan pengadilan, atau permintaan otoritas pemerintah yang berwenang di Indonesia.",
-                            "Perlindungan hak — jika diperlukan untuk melindungi hak, properti, atau keselamatan kami, pengguna lain, atau publik.",
+                            "Penyedia layanan teknis (misalnya: layanan hosting/cloud) yang kami gunakan untuk menjalankan infrastruktur - mereka terikat perjanjian kerahasiaan.",
+                            "Kewajiban hukum - jika diwajibkan oleh hukum, putusan pengadilan, atau permintaan otoritas pemerintah yang berwenang di Indonesia.",
+                            "Perlindungan hak - jika diperlukan untuk melindungi hak, properti, atau keselamatan kami, pengguna lain, atau publik.",
                         ],
                     },
                 ],
@@ -145,16 +145,16 @@ const POLICY = {
                     {
                         type: "list",
                         items: [
-                            "Hak Mengakses — Meminta salinan data pribadi yang kami miliki tentang Anda.",
-                            "Hak Mengoreksi — Meminta perbaikan data yang tidak akurat atau tidak lengkap.",
-                            "Hak Menghapus — Meminta penghapusan data pribadi Anda, termasuk penutupan akun.",
-                            "Hak Menarik Persetujuan — Menarik persetujuan Anda untuk pemrosesan data sewaktu-waktu, dengan catatan hal ini dapat mempengaruhi kemampuan kami memberikan layanan.",
-                            "Hak Mengajukan Keberatan — Mengajukan keberatan atas pemrosesan data Anda untuk tujuan tertentu.",
+                            "Hak Mengakses - Meminta salinan data pribadi yang kami miliki tentang Anda.",
+                            "Hak Mengoreksi - Meminta perbaikan data yang tidak akurat atau tidak lengkap.",
+                            "Hak Menghapus - Meminta penghapusan data pribadi Anda, termasuk penutupan akun.",
+                            "Hak Menarik Persetujuan - Menarik persetujuan Anda untuk pemrosesan data sewaktu-waktu, dengan catatan hal ini dapat mempengaruhi kemampuan kami memberikan layanan.",
+                            "Hak Mengajukan Keberatan - Mengajukan keberatan atas pemrosesan data Anda untuk tujuan tertentu.",
                         ],
                     },
                     {
                         type: "text",
-                        text: "Untuk menggunakan hak-hak di atas, silakan hubungi kami melalui kontak yang tercantum di bagian akhir dokumen ini. Kami akan merespons dalam 1–3 hari kerja sesuai ketentuan yang berlaku.",
+                        text: "Untuk menggunakan hak-hak di atas, silakan hubungi kami melalui kontak yang tercantum di bagian akhir dokumen ini. Kami akan merespons dalam 1-3 hari kerja sesuai ketentuan yang berlaku.",
                     },
                 ],
             },
@@ -295,9 +295,9 @@ const POLICY = {
                     {
                         type: "list",
                         items: [
-                            "Account data — Authentication, account management, and service communication.",
-                            "Report files you upload — Running P/L calculations and displaying the results to you.",
-                            "Technical data — System security, performance analysis, and service improvement.",
+                            "Account data - Authentication, account management, and service communication.",
+                            "Report files you upload - Running P/L calculations and displaying the results to you.",
+                            "Technical data - System security, performance analysis, and service improvement.",
                         ],
                     },
                     { type: "subheading", text: "We do not use your data for:" },
@@ -343,9 +343,9 @@ const POLICY = {
                     {
                         type: "list",
                         items: [
-                            "Technical service providers (e.g. hosting/cloud services) we use to run our infrastructure — they are bound by confidentiality agreements.",
-                            "Legal obligations — if required by law, a court order, or a request from a competent government authority in Indonesia.",
-                            "Protection of rights — if necessary to protect the rights, property, or safety of us, other users, or the public.",
+                            "Technical service providers (e.g. hosting/cloud services) we use to run our infrastructure - they are bound by confidentiality agreements.",
+                            "Legal obligations - if required by law, a court order, or a request from a competent government authority in Indonesia.",
+                            "Protection of rights - if necessary to protect the rights, property, or safety of us, other users, or the public.",
                         ],
                     },
                 ],
@@ -357,16 +357,16 @@ const POLICY = {
                     {
                         type: "list",
                         items: [
-                            "Right to Access — Request a copy of the personal data we hold about you.",
-                            "Right to Rectify — Request correction of inaccurate or incomplete data.",
-                            "Right to Erase — Request deletion of your personal data, including account closure.",
-                            "Right to Withdraw Consent — Withdraw your consent to data processing at any time, noting this may affect our ability to provide the service.",
-                            "Right to Object — Object to the processing of your data for certain purposes.",
+                            "Right to Access - Request a copy of the personal data we hold about you.",
+                            "Right to Rectify - Request correction of inaccurate or incomplete data.",
+                            "Right to Erase - Request deletion of your personal data, including account closure.",
+                            "Right to Withdraw Consent - Withdraw your consent to data processing at any time, noting this may affect our ability to provide the service.",
+                            "Right to Object - Object to the processing of your data for certain purposes.",
                         ],
                     },
                     {
                         type: "text",
-                        text: "To exercise the rights above, please contact us via the contact details at the end of this document. We will respond within 1–3 business days as applicable.",
+                        text: "To exercise the rights above, please contact us via the contact details at the end of this document. We will respond within 1-3 business days as applicable.",
                     },
                 ],
             },
@@ -478,7 +478,7 @@ export default function PrivacyPolicyModal({ open, onOpenChange }) {
         if (!el) return;
         const max = el.scrollHeight - el.clientHeight;
         if (max <= 1) {
-            // Content fits without scrolling — no progress/fades needed.
+            // Content fits without scrolling - no progress/fades needed.
             setProgress(0);
             setAtTop(true);
             setAtBottom(true);

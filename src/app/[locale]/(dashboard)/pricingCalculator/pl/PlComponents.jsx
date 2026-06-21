@@ -351,6 +351,25 @@ export function ShopeeChip() {
     )
 }
 
+// ─── ClassificationBadge - Improvement A order bucket pill ────────────────────
+// cls: SETTLED | PENDING | CROSS_PERIOD | ANOMALY | CANCELLED. `label` is the
+// localized text to display (caller passes it via t()).
+const CLASSIFICATION_STYLES = {
+    SETTLED:      'bg-green-50 text-green-700',
+    PENDING:      'bg-blue-50 text-blue-700',
+    CROSS_PERIOD: 'bg-purple-50 text-purple-700',
+    ANOMALY:      'bg-red-50 text-red-700',
+    CANCELLED:    'bg-muted text-muted-foreground',
+}
+export function ClassificationBadge({ cls, label }) {
+    const style = CLASSIFICATION_STYLES[cls] ?? CLASSIFICATION_STYLES.CANCELLED
+    return (
+        <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${style}`}>
+            {label ?? cls}
+        </span>
+    )
+}
+
 // ─── SkuCell - SKU canonical name + code + optional import alias ──────────────
 export function SkuCell({ rec }) {
     const name      = rec?.sku_name

@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { classifyOrderRow } from './plLib'
 
 // ─── Column patterns (lowercase fragments) ────────────────────────────────────
 // Covers Shopee Income Report (Laporan Keuangan) and Order Report (Laporan Pesanan).
@@ -8,12 +9,15 @@ const COL_INCOME = {
     sellingPrice:   ['harga setelah diskon', 'discounted price', 'selling price', 'harga jual'],
     orderStatus:    ['status pesanan', 'order status'],
     // Seller-funded discounts
-    voucher:        ['voucher disponsor oleh penjual', 'voucher dispons', 'diskon dari voucher penjual', 'seller voucher', 'voucher penjual'],
+    voucher:        ['voucher ditanggung penjual', 'voucher disponsor oleh penjual', 'voucher dispons', 'diskon dari voucher penjual', 'seller voucher', 'voucher penjual'],
+    // "Diskon dari Seller / Penjual" (col U) — distinct seller-funded discount (Improvement B).
+    sellerDiscount: ['diskon dari seller', 'diskon seller'],
     voucherCofund:  ['voucher co-fund disponsor', 'voucher co-fund', 'diskon dari voucher shopee', 'shopee voucher'],
     coin:           ['cashback koin dispons', 'koin shopee yang digunakan', 'koin yang digunakan'],
     coinCofund:     ['cashback koin co-fund', 'koin co-fund'],
     totalDiscount:  ['total diskon produk', 'total diskon', 'total discount'],
-    refundAmount:   ['jumlah pengembalian dana', 'pengembalian dana ke pembeli', 'refund amount'],
+    // "Pengembalian Dana (Produk)" (col J) — buyer refund on returns.
+    refundAmount:   ['jumlah pengembalian dana', 'pengembalian dana ke pembeli', 'pengembalian dana', 'refund amount'],
     // Channel fees — Shopee income report naming:
     //   "Biaya Administrasi"           = main commission/admin fee (% of order)
     //   "Biaya Layanan"                = platform service fee
@@ -25,17 +29,17 @@ const COL_INCOME = {
     //       before "Biaya Administrasi" in the xlsx so we use the most specific pattern.
     commissionFee:  ['biaya administrasi', 'commission fee', 'admin fee'],
     serviceFee:     ['biaya layanan', 'service fee'],
-    processingFee:  ['biaya proses pesanan', 'biaya administrasi pembayaran', 'payment admin', 'processing fee'],
+    processingFee:  ['biaya proses pesanan', 'biaya proses pembayaran', 'biaya administrasi pembayaran', 'payment admin', 'processing fee'],
     transactionFee: ['biaya transaksi', 'transaction fee'],
     programFee:     ['biaya program hemat', 'program hemat biaya kirim'],
     campaignFee:    ['biaya kampanye', 'campaign fee'],
     affiliateFee:   ['biaya komisi ams', 'komisi afiliasi', 'affiliate commission', 'biaya afiliasi'],
     // Shipping
     shippingSubsidy: ['gratis ongkir dari shopee', 'gratis ongkir', 'subsidi ongkir', 'shipping subsidy'],
-    // Courier cost (col S "Biaya Pengiriman ke Kurir" / "Ongkir yang diteruskan ke jasa kirim").
-    actualShipping:  ['biaya pengiriman ke kurir', 'pengiriman ke kurir', 'ongkir ke kurir', 'ongkir yang diteruskan', 'diteruskan oleh shopee', 'biaya ongkir yang ditanggung penjual', 'ongkos kirim aktual', 'actual shipping'],
-    // Buyer-paid shipping (col P "Ongkos Kirim Dibayar Pembeli").
-    buyerShipping:   ['ongkos kirim dibayar pembeli', 'ongkir dibayar pembeli', 'ongkos kirim yang dibayar pembeli', 'buyer shipping'],
+    // Courier cost (col S "Biaya Pengiriman ke Kurir" / "Ongkir yang Diterimakan ke Kurir").
+    actualShipping:  ['biaya pengiriman ke kurir', 'pengiriman ke kurir', 'ongkir ke kurir', 'ongkir yang diteruskan', 'ongkir yang diterimakan ke kurir', 'diterimakan ke kurir', 'diteruskan oleh shopee', 'biaya ongkir yang ditanggung penjual', 'ongkos kirim aktual', 'actual shipping'],
+    // Buyer-paid shipping (col P "Ongkos Kirim Dibayar/Berbayar Pembeli").
+    buyerShipping:   ['ongkos kirim dibayar pembeli', 'ongkos kirim berbayar pembeli', 'ongkir berbayar pembeli', 'ongkir dibayar pembeli', 'ongkos kirim yang dibayar pembeli', 'buyer shipping'],
     // Settlement — "Total Penghasilan" is the net payout to the seller
     settlement:      ['total penghasilan', 'total pemasukan', 'jumlah pemasukan', 'settlement amount', 'total diterima'],
 }
@@ -44,6 +48,9 @@ const COL_ORDER = {
     orderNo:        ['no. pesanan', 'order id', 'no pesanan'],
     productName:    ['nama produk', 'product name', 'nama barang'],
     quantity:       ['jumlah produk di pesan', 'jumlah produk dipesan', 'jumlah produk dibeli', 'jumlah produk', 'kuantitas produk', 'quantity', 'qty', 'jumlah'],
+    // Returned units (Bug 2) — goods physically returned by the buyer. Patterns are
+    // specific so they don't collide with "Jumlah" (qty) or the "Dikembalikan" timestamp.
+    returnedQty:    ['jumlah produk dikembalikan', 'jumlah dikembalikan', 'kuantitas dikembalikan', 'kuantitas pengembalian', 'jumlah retur', 'returned quantity', 'qty returned'],
     sellingPrice:   ['harga setelah diskon', 'discounted price', 'harga jual'],
     originalPrice:  ['harga awal', 'harga asli', 'original price'],
     orderStatus:    ['status pesanan', 'order status'],
@@ -122,6 +129,7 @@ function parseOrderReport(rawRows) {
         if (!name || name === 'null') continue
 
         const qty   = ci.quantity >= 0 ? (n(row[ci.quantity]) || 1) : 1
+        const qtyReturned = ci.returnedQty >= 0 ? n(row[ci.returnedQty]) : 0
         const price = ci.originalPrice >= 0 ? n(row[ci.originalPrice])
             : ci.sellingPrice  >= 0 ? n(row[ci.sellingPrice]) : 0
         const cancelled = status != null && isCancelled(status)
@@ -134,6 +142,7 @@ function parseOrderReport(rawRows) {
             order_no:     orderNo,
             product_name: name,
             qty,
+            qty_returned: qtyReturned,   // Bug 2: units physically returned by buyer
             price,
             gmv:          qty * price,
             status:       status ? String(status) : '',
@@ -164,7 +173,10 @@ function parseOrderReport(rawRows) {
 }
 
 // ─── Parse income report ─────────────────────────────────────────────────────
-function parseIncomeReport(rawRows) {
+// validOrderNos: when an Order report is uploaded, the set of its order numbers.
+// Income rows whose order_no is NOT in that set are ANOMALY (Improvement A) — they
+// are excluded from all P&L totals and collected separately for review.
+function parseIncomeReport(rawRows, validOrderNos = null) {
     const headerIdx = findHeaderRow(rawRows, ['no. pesanan', 'harga asli produk', 'waktu pesanan dibuat'])
     const headers   = rawRows[headerIdx] ?? []
     const ci = Object.fromEntries(
@@ -175,8 +187,9 @@ function parseIncomeReport(rawRows) {
     )
 
     let matchedOrders = 0, excludedOrders = 0
+    const anomalies = []
     const totals = {
-        grossGmv: 0, voucher: 0, voucherCofund: 0, totalDiscount: 0,
+        grossGmv: 0, voucher: 0, sellerDiscount: 0, voucherCofund: 0, totalDiscount: 0,
         coin: 0, coinCofund: 0, refundAmount: 0,
         commissionFee: 0, serviceFee: 0, processingFee: 0,
         transactionFee: 0, programFee: 0, campaignFee: 0, affiliateFee: 0,
@@ -204,6 +217,17 @@ function parseIncomeReport(rawRows) {
             continue
         }
 
+        // ANOMALY (Improvement A): in Income but no matching Order → exclude from P&L.
+        const incOrderNo = ci.orderNo >= 0 ? String(row[ci.orderNo] ?? '').trim() : ''
+        if (validOrderNos && incOrderNo && !validOrderNos.has(incOrderNo)) {
+            anomalies.push({
+                order_no:   incOrderNo,
+                status:     status ? String(status) : '',
+                settlement: ci.settlement >= 0 ? Math.round(ns(row[ci.settlement])) : 0,
+            })
+            continue
+        }
+
         // Use original price (harga asli) for gross GMV — seller receives full original
         // price and is reimbursed for platform vouchers; only seller-funded vouchers reduce income.
         const price = ci.originalPrice >= 0 ? n(row[ci.originalPrice])
@@ -215,7 +239,7 @@ function parseIncomeReport(rawRows) {
 
         // All accumulated as magnitudes. Net shipping = buyer (+) − courier (−) is computed
         // from these magnitudes below, matching the per-order calculation (Bug #2).
-        for (const key of ['voucher','voucherCofund','totalDiscount','coin','coinCofund',
+        for (const key of ['voucher','sellerDiscount','voucherCofund','totalDiscount','coin','coinCofund',
                            'refundAmount','commissionFee','serviceFee','processingFee',
                            'transactionFee','programFee','campaignFee','affiliateFee',
                            'shippingSubsidy','actualShipping','buyerShipping']) {
@@ -223,7 +247,7 @@ function parseIncomeReport(rawRows) {
         }
 
         // Seller Discount per order = sum of seller-funded discount columns only.
-        const rowDiscount = ['voucher','voucherCofund','coin','coinCofund']
+        const rowDiscount = ['voucher','sellerDiscount','voucherCofund','coin','coinCofund']
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
         const rowFeeTotal = ['commissionFee','serviceFee','processingFee','transactionFee','programFee','campaignFee','affiliateFee']
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
@@ -243,7 +267,7 @@ function parseIncomeReport(rawRows) {
         matchedOrders++
     }
 
-    return { totals, matchedOrders, excludedOrders, productMap, orderRows }
+    return { totals, matchedOrders, excludedOrders, productMap, orderRows, anomalies }
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
@@ -265,8 +289,21 @@ export function parseShopeeReports(incomeFile, orderFile) {
         readFile(incomeFile),
         orderFile ? readFile(orderFile) : Promise.resolve(null),
     ]).then(([incomeRows, orderFileRows]) => {
-        const { totals, matchedOrders, excludedOrders, orderRows } = parseIncomeReport(incomeRows)
+        // Parse the Order report first so the Income parser can flag anomalies
+        // (Income rows with no matching order) and exclude them from P&L totals.
         const order = orderFileRows ? parseOrderReport(orderFileRows) : { productMap: new Map(), platformVoucher: 0, orderRows: [] }
+        const validOrderNos = orderFileRows
+            ? new Set(order.orderRows.map(r => r.order_no?.trim()).filter(Boolean))
+            : null
+        let incomeResult = parseIncomeReport(incomeRows, validOrderNos)
+        // If NOTHING matched, the two files are different exports (order IDs differ),
+        // not anomalies — reparse with full totals and drop the anomaly flags so the
+        // existing "order numbers don't match" fallback still shows gross.
+        if (validOrderNos && incomeResult.matchedOrders === 0 && order.orderRows.length > 0) {
+            incomeResult = parseIncomeReport(incomeRows, null)
+            incomeResult.anomalies = []
+        }
+        const { totals, matchedOrders, excludedOrders, orderRows, anomalies } = incomeResult
 
         // Build income lookup by order_no for enriching order report rows
         const incomeByOrderNo = new Map()
@@ -277,10 +314,11 @@ export function parseShopeeReports(incomeFile, orderFile) {
         // Enrich order report rows with financial data from income report
         const enrichedOrderReportRows = order.orderRows.map(r => {
             const inc = incomeByOrderNo.get(r.order_no?.trim()) ?? null
-            return {
+            const base = {
                 order_no:        r.order_no,
                 product_name:    r.product_name,
                 qty:             r.qty,
+                qty_returned:    r.qty_returned ?? 0,   // Bug 2
                 price:           r.price,
                 gmv:             r.gmv,
                 status:          r.status,
@@ -292,13 +330,52 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 net_shipping:    inc !== null ? (inc.netShipping    ?? 0) : null,
                 settlement:      inc !== null ? (inc.settlement     ?? 0) : null,
             }
+            return { ...base, classification: classifyOrderRow(base) }  // Improvement A
         })
         const anyIncomeMatch = enrichedOrderReportRows.some(r => r.income_matched)
 
+        // ── Improvement A: classification summary ──────────────────────────────────
+        // `anomalies` already detected by parseIncomeReport (Income rows with no order).
+        // Distinct-order counts per classification (rows are per product line).
+        const distinctOrders = (cls) => new Set(
+            enrichedOrderReportRows.filter(r => r.classification === cls).map(r => r.order_no?.trim()).filter(Boolean)
+        ).size
+        const sumGmv = (cls) => enrichedOrderReportRows
+            .filter(r => r.classification === cls)
+            .reduce((s, r) => s + (r.gmv || 0), 0)
+
+        const classificationSummary = {
+            settled_count:       distinctOrders('SETTLED'),
+            pending_count:       distinctOrders('PENDING'),
+            cross_period_count:  distinctOrders('CROSS_PERIOD'),
+            anomaly_count:       anomalies.length,
+            pending_gmv:         Math.round(sumGmv('PENDING')),
+            cross_period_gmv:    Math.round(sumGmv('CROSS_PERIOD')),
+            anomaly_settlement:  Math.round(anomalies.reduce((s, a) => s + (a.settlement || 0), 0)),
+        }
+
+        // Improvement A: P&L is SETTLED-only. Rebuild the per-product map from order
+        // lines that matched an Income row, so PENDING/CROSS_PERIOD orders are excluded
+        // from revenue/COGS. For fully-matched data this is identical to order.productMap.
+        // When NO order line matched (order IDs differ between files) we fall back to the
+        // full order.productMap to preserve the existing "show gross, fees as –" behavior.
+        const settledMap = new Map()
+        for (const r of enrichedOrderReportRows) {
+            if (r.classification !== 'SETTLED') continue
+            if (!settledMap.has(r.product_name)) {
+                settledMap.set(r.product_name, { units_sold: 0, price_sum: 0, gross_gmv: 0, refund_gmv: 0 })
+            }
+            const p = settledMap.get(r.product_name)
+            p.gross_gmv += r.gmv || 0
+            if (r.refunded) p.refund_gmv += r.gmv || 0
+            else { p.units_sold += r.qty || 0; p.price_sum += r.price || 0 }
+        }
+        const effectiveProductMap = anyIncomeMatch ? settledMap : order.productMap
+
         // Build sales from order report (product names) + income report (values)
         let sales
-        if (order.productMap.size > 0) {
-            sales = Array.from(order.productMap.entries()).map(([name, p]) => ({
+        if (effectiveProductMap.size > 0) {
+            sales = Array.from(effectiveProductMap.entries()).map(([name, p]) => ({
                 sku:                  name,
                 units_sold:           Math.round(p.units_sold),          // Selesai only (Bug #1)
                 actual_selling_price: p.units_sold > 0 ? Math.round(p.price_sum / p.units_sold) : 0,
@@ -328,7 +405,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
         // Seller Discount = sum of seller-funded discount columns only (excludes Shopee-funded
         // discounts that may be embedded in "Total Diskon Produk").
         const effectiveVouch = totals.voucher
-        const effectiveTotal = totals.voucher + totals.voucherCofund + totals.coin + totals.coinCofund
+        const effectiveTotal = totals.voucher + totals.sellerDiscount + totals.voucherCofund + totals.coin + totals.coinCofund
 
         const feeTotal = totals.commissionFee + totals.serviceFee + totals.processingFee +
             totals.transactionFee + totals.programFee + totals.campaignFee + totals.affiliateFee
@@ -355,6 +432,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
             platform_discount: Math.round(order.platformVoucher),
             discounts: [
                 { tKey: 'shopeeImportDiscountVoucher',       value: Math.round(effectiveVouch) },
+                { tKey: 'shopeeImportDiscountSeller',        value: Math.round(totals.sellerDiscount) },
                 { tKey: 'shopeeImportDiscountVoucherCofund', value: Math.round(totals.voucherCofund) },
                 { tKey: 'shopeeImportDiscountCoin',          value: Math.round(totals.coin) },
                 { tKey: 'shopeeImportDiscountCoinCofund',    value: Math.round(totals.coinCofund) },
@@ -381,6 +459,8 @@ export function parseShopeeReports(incomeFile, orderFile) {
             order_rows:              orderRows,                // income report rows (matched only)
             order_report_rows:       enrichedOrderReportRows, // order report rows enriched with financial data
             order_numbers_matched:   anyIncomeMatch,           // false = order IDs don't match between files
+            classification:          classificationSummary,    // Improvement A: counts + info GMV
+            anomalies,                                          // Improvement A: income rows with no order match
         }
     })
 }

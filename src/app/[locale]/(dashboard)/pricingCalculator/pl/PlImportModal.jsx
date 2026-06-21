@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useMemo } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,12 +13,12 @@ import {
     Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { IconArrowRight, IconCheck, IconFile, IconUpload, IconX } from "@tabler/icons-react"
+import { IconArrowRight, IconCheck, IconChevronDown, IconFile, IconSearch, IconUpload, IconX } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import services from "@/services"
-import { fmt } from "./plLib"
+import { classifyOrderRow, fmt } from "./plLib"
 import { parseShopeeReports } from "./plShopeeParser"
-import { AuditTable, KpiCards, Section, SectionHeader } from "./PlComponents"
+import { AuditTable, ClassificationBadge, KpiCards, Section, SectionHeader } from "./PlComponents"
 
 const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -87,6 +87,73 @@ function allocateInt(total, weights) {
     const order = raw.map((v, i) => [i, v - Math.floor(v)]).sort((a, b) => b[1] - a[1])
     for (let k = 0; rem > 0 && k < order.length; k++) { out[order[k][0]]++; rem-- }
     return out
+}
+
+// ─── Searchable SKU picker (no extra deps — Command/cmdk isn't installed) ──────
+function SkuCombobox({ skuList, placeholder, searchPlaceholder, noResults, onSelect }) {
+    const [open, setOpen] = useState(false)
+    const [query, setQuery] = useState('')
+    const wrapRef = useRef(null)
+    const inputRef = useRef(null)
+
+    // Close on outside click / Escape
+    useEffect(() => {
+        if (!open) return
+        const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+        const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+        document.addEventListener('mousedown', onDown)
+        document.addEventListener('keydown', onKey)
+        return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+    }, [open])
+
+    // Reset + focus the search box when opening
+    useEffect(() => {
+        if (open) { setQuery(''); const id = setTimeout(() => inputRef.current?.focus(), 0); return () => clearTimeout(id) }
+    }, [open])
+
+    const filtered = useMemo(() => {
+        const q = query.toLowerCase().trim()
+        if (!q) return skuList
+        return skuList.filter(s =>
+            (s.product_name || '').toLowerCase().includes(q) ||
+            (s.sku_code || '').toLowerCase().includes(q)
+        )
+    }, [skuList, query])
+
+    const pick = (s) => { onSelect(s); setOpen(false) }
+
+    return (
+        <div ref={wrapRef} className="relative flex-1">
+            <button type="button" onClick={() => setOpen(o => !o)}
+                className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 text-xs text-muted-foreground shadow-xs outline-none transition-colors hover:bg-muted/30 focus:ring-1 focus:ring-ring">
+                <span className="truncate">{placeholder}</span>
+                <IconChevronDown size={14} className="opacity-50 flex-shrink-0" />
+            </button>
+            {open && (
+                <div className="absolute left-0 right-0 z-50 mt-1 rounded-md border bg-popover shadow-md">
+                    <div className="flex items-center gap-1.5 border-b px-2">
+                        <IconSearch size={13} className="text-muted-foreground flex-shrink-0" />
+                        <input ref={inputRef} value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && filtered.length > 0) { e.preventDefault(); pick(filtered[0]) } }}
+                            placeholder={searchPlaceholder}
+                            className="h-8 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground" />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto p-1">
+                        {filtered.length === 0 ? (
+                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">{noResults}</p>
+                        ) : filtered.map(s => (
+                            <button key={s.id} type="button" onClick={() => pick(s)}
+                                className="flex w-full flex-col items-start rounded px-2 py-1.5 text-left hover:bg-accent">
+                                <span className="text-xs font-medium break-words">{s.product_name || s.sku_code}</span>
+                                <span className="text-[11px] text-muted-foreground">{s.sku_code}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
 }
 
 // ─── Step 1 ───────────────────────────────────────────────────────────────────
@@ -167,17 +234,14 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
         return m.sku_code ?? null
     }
 
-    // Localized order status label (raw Shopee status → RETURNED / CANCELLED / MATCHED)
-    const isRefundStatus = (s) => {
-        const x = String(s ?? '').toLowerCase()
-        return x.includes('pengembalian') || x.includes('dikembalikan') ||
-            x.includes('kembali') || x.includes('refund') || x.includes('retur')
-    }
-    const orderStatusLabel = (r) => {
-        if (!r.excluded) return t('shopeeImportStatusMatched')
-        if (r.refunded || isRefundStatus(r.status)) return t('shopeeImportStatusReturned')
-        return t('shopeeImportStatusCancelled')
-    }
+    // Improvement A: localized label for an order's classification bucket.
+    const classLabel = (cls) => ({
+        SETTLED:      t('shopeeClassSettled'),
+        PENDING:      t('shopeeClassPending'),
+        CROSS_PERIOD: t('shopeeClassCrossPeriod'),
+        ANOMALY:      t('shopeeClassAnomaly'),
+        CANCELLED:    t('shopeeImportStatusCancelled'),
+    }[cls] ?? cls)
 
     const grossGmv = d.sales.reduce((s, p) => s + p.gross_gmv, 0)
     const feeTotal = d.channel_fees_total
@@ -199,14 +263,42 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
         const allocShip   = allocateInt(d.net_shipping ?? 0,         gmvWeights)
         const allocSettle = allocateInt(settle,                       gmvWeights)
 
+        // Per-product actual settlement (Bug 1) + units lost (Bug 2), from the order
+        // report — same logic as the saved P/L detail. Falls back to the GMV allocation
+        // / completed units when no order report was uploaded.
+        const reportRows = d.order_report_rows ?? []
+        const hasReport = reportRows.length > 0
+        const perProduct = {}
+        if (hasReport) {
+            const orderAgg = {}
+            for (const r of reportRows) {
+                if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
+                const key = (r.order_no ?? '').trim()
+                if (!key) continue
+                if (!orderAgg[key]) orderAgg[key] = { totalGmv: 0, settlement: 0 }
+                orderAgg[key].totalGmv += r.gmv || 0
+                orderAgg[key].settlement = r.settlement ?? 0   // same value on every line
+            }
+            for (const r of reportRows) {
+                if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
+                const name = r.product_name
+                if (!perProduct[name]) perProduct[name] = { settlement: 0, cogsUnits: 0 }
+                perProduct[name].cogsUnits += Math.max(0, (r.qty || 0) - (r.qty_returned || 0))   // Bug 2
+                const oa = orderAgg[(r.order_no ?? '').trim()]
+                if (oa && oa.totalGmv > 0) perProduct[name].settlement += oa.settlement * ((r.gmv || 0) / oa.totalGmv)   // Bug 1
+            }
+        }
+
         return d.sales.map((p, idx) => {
             const mapping = skuMapping?.[p.sku]
             const mappedSku = (mapping && mapping !== 'skip')
                 ? skuList.find(s => s.id === mapping.id)
                 : null
             const cogsPerUnit = parseFloat(mappedSku?.cogs_per_unit) || 0
-            const totalCogs = cogsPerUnit * (p.units_sold || 0)
-            const alloc_settlement = allocSettle[idx]
+            // Bug 2: COGS on units lost (qty − returned); Bug 1: actual per-order settlement.
+            const cogsUnits = hasReport ? (perProduct[p.sku]?.cogsUnits ?? 0) : (p.units_sold || 0)
+            const totalCogs = cogsPerUnit * cogsUnits
+            const alloc_settlement = hasReport ? Math.round(perProduct[p.sku]?.settlement ?? 0) : allocSettle[idx]
             const contribution = cogsPerUnit > 0 ? (alloc_settlement - totalCogs) : null
             return {
                 ...p,
@@ -347,11 +439,20 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
 
                 {/* ── Per Pesanan ── */}
                 <TabsContent value="per-pesanan" className="mt-0 space-y-2">
+                    {/* Improvement A: anomaly banner (Income rows with no matching order) */}
+                    {d.anomalies?.length > 0 && (
+                        <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5">
+                            <span className="text-red-600 text-base flex-shrink-0">⚠</span>
+                            <p className="text-xs text-red-800">
+                                {t('shopeeClassAnomalyBanner', { count: d.anomalies.length })}
+                            </p>
+                        </div>
+                    )}
                     {useOrderReport && d.order_numbers_matched === false && (
                         <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
                             <span className="text-amber-600 text-base flex-shrink-0">⚠</span>
                             <p className="text-xs text-amber-800">
-                                <strong>Order numbers don't match between files.</strong> Seller Discount, Channel Fees, and Settlement show <strong>-</strong> because the Income Report and Order Report use different order IDs. Make sure both files are exported from the same Shopee period.
+                                {t('shopeeImportOrderMismatch')}
                             </p>
                         </div>
                     )}
@@ -391,9 +492,13 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                                 <TableCell className="font-mono text-[11px]">{orderNo}</TableCell>
                                                 <TableCell className="max-w-[160px] truncate">{product}</TableCell>
                                                 <TableCell>
-                                                    <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium ${excl ? 'bg-muted text-muted-foreground' : 'bg-green-50 text-green-700'}`}>
-                                                        {orderStatusLabel(r)}
-                                                    </span>
+                                                    {(() => {
+                                                        // Order-report rows carry `classification`; income-only rows
+                                                        // (no order report) are settled unless cancelled.
+                                                        const cls = r.classification
+                                                            ?? classifyOrderRow({ ...r, income_matched: !r.excluded })
+                                                        return <ClassificationBadge cls={cls} label={classLabel(cls)} />
+                                                    })()}
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums">{qty}</TableCell>
                                                 <TableCell className="text-right tabular-nums">{fmt(price)}</TableCell>
@@ -419,6 +524,24 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                     </TableRow>
                                 </TableFooter>
                             </Table>
+                        </div>
+                    )}
+                    {/* Improvement A: informational counts (not in P&L) */}
+                    {(d.classification?.pending_count > 0 || d.classification?.cross_period_count > 0) && (
+                        <div className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 space-y-1">
+                            <p className="text-[11px] font-medium text-muted-foreground">{t('shopeeClassInfoNote')}</p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                                {d.classification?.pending_count > 0 && (
+                                    <span className="text-blue-700">
+                                        {t('shopeeClassPendingSummary', { count: d.classification.pending_count, gmv: fmt(d.classification.pending_gmv) })}
+                                    </span>
+                                )}
+                                {d.classification?.cross_period_count > 0 && (
+                                    <span className="text-purple-700">
+                                        {t('shopeeClassCrossSummary', { count: d.classification.cross_period_count, gmv: fmt(d.classification.cross_period_gmv) })}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     )}
                     <p className="text-[11px] text-muted-foreground mt-2">
@@ -639,6 +762,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
             const weights = groups.map(g => g.grossGmv)
             const alloc = {
                 voucher:         allocateInt(getDisc('shopeeImportDiscountVoucher'),       weights),
+                sellerDiscount:  allocateInt(getDisc('shopeeImportDiscountSeller'),        weights),
                 voucherCofund:   allocateInt(getDisc('shopeeImportDiscountVoucherCofund'), weights),
                 coin:            allocateInt(getDisc('shopeeImportDiscountCoin'),          weights),
                 coinCofund:      allocateInt(getDisc('shopeeImportDiscountCoinCofund'),    weights),
@@ -679,9 +803,11 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                     matched_orders: matchedOrdersCount,
                     excluded_orders: parsedData.excluded_orders ?? 0,
                     order_report_rows: parsedData.order_report_rows ?? [],
+                    anomalies: parsedData.anomalies ?? [],
                     sales: salesEntries,
                     discounts: [{
                         voucher_amount:          alloc.voucher[idx],
+                        seller_discount_amount:  alloc.sellerDiscount[idx],
                         voucher_cofund_amount:   alloc.voucherCofund[idx],
                         coin_amount:             alloc.coin[idx],
                         coin_cofund_amount:      alloc.coinCofund[idx],
@@ -813,23 +939,13 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                                                 <Skeleton className="h-8 w-full" />
                                             ) : (
                                                 <div className="flex gap-1.5">
-                                                    <Select value=""
-                                                        onValueChange={v => {
-                                                            const selected = skuList.find(s => s.id === v)
-                                                            setSkuMapping(prev => ({ ...prev, [productName]: selected ? { id: selected.id, sku_code: selected.sku_code } : null }))
-                                                        }}>
-                                                        <SelectTrigger className="h-8 text-xs flex-1">
-                                                            <SelectValue placeholder={t('skuMappingSelectSku')} />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {skuList.map(s => (
-                                                                <SelectItem key={s.id} value={s.id} className="text-xs">
-                                                                    {s.product_name || s.sku_code}
-                                                                    <span className="text-muted-foreground ml-1">· {s.sku_code}</span>
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
+                                                    <SkuCombobox
+                                                        skuList={skuList}
+                                                        placeholder={t('skuMappingSelectSku')}
+                                                        searchPlaceholder={t('skuMappingSearchPlaceholder')}
+                                                        noResults={t('skuMappingNoResults')}
+                                                        onSelect={(selected) => setSkuMapping(prev => ({ ...prev, [productName]: selected ? { id: selected.id, sku_code: selected.sku_code } : null }))}
+                                                    />
                                                     {/* Skip removed - all products must be mapped */}
                                                 </div>
                                             )}

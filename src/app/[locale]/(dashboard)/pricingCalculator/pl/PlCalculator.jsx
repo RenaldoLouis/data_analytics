@@ -11,8 +11,8 @@ import services from "@/services"
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import { useEffect, useState, useMemo } from "react"
-import { fmt } from "./plLib"
-import { AuditTable, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
+import { classifyOrderRow, fmt } from "./plLib"
+import { AuditTable, ClassificationBadge, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -55,6 +55,7 @@ function buildFormFromRecord(rec) {
         actual_selling_price: salesArr.length > 1 ? String(aggAvgPrice) : toInt(s0.actual_selling_price),
         settlement_amount: salesArr.length > 1 ? String(aggSettlement) : toInt(s0.settlement_amount),
         voucher_amount: toInt(d.voucher_amount),
+        seller_discount_amount: toInt(d.seller_discount_amount),
         voucher_cofund_amount: toInt(d.voucher_cofund_amount),
         coin_amount: toInt(d.coin_amount),
         coin_cofund_amount: toInt(d.coin_cofund_amount),
@@ -106,6 +107,7 @@ function SummaryTab({ agg }) {
                 <AuditTable noBorder
                     rows={[
                         { label: t('shopeeImportDiscountVoucher'), value: agg.voucher, cls: cl(agg.voucher, false) },
+                        { label: t('shopeeImportDiscountSeller'), value: agg.sellerDiscount, cls: cl(agg.sellerDiscount, false) },
                         { label: t('shopeeImportDiscountVoucherCofund'), value: agg.voucherCof, cls: cl(agg.voucherCof, false) },
                         { label: t('shopeeImportDiscountCoin'), value: agg.coin, cls: cl(agg.coin, false) },
                         { label: t('shopeeImportDiscountCoinCofund'), value: agg.coinCof, cls: cl(agg.coinCof, false) },
@@ -160,15 +162,14 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     const [forms, setForms] = useState({})
     const [orderPage, setOrderPage] = useState(0)
 
-    // Localized order status label (raw Shopee status → Returned / Cancelled)
-    const orderStatusLabel = (entry) => {
-        const s = String(entry?.status ?? '').toLowerCase()
-        const isRefund = entry?.refunded || s.includes('pengembalian') || s.includes('dikembalikan') ||
-            s.includes('kembali') || s.includes('refund') || s.includes('retur')
-        if (isRefund)                                        return t('shopeeImportStatusReturned')
-        if (s.includes('batal') || s.includes('cancel'))     return t('shopeeImportStatusCancelled')
-        return entry?.status ?? ''
-    }
+    // Improvement A: localized label for an order's classification bucket.
+    const classLabel = (cls) => ({
+        SETTLED:      t('shopeeClassSettled'),
+        PENDING:      t('shopeeClassPending'),
+        CROSS_PERIOD: t('shopeeClassCrossPeriod'),
+        ANOMALY:      t('shopeeClassAnomaly'),
+        CANCELLED:    t('shopeeImportStatusCancelled'),
+    }[cls] ?? cls)
 
     // ── Load ──────────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -200,15 +201,17 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const firstOrderRows = records[0]?.order_report_rows ?? []
         const grossGmv = firstOrderRows.length > 0
             ? firstOrderRows
-                .filter(r => !r.excluded || r.refunded)
+                // SETTLED only (Improvement A) — excludes PENDING/CROSS_PERIOD from P&L.
+                .filter(r => (r.classification ?? classifyOrderRow(r)) === 'SETTLED')
                 .reduce((s, r) => s + (r.gmv || 0), 0)
             : sum((f) => n(f.units_sold) * n(f.actual_selling_price))
         const settlement = sum((f) => n(f.settlement_amount))
         const voucher = sum((f) => n(f.voucher_amount))
+        const sellerDiscount = sum((f) => n(f.seller_discount_amount))
         const voucherCof = sum((f) => n(f.voucher_cofund_amount))
         const coin = sum((f) => n(f.coin_amount))
         const coinCof = sum((f) => n(f.coin_cofund_amount))
-        const totalDisc = voucher + voucherCof + coin + coinCof
+        const totalDisc = voucher + sellerDiscount + voucherCof + coin + coinCof
         const refund = sum((f) => n(f.actual_refund_amount))
         const platformVoucher = sum((f) => n(f.platform_voucher_amount))
         const subsidy = sum((f) => n(f.shipping_subsidy))
@@ -223,9 +226,27 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const campFee = sum((f) => n(f.campaign_fee_amount))
         const affFee = sum((f) => n(f.affiliate_commission_amount))
         const totalFees = commFee + svcFee + procFee + txFee + campFee + affFee
-        const totalCogs = sum((f, rec) => (parseFloat(rec.cogs_per_unit) || 0) * n(f.units_sold))
+        // Bug 2: COGS = cogs_per_unit × units_lost, where units_lost = qty − returned_qty
+        // across all SETTLED order lines (refund goods not returned still cost COGS).
+        // Falls back to stored units_sold when no order report is available.
+        const totalCogs = records.reduce((s, rec) => {
+            const cogsUnit = parseFloat(rec.cogs_per_unit) || 0
+            const rows = rec.order_report_rows ?? []
+            const names = Array.isArray(rec.product_names) ? rec.product_names : []
+            if (rows.length > 0 && names.length > 0) {
+                let lost = 0
+                for (const r of rows) {
+                    if (!names.includes(r.product_name)) continue
+                    if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
+                    lost += Math.max(0, (r.qty || 0) - (r.qty_returned || 0))
+                }
+                return s + cogsUnit * lost
+            }
+            const f = forms[rec.id] ?? buildFormFromRecord(rec)
+            return s + cogsUnit * n(f.units_sold)
+        }, 0)
         return {
-            grossGmv, settlement, voucher, voucherCof, coin, coinCof, totalDisc,
+            grossGmv, settlement, voucher, sellerDiscount, voucherCof, coin, coinCof, totalDisc,
             refund, platformVoucher, subsidy, buyerShipping, shipCost, netShipping,
             commFee, svcFee, procFee, txFee, campFee, affFee, totalFees,
             totalCogs,
@@ -288,36 +309,53 @@ export default function PlCalculator({ editId, allIds, onBack }) {
 
             // When order report rows are available, break down per Shopee product
             if (reportRows.length > 0 && productNames.length > 0) {
-                const recSettlement = n(f.settlement_amount)
                 const recFees = n(f.commission_fee_amount) + n(f.service_fee_amount) +
                     n(f.processing_fee) + n(f.transaction_fee_amount) +
                     n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
-                const recDisc = n(f.voucher_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
+                const recDisc = n(f.voucher_amount) + n(f.seller_discount_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
                 const recNetShipping = n(f.buyer_shipping_paid) - n(f.actual_shipping_cost)
 
-                // Aggregate per product from order report rows for this SKU's products.
-                // Gross GMV = all non-cancelled (Selesai + refund); QTY/COGS = Selesai only;
-                // refund tracked separately for the Pengembalian Dana column (Improv. B / Bug #1).
+                // Bug 1: actual per-order settlement. The Income join puts the same order
+                // settlement (signed — negative for refunds) on every line of that order;
+                // build order → { revenue, settlement } from ALL settled lines so we can
+                // split it across SKUs by revenue share instead of a flat GMV rate.
+                const orderAgg = {}
+                for (const r of reportRows) {
+                    if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
+                    const key = (r.order_no ?? '').trim()
+                    if (!key) continue
+                    if (!orderAgg[key]) orderAgg[key] = { totalGmv: 0, settlement: 0 }
+                    orderAgg[key].totalGmv += r.gmv || 0
+                    orderAgg[key].settlement = r.settlement ?? 0   // same value on every line
+                }
+
+                // Aggregate per product for this SKU's products.
+                //  - settlement: actual per-order value allocated by revenue (Bug 1, signed)
+                //  - cogsUnits: qty − returned_qty across ALL settled lines (Bug 2 — refund
+                //    goods not returned by the buyer still cost COGS)
                 const productMap = {}
                 for (const r of reportRows.filter(r => productNames.includes(r.product_name))) {
-                    const cancelled = r.excluded && !r.refunded
-                    if (cancelled) continue
-                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0 }
+                    // SETTLED only (Improvement A) — skip cancelled, pending & cross-period.
+                    if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
+                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0, settlement: 0, cogsUnits: 0 }
                     const pm = productMap[r.product_name]
-                    pm.gmv += r.gmv || 0                        // all non-cancelled
+                    pm.gmv += r.gmv || 0
+                    pm.cogsUnits += Math.max(0, (r.qty || 0) - (r.qty_returned || 0))   // Bug 2
+                    const oa = orderAgg[(r.order_no ?? '').trim()]
+                    if (oa && oa.totalGmv > 0) pm.settlement += oa.settlement * ((r.gmv || 0) / oa.totalGmv)   // Bug 1
                     if (r.refunded) pm.refund += r.gmv || 0     // refunded value
-                    else            pm.units  += r.qty || 0     // completed → QTY/COGS
+                    else            pm.units  += r.qty || 0     // completed → QTY display
                 }
 
                 const totalProductGmv = Object.values(productMap).reduce((s, p) => s + p.gmv, 0)
 
                 return Object.entries(productMap).map(([productName, p]) => {
                     const share = totalProductGmv > 0 ? p.gmv / totalProductGmv : 0
-                    const settlement = Math.round(recSettlement * share)
+                    const settlement = Math.round(p.settlement)        // Bug 1: actual per-order
                     const channelFees = Math.round(recFees * share)
                     const discPenjual = Math.round(recDisc * share)
                     const netOngkir = Math.round(recNetShipping * share)
-                    const cogs = cogsUnit * p.units
+                    const cogs = cogsUnit * p.cogsUnits                // Bug 2: units lost
                     const contribution = settlement - cogs
                     return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, netOngkir, settlement, cogs, contribution,
                         cmPercent: p.gmv > 0 ? (contribution / p.gmv) * 100 : null }
@@ -327,7 +365,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             // Fallback: single aggregate row per SKU record
             const units = n(f.units_sold)
             const grossGmv = units * n(f.actual_selling_price)
-            const discPenjual = n(f.voucher_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
+            const discPenjual = n(f.voucher_amount) + n(f.seller_discount_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
             const channelFees = n(f.commission_fee_amount) + n(f.service_fee_amount) + n(f.processing_fee) + n(f.transaction_fee_amount) + n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
             const netOngkir = n(f.buyer_shipping_paid) - n(f.actual_shipping_cost)
             const settlement = n(f.settlement_amount)
@@ -352,6 +390,23 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     )
 
     const periodMonth = active.period_month ? parseInt(active.period_month) - 1 : null
+
+    // Improvement A: informational classification counts (orders not in P&L).
+    // All period records store the same order_report_rows, so read the first only.
+    const classInfo = (() => {
+        const rows = records[0]?.order_report_rows ?? []
+        const pend = new Set(), cross = new Set()
+        let pendingGmv = 0, crossGmv = 0
+        for (const r of rows) {
+            const cls = r.classification ?? classifyOrderRow(r)
+            if (cls === 'PENDING') { pendingGmv += r.gmv || 0; if (r.order_no) pend.add(r.order_no.trim()) }
+            else if (cls === 'CROSS_PERIOD') { crossGmv += r.gmv || 0; if (r.order_no) cross.add(r.order_no.trim()) }
+        }
+        return { pendingCount: pend.size, crossCount: cross.size, pendingGmv, crossGmv }
+    })()
+
+    // Improvement A: anomalies persisted at import (Income rows with no matching order).
+    const anomalies = records[0]?.anomalies ?? []
 
     // Orders tab footer totals (matched rows)
     const matchedRows = allOrderRows.filter(r => r.entry !== null && !r.entry?.excluded && !r.entry?.Excluded)
@@ -446,6 +501,15 @@ export default function PlCalculator({ editId, allIds, onBack }) {
 
                     {/* ── Orders ── */}
                     <TabsContent value="orders" className="mt-0 space-y-3">
+                        {/* Improvement A: anomaly banner (persisted at import) */}
+                        {anomalies.length > 0 && (
+                            <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5">
+                                <span className="text-red-600 text-base flex-shrink-0">⚠</span>
+                                <p className="text-xs text-red-800">
+                                    {t('shopeeClassAnomalyBanner', { count: anomalies.length })}
+                                </p>
+                            </div>
+                        )}
                         <div>
                             <div className="overflow-x-auto">
                                 <Table className="min-w-[760px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
@@ -473,11 +537,11 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                     </TableRow>
                                                 )
                                             }
-                                            const statusBadge = (
-                                                <span className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium ${entry.excluded ? 'bg-muted text-muted-foreground' : 'bg-green-50 text-green-700'}`}>
-                                                    {entry.excluded ? orderStatusLabel(entry) : t('shopeeImportStatusMatched')}
-                                                </span>
-                                            )
+                                            // Improvement A: classify per stored row (income_matched/status).
+                                            // Falls back to the income-report row case (SETTLED) when not present.
+                                            const cls = entry.classification
+                                                ?? (fromOrderReport ? classifyOrderRow(entry) : 'SETTLED')
+                                            const statusBadge = <ClassificationBadge cls={cls} label={classLabel(cls)} />
                                             if (fromOrderReport) {
                                                 const excluded = entry.excluded
                                                 return (
@@ -523,6 +587,24 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                 </Table>
                             </div>
                         </div>
+                        {/* Improvement A: informational counts (not in P&L) */}
+                        {(classInfo.pendingCount > 0 || classInfo.crossCount > 0) && (
+                            <div className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 space-y-1">
+                                <p className="text-[11px] font-medium text-muted-foreground">{t('shopeeClassInfoNote')}</p>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                                    {classInfo.pendingCount > 0 && (
+                                        <span className="text-blue-700">
+                                            {t('shopeeClassPendingSummary', { count: classInfo.pendingCount, gmv: fmt(classInfo.pendingGmv) })}
+                                        </span>
+                                    )}
+                                    {classInfo.crossCount > 0 && (
+                                        <span className="text-purple-700">
+                                            {t('shopeeClassCrossSummary', { count: classInfo.crossCount, gmv: fmt(classInfo.crossGmv) })}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         {/* Pagination */}
                         <div className="flex items-center justify-between">
                             <p className="text-[11px] text-muted-foreground">
