@@ -38,13 +38,13 @@ export function AppSidebar({ ...props }) {
   const pathname = usePathname()
 
   const getNavFromPath = (p) => {
-    if (p.includes("/pricingCalculator/sku-modal"))  return "pricing-sku-modal"
-    if (p.includes("/pricingCalculator/sku"))        return "pricing-sku"
+    if (p.includes("/pricingCalculator/sku-modal")) return "pricing-sku-modal"
+    if (p.includes("/pricingCalculator/sku")) return "pricing-sku"
     if (p.includes("/pricingCalculator/simulation")) return "pricing-simulation"
-    if (p.includes("/pricingCalculator/pl"))         return "pricing-pl"
-    if (p.includes("/pricingCalculator/brand"))      return "pricing-brand"
-    if (p.includes("/pricingCalculator"))            return "pricing-calculator"
-    if (p.includes("/dashboard"))                    return "1"
+    if (p.includes("/pricingCalculator/pl")) return "pricing-pl"
+    if (p.includes("/pricingCalculator/brand")) return "pricing-brand"
+    if (p.includes("/pricingCalculator")) return "pricing-calculator"
+    if (p.includes("/dashboard")) return "1"
     return "1"
   }
 
@@ -131,7 +131,7 @@ export function AppSidebar({ ...props }) {
           <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300">
             BETA
           </span>
-          <span className="text-[11px] text-muted-foreground">v0.1.0</span>
+          <span className="text-[11px] text-muted-foreground">v0.2.0</span>
         </div>
       </SidebarFooter>
     </Sidebar>
