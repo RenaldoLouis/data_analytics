@@ -10,9 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import services from "@/services"
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
-import { useEffect, useState, useMemo } from "react"
+import { Fragment, useEffect, useState, useMemo } from "react"
 import { classifyOrderRow, fmt } from "./plLib"
-import { AuditTable, ClassificationBadge, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
+import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,24 @@ const toInt = (v) => v != null && v !== '' ? String(Math.round(parseFloat(v) || 
 
 // Canonical SKU name (from skus table, not Shopee import name)
 const canonicalName = (r) => r?.sku_name ?? r?.product_names?.[0] ?? r?.sku_code ?? 'SKU'
+
+// Per-order fee components shown in the expandable breakdown.
+const FEE_COMPONENT_KEYS = ['commission_fee', 'service_fee', 'processing_fee', 'transaction_fee', 'campaign_fee', 'affiliate_commission']
+
+// Reconstruct a per-order fee breakdown for legacy imports that only stored `fee_total`
+// (before the parser captured the component split). Splits fee_total across the SKU
+// record's fee-component proportions; the largest component absorbs the rounding
+// remainder so the parts sum EXACTLY to fee_total (keeps the "matches row" guarantee).
+const reconstructFeeBreakdown = (feeTotal, comps) => {
+    const sum = FEE_COMPONENT_KEYS.reduce((s, k) => s + (comps[k] || 0), 0)
+    if (!(feeTotal > 0) || sum <= 0) return null
+    const raw = FEE_COMPONENT_KEYS.map(k => feeTotal * (comps[k] || 0) / sum)
+    const rounded = raw.map(v => Math.round(v))
+    let maxIdx = 0
+    raw.forEach((v, idx) => { if (v > raw[maxIdx]) maxIdx = idx })
+    rounded[maxIdx] += feeTotal - rounded.reduce((a, b) => a + b, 0)
+    return Object.fromEntries(FEE_COMPONENT_KEYS.map((k, idx) => [k, rounded[idx]]))
+}
 
 // ─── Build per-record form ────────────────────────────────────────────────────
 
@@ -161,6 +179,16 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     const [isLoading, setIsLoading] = useState(true)
     const [forms, setForms] = useState({})
     const [orderPage, setOrderPage] = useState(0)
+    // Expand/collapse state for the per-order & per-SKU channel-fee detail rows.
+    const [expandedOrders, setExpandedOrders] = useState(() => new Set())
+    const [expandedSkus, setExpandedSkus] = useState(() => new Set())
+    const toggleKey = (setter) => (key) => setter(prev => {
+        const next = new Set(prev)
+        if (next.has(key)) next.delete(key); else next.add(key)
+        return next
+    })
+    const toggleOrder = toggleKey(setExpandedOrders)
+    const toggleSku = toggleKey(setExpandedSkus)
 
     // Improvement A: localized label for an order's classification bucket.
     const classLabel = (cls) => ({
@@ -352,12 +380,22 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 return Object.entries(productMap).map(([productName, p]) => {
                     const share = totalProductGmv > 0 ? p.gmv / totalProductGmv : 0
                     const settlement = Math.round(p.settlement)        // Bug 1: actual per-order
-                    const channelFees = Math.round(recFees * share)
+                    // Per-component fee allocation by revenue share; channelFees is the sum so
+                    // the row total always matches the expandable breakdown subtotal.
+                    const feeBreakdown = {
+                        commission_fee:       Math.round(n(f.commission_fee_amount) * share),
+                        service_fee:          Math.round(n(f.service_fee_amount) * share),
+                        processing_fee:       Math.round(n(f.processing_fee) * share),
+                        transaction_fee:      Math.round(n(f.transaction_fee_amount) * share),
+                        campaign_fee:         Math.round(n(f.campaign_fee_amount) * share),
+                        affiliate_commission: Math.round(n(f.affiliate_commission_amount) * share),
+                    }
+                    const channelFees = Object.values(feeBreakdown).reduce((s, v) => s + v, 0)
                     const discPenjual = Math.round(recDisc * share)
                     const netOngkir = Math.round(recNetShipping * share)
                     const cogs = cogsUnit * p.cogsUnits                // Bug 2: units lost
                     const contribution = settlement - cogs
-                    return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, netOngkir, settlement, cogs, contribution,
+                    return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution,
                         cmPercent: p.gmv > 0 ? (contribution / p.gmv) * 100 : null }
                 })
             }
@@ -366,12 +404,20 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             const units = n(f.units_sold)
             const grossGmv = units * n(f.actual_selling_price)
             const discPenjual = n(f.voucher_amount) + n(f.seller_discount_amount) + n(f.voucher_cofund_amount) + n(f.coin_amount) + n(f.coin_cofund_amount)
-            const channelFees = n(f.commission_fee_amount) + n(f.service_fee_amount) + n(f.processing_fee) + n(f.transaction_fee_amount) + n(f.campaign_fee_amount) + n(f.affiliate_commission_amount)
+            const feeBreakdown = {
+                commission_fee:       n(f.commission_fee_amount),
+                service_fee:          n(f.service_fee_amount),
+                processing_fee:       n(f.processing_fee),
+                transaction_fee:      n(f.transaction_fee_amount),
+                campaign_fee:         n(f.campaign_fee_amount),
+                affiliate_commission: n(f.affiliate_commission_amount),
+            }
+            const channelFees = Object.values(feeBreakdown).reduce((s, v) => s + v, 0)
             const netOngkir = n(f.buyer_shipping_paid) - n(f.actual_shipping_cost)
             const settlement = n(f.settlement_amount)
             const cogs = cogsUnit * units
             const contribution = settlement - cogs
-            return [{ rec, productName: canonicalName(rec), units, grossGmv, refundGmv: 0, discPenjual, channelFees, netOngkir, settlement, cogs, contribution,
+            return [{ rec, productName: canonicalName(rec), units, grossGmv, refundGmv: 0, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution,
                 cmPercent: grossGmv > 0 ? (contribution / grossGmv) * 100 : null }]
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -524,16 +570,40 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportSectionFees')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColNetShipping')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColSettlement')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {pagedOrders.map(({ rec, entry, fromOrderReport }, i) => {
+                                            const rowKey = entry
+                                                ? `${rec.id}::${entry.order_no ?? entry.orderNo ?? ''}::${entry.product_name ?? ''}::${i}`
+                                                : `${rec.id}::empty::${i}`
+                                            // Stored breakdown (new imports) or reconstructed from fee_total
+                                            // via the record's component proportions (legacy imports).
+                                            let feeBreakdown = entry?.fee_breakdown ?? null
+                                            if (!feeBreakdown && entry) {
+                                                // Use the SKU record whose products include this order's product
+                                                // (order rows are deduped across records, so `rec` may differ).
+                                                const propRec = records.find(rr =>
+                                                    Array.isArray(rr.product_names) && rr.product_names.includes(entry.product_name)
+                                                ) ?? rec
+                                                const ff = forms[propRec.id] ?? buildFormFromRecord(propRec)
+                                                feeBreakdown = reconstructFeeBreakdown(n(entry.fee_total ?? entry.feeTotal ?? 0), {
+                                                    commission_fee:       n(ff.commission_fee_amount),
+                                                    service_fee:          n(ff.service_fee_amount),
+                                                    processing_fee:       n(ff.processing_fee),
+                                                    transaction_fee:      n(ff.transaction_fee_amount),
+                                                    campaign_fee:         n(ff.campaign_fee_amount),
+                                                    affiliate_commission: n(ff.affiliate_commission_amount),
+                                                })
+                                            }
+                                            const isOpen = expandedOrders.has(rowKey)
                                             if (!entry) {
                                                 return (
-                                                    <TableRow key={i} className="opacity-50">
+                                                    <TableRow key={rowKey} className="opacity-50">
                                                         <TableCell className="py-1.5 px-3 text-sm font-mono text-muted-foreground">-</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-muted-foreground">{canonicalName(rec)}</TableCell>
-                                                        <TableCell colSpan={7} className="py-1.5 px-3 text-sm text-muted-foreground text-center">{t('plDetailNoOrderData')}</TableCell>
+                                                        <TableCell colSpan={8} className="py-1.5 px-3 text-sm text-muted-foreground text-center">{t('plDetailNoOrderData')}</TableCell>
                                                     </TableRow>
                                                 )
                                             }
@@ -542,34 +612,62 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             const cls = entry.classification
                                                 ?? (fromOrderReport ? classifyOrderRow(entry) : 'SETTLED')
                                             const statusBadge = <ClassificationBadge cls={cls} label={classLabel(cls)} />
+                                            const detailRow = feeBreakdown && isOpen && (
+                                                <TableRow className="bg-muted/20 hover:bg-muted/20">
+                                                    <TableCell colSpan={10} className="py-2 px-3">
+                                                        <FeeBreakdownDetail t={t} fees={feeBreakdown} gmv={entry?.gmv} />
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                            const toggleCell = (
+                                                <TableCell className="py-1.5 px-3 text-right">
+                                                    {feeBreakdown && (
+                                                        <ExpandToggle open={isOpen} onClick={() => toggleOrder(rowKey)} label={t('shopeeImportExpandFees')} />
+                                                    )}
+                                                </TableCell>
+                                            )
                                             if (fromOrderReport) {
                                                 const excluded = entry.excluded
                                                 return (
-                                                    <TableRow key={i} className={excluded ? 'opacity-40' : ''}>
-                                                        <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm">{entry.product_name}</TableCell>
-                                                        <TableCell className="py-1.5 px-3">{statusBadge}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{entry.qty}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(entry.price)}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.seller_discount))}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.fee_total))}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.net_shipping))}</TableCell>
-                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.settlement))}</TableCell>
-                                                    </TableRow>
+                                                    <Fragment key={rowKey}>
+                                                        <TableRow
+                                                            className={`${excluded ? 'opacity-40 ' : ''}${feeBreakdown ? 'cursor-pointer hover:bg-muted/30' : ''}`}
+                                                            onClick={feeBreakdown ? () => toggleOrder(rowKey) : undefined}
+                                                        >
+                                                            <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
+                                                            <TableCell className="py-1.5 px-3 text-sm">{entry.product_name}</TableCell>
+                                                            <TableCell className="py-1.5 px-3">{statusBadge}</TableCell>
+                                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{entry.qty}</TableCell>
+                                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(entry.price)}</TableCell>
+                                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.seller_discount))}</TableCell>
+                                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.fee_total))}</TableCell>
+                                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.net_shipping))}</TableCell>
+                                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.settlement))}</TableCell>
+                                                            {toggleCell}
+                                                        </TableRow>
+                                                        {detailRow}
+                                                    </Fragment>
                                                 )
                                             }
                                             return (
-                                                <TableRow key={i}>
-                                                    <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
-                                                    <TableCell className="py-1.5 px-3 text-sm">{canonicalName(rec)}</TableCell>
-                                                    <TableCell className="py-1.5 px-3">{statusBadge}</TableCell>
-                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{n(entry.units_sold)}</TableCell>
-                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.actual_selling_price))}</TableCell>
-                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.seller_discount))}</TableCell>
-                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.fee_total))}</TableCell>
-                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.net_shipping))}</TableCell>
-                                                    <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.settlement_amount))}</TableCell>
-                                                </TableRow>
+                                                <Fragment key={rowKey}>
+                                                    <TableRow
+                                                        className={feeBreakdown ? 'cursor-pointer hover:bg-muted/30' : ''}
+                                                        onClick={feeBreakdown ? () => toggleOrder(rowKey) : undefined}
+                                                    >
+                                                        <TableCell className="py-1.5 px-3 text-sm font-mono">{entry.order_no || '-'}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm">{canonicalName(rec)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3">{statusBadge}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{n(entry.units_sold)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.actual_selling_price))}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.seller_discount))}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.fee_total))}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.net_shipping))}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(n(entry.settlement_amount))}</TableCell>
+                                                        {toggleCell}
+                                                    </TableRow>
+                                                    {detailRow}
+                                                </Fragment>
                                             )
                                         })}
                                     </TableBody>
@@ -582,6 +680,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalFees >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalFees)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalShipping >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalShipping)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${totalSettle >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(totalSettle)}</TableCell>
+                                            <TableCell className="py-1.5 px-3" />
                                         </TableRow>
                                     </TableFooter>
                                 </Table>
@@ -640,31 +739,48 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCogs')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColContribution')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCmPercent')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {skuRows.map(({ rec, productName, units, grossGmv, refundGmv, discPenjual, channelFees, netOngkir, settlement, cogs, contribution, cmPercent }, idx) => (
-                                            <TableRow key={`${rec.id}-${idx}`}>
-                                                <TableCell className="py-1.5 px-3">
-                                                    <p className="font-medium text-sm">{productName}</p>
-                                                    <p className="text-[11px] text-muted-foreground mt-0.5">↳ {rec.sku_code ?? canonicalName(rec)}</p>
-                                                </TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{units}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(grossGmv)}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(refundGmv ?? 0)}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(discPenjual)}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(channelFees)}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(netOngkir)}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(settlement)}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(cogs)}</TableCell>
-                                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">
-                                                    {fmt(contribution)}
-                                                </TableCell>
-                                                <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${cmPercent != null && cmPercent < 20 ? 'text-red-600' : ''}`}>
-                                                    {cmPercent != null ? `${cmPercent.toFixed(1)}%` : '-'}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {skuRows.map(({ rec, productName, units, grossGmv, refundGmv, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution, cmPercent }, idx) => {
+                                            const rowKey = `${rec.id}-${idx}`
+                                            const isOpen = expandedSkus.has(rowKey)
+                                            return (
+                                                <Fragment key={rowKey}>
+                                                    <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleSku(rowKey)}>
+                                                        <TableCell className="py-1.5 px-3">
+                                                            <p className="font-medium text-sm">{productName}</p>
+                                                            <p className="text-[11px] text-muted-foreground mt-0.5">↳ {rec.sku_code ?? canonicalName(rec)}</p>
+                                                        </TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{units}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(grossGmv)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(refundGmv ?? 0)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(discPenjual)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(channelFees)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(netOngkir)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(settlement)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(cogs)}</TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">
+                                                            {fmt(contribution)}
+                                                        </TableCell>
+                                                        <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${cmPercent != null && cmPercent < 20 ? 'text-red-600' : ''}`}>
+                                                            {cmPercent != null ? `${cmPercent.toFixed(1)}%` : '-'}
+                                                        </TableCell>
+                                                        <TableCell className="py-1.5 px-3 text-right">
+                                                            <ExpandToggle open={isOpen} onClick={() => toggleSku(rowKey)} label={t('shopeeImportExpandFees')} />
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    {isOpen && (
+                                                        <TableRow className="bg-muted/20 hover:bg-muted/20">
+                                                            <TableCell colSpan={12} className="py-2 px-3">
+                                                                <FeeBreakdownDetail t={t} fees={feeBreakdown} gmv={grossGmv} />
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </Fragment>
+                                            )
+                                        })}
                                     </TableBody>
                                     <TableFooter>
                                         <TableRow className="bg-muted/40">
@@ -681,6 +797,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                 {fmt(agg.settlement - agg.totalCogs)}
                                             </TableCell>
                                             {/* CM% total intentionally omitted — not meaningful as an aggregate */}
+                                            <TableCell className="py-1.5 px-3" />
                                             <TableCell className="py-1.5 px-3" />
                                         </TableRow>
                                     </TableFooter>

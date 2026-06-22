@@ -342,6 +342,124 @@ export function KpiCards({ cards }) {
     )
 }
 
+// ─── Channel-fee breakdown components ─────────────────────────────────────────
+// The 6 fee components stored per SKU record (program_fee is folded at import and
+// not persisted separately) + program_fee which only the per-order breakdown carries.
+const FEE_BREAKDOWN_FIELDS = [
+    ['commission_fee',       'shopeeImportFeeCommission'],
+    ['service_fee',          'shopeeImportFeeService'],
+    ['processing_fee',       'shopeeImportFeeProcessing'],
+    ['transaction_fee',      'shopeeImportFeeTransaction'],
+    ['program_fee',          'shopeeImportFeeProgram'],
+    ['campaign_fee',         'shopeeImportFeeCampaign'],
+    ['affiliate_commission', 'shopeeImportFeeAffiliate'],
+]
+
+// The standard six fee components always listed in the breakdown (mirrors the Summary
+// tab), even when zero. program_fee is the only field shown conditionally (when > 0).
+const ALWAYS_SHOWN_FEES = new Set([
+    'commission_fee', 'service_fee', 'processing_fee', 'transaction_fee', 'campaign_fee', 'affiliate_commission',
+])
+
+// Per-component segment colors (bar fill + legend dot), keyed by fee field.
+const FEE_COLORS = {
+    commission_fee:       'bg-rose-400',
+    service_fee:          'bg-amber-400',
+    processing_fee:       'bg-sky-400',
+    transaction_fee:      'bg-violet-400',
+    program_fee:          'bg-teal-400',
+    campaign_fee:         'bg-fuchsia-400',
+    affiliate_commission: 'bg-slate-400',
+}
+
+// ExpandToggle - rightmost chevron button that expands/collapses a detail row.
+export function ExpandToggle({ open, onClick, label }) {
+    return (
+        <button
+            type="button"
+            aria-label={label}
+            aria-expanded={open}
+            onClick={(e) => { e.stopPropagation(); onClick() }}
+            className="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+            {open ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+        </button>
+    )
+}
+
+// FeeBreakdownDetail - full-width channel-fee breakdown shown inside an expanded row.
+// `fees` is a snake_case object; only non-zero components are listed. A stacked bar
+// shows each component's share of the total; each line shows its share of GMV (when
+// `gmv` is provided) and share of total fees. The subtotal reconciles to the row.
+export function FeeBreakdownDetail({ t, fees, gmv, emptyLabel }) {
+    // Show the full standard set of fee components (same six as the Summary tab) even
+    // when they're zero; program_fee is only listed when it actually carries a value.
+    const rows = FEE_BREAKDOWN_FIELDS
+        .map(([key, tKey]) => ({ key, label: t(tKey), value: Math.round(Number(fees?.[key]) || 0), color: FEE_COLORS[key] }))
+        .filter(r => ALWAYS_SHOWN_FEES.has(r.key) || r.value !== 0)
+    const total = rows.reduce((s, r) => s + r.value, 0)
+    const grossGmv = Math.round(Number(gmv) || 0)
+    const pct = (v, base) => base > 0 ? `${((v / base) * 100).toFixed(1)}%` : null
+
+    if (total === 0) {
+        return (
+            <div className="rounded-md border bg-muted/20 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">{t('shopeeImportSectionFees')}</p>
+                <p className="text-xs text-muted-foreground">{emptyLabel ?? t('shopeeImportFeeBreakdownEmpty')}</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="w-fit max-w-full rounded-md border bg-muted/20 px-4 py-3.5 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('shopeeImportSectionFees')}</p>
+
+            {/* Bar + component lines share the same constrained width so the bar tracks
+                the text block rather than stretching across the whole row. */}
+            <div className="w-[28rem] max-w-full space-y-3">
+
+                {/* Stacked proportion bar — each segment is its share of total fees */}
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                    {rows.map(r => (
+                        <div
+                            key={r.key}
+                            className={r.color}
+                            style={{ width: `${(r.value / total) * 100}%` }}
+                            title={`${r.label}: ${fmt(r.value)}`}
+                        />
+                    ))}
+                </div>
+
+                {/* Component lines: label · Rp value · % of GMV · % of total fees. */}
+                <div className="space-y-2">
+                {rows.map(r => (
+                    <div key={r.key} className={`flex items-center gap-3 text-sm ${r.value === 0 ? 'opacity-45' : ''}`}>
+                        <span className="flex items-center gap-2 flex-1 min-w-0 text-muted-foreground">
+                            <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${r.color}`} />
+                            <span className="truncate">{r.label}</span>
+                        </span>
+                        <span className="tabular-nums text-right w-24 text-foreground">{fmt(r.value)}</span>
+                        <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(r.value, grossGmv) ? `${pct(r.value, grossGmv)} GMV` : '—'}</span>
+                        <span className="tabular-nums text-right w-14 text-xs text-muted-foreground">{r.value === 0 ? '0%' : pct(r.value, total)}</span>
+                    </div>
+                ))}
+
+                {/* Total — reconciles to the row's Channel Fees cell */}
+                <div className="flex items-center gap-3 text-sm border-t pt-2 mt-2">
+                    <span className="flex items-center gap-2 flex-1 min-w-0 font-medium">
+                        {t('shopeeImportFeesTotal')}
+                        <span className="text-xs font-normal text-green-700 whitespace-nowrap">✓ {t('shopeeImportFeeMatch')}</span>
+                    </span>
+                    <span className="tabular-nums text-right w-24 font-semibold text-red-600">{fmt(total)}</span>
+                    <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(total, grossGmv) ? `${pct(total, grossGmv)} GMV` : '—'}</span>
+                    <span className="tabular-nums text-right w-14 text-xs text-muted-foreground">100%</span>
+                </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ─── ShopeeChip - orange Shopee platform badge ────────────────────────────────
 export function ShopeeChip() {
     return (

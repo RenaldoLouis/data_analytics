@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useMemo } from "react"
+import { Fragment, useEffect, useRef, useState, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,7 +18,7 @@ import { useLocale, useTranslations } from "next-intl"
 import services from "@/services"
 import { classifyOrderRow, fmt } from "./plLib"
 import { parseShopeeReports } from "./plShopeeParser"
-import { AuditTable, ClassificationBadge, KpiCards, Section, SectionHeader } from "./PlComponents"
+import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, Section, SectionHeader } from "./PlComponents"
 
 const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -226,6 +226,16 @@ function Step1({ t, year, setYear, monthIdx, setMonthIdx, incomeFile, setIncomeF
 function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] }) {
     const d = data
     const months = locale === 'id' ? MONTHS_ID : MONTHS_EN
+    // Expand/collapse state for the per-order & per-SKU channel-fee detail rows.
+    const [expandedOrders, setExpandedOrders] = useState(() => new Set())
+    const [expandedSkus, setExpandedSkus] = useState(() => new Set())
+    const toggleKey = (setter) => (key) => setter(prev => {
+        const next = new Set(prev)
+        if (next.has(key)) next.delete(key); else next.add(key)
+        return next
+    })
+    const toggleOrder = toggleKey(setExpandedOrders)
+    const toggleSku = toggleKey(setExpandedSkus)
     if (!d) return <p className="text-sm text-muted-foreground py-8 text-center">{t('shopeeImportParseError')}</p>
 
     const getMappedSkuCode = (shopeeProductName) => {
@@ -259,9 +269,16 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
         })
         const settle = d.settlement_report ?? d.settlement_calc ?? 0
         const allocDisc   = allocateInt(d.discount_total ?? 0,      gmvWeights)
-        const allocFees   = allocateInt(d.channel_fees_total ?? 0,   gmvWeights)
         const allocShip   = allocateInt(d.net_shipping ?? 0,         gmvWeights)
         const allocSettle = allocateInt(settle,                       gmvWeights)
+        // Per-component channel-fee allocation (drives the expandable detail row).
+        // alloc_channel_fees is the row's sum of these so the row total always equals
+        // the breakdown subtotal shown when expanded.
+        const FEE_FIELDS = ['commission_fee','service_fee','processing_fee','transaction_fee','program_fee','campaign_fee','affiliate_commission']
+        const feeVal = (field) => (d.channel_fees ?? []).find(f => f.field === field)?.value ?? 0
+        const allocFeeByField = Object.fromEntries(
+            FEE_FIELDS.map(field => [field, allocateInt(feeVal(field), gmvWeights)])
+        )
 
         // Per-product actual settlement (Bug 1) + units lost (Bug 2), from the order
         // report — same logic as the saved P/L detail. Falls back to the GMV allocation
@@ -300,10 +317,15 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
             const totalCogs = cogsPerUnit * cogsUnits
             const alloc_settlement = hasReport ? Math.round(perProduct[p.sku]?.settlement ?? 0) : allocSettle[idx]
             const contribution = cogsPerUnit > 0 ? (alloc_settlement - totalCogs) : null
+            const alloc_fee_breakdown = Object.fromEntries(
+                FEE_FIELDS.map(field => [field, allocFeeByField[field][idx]])
+            )
+            const alloc_channel_fees = FEE_FIELDS.reduce((s, field) => s + allocFeeByField[field][idx], 0)
             return {
                 ...p,
                 alloc_seller_discount: allocDisc[idx],
-                alloc_channel_fees:    allocFees[idx],
+                alloc_fee_breakdown,
+                alloc_channel_fees,
                 alloc_net_shipping:    allocShip[idx],
                 alloc_settlement,
                 cogs_per_unit: cogsPerUnit,
@@ -472,6 +494,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                         <TableHead className="text-right">{t('shopeeImportSectionFees')}</TableHead>
                                         <TableHead className="text-right">{t('shopeeImportShippingNet')}</TableHead>
                                         <TableHead className="text-right">{t('shopeeImportColSettlement')}</TableHead>
+                                        <TableHead className="w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -484,29 +507,48 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                         const price = r.price ?? r.grossGmv ?? 0
                                         const discount = r.seller_discount ?? r.sellerDiscount
                                         const fees = r.fee_total ?? r.feeTotal
+                                        const feeBreakdown = r.fee_breakdown ?? r.feeBreakdown ?? null
                                         const shipping = r.net_shipping ?? r.netShipping
                                         const settle = r.settlement
                                         const fmtOrDash = (v) => v != null ? fmt(v) : <span className="text-muted-foreground/40">-</span>
+                                        const isOpen = expandedOrders.has(i)
                                         return (
-                                            <TableRow key={i} className={excl ? 'opacity-40' : ''}>
-                                                <TableCell className="font-mono text-[11px]">{orderNo}</TableCell>
-                                                <TableCell className="max-w-[160px] truncate">{product}</TableCell>
-                                                <TableCell>
-                                                    {(() => {
-                                                        // Order-report rows carry `classification`; income-only rows
-                                                        // (no order report) are settled unless cancelled.
-                                                        const cls = r.classification
-                                                            ?? classifyOrderRow({ ...r, income_matched: !r.excluded })
-                                                        return <ClassificationBadge cls={cls} label={classLabel(cls)} />
-                                                    })()}
-                                                </TableCell>
-                                                <TableCell className="text-right tabular-nums">{qty}</TableCell>
-                                                <TableCell className="text-right tabular-nums">{fmt(price)}</TableCell>
-                                                <TableCell className="text-right tabular-nums">{fmtOrDash(discount)}</TableCell>
-                                                <TableCell className="text-right tabular-nums">{fmtOrDash(fees)}</TableCell>
-                                                <TableCell className="text-right tabular-nums">{fmtOrDash(shipping)}</TableCell>
-                                                <TableCell className="text-right tabular-nums">{fmtOrDash(settle)}</TableCell>
-                                            </TableRow>
+                                            <Fragment key={i}>
+                                                <TableRow
+                                                    className={`${excl ? 'opacity-40 ' : ''}${feeBreakdown ? 'cursor-pointer hover:bg-muted/30' : ''}`}
+                                                    onClick={feeBreakdown ? () => toggleOrder(i) : undefined}
+                                                >
+                                                    <TableCell className="font-mono text-[11px]">{orderNo}</TableCell>
+                                                    <TableCell className="max-w-[160px] truncate">{product}</TableCell>
+                                                    <TableCell>
+                                                        {(() => {
+                                                            // Order-report rows carry `classification`; income-only rows
+                                                            // (no order report) are settled unless cancelled.
+                                                            const cls = r.classification
+                                                                ?? classifyOrderRow({ ...r, income_matched: !r.excluded })
+                                                            return <ClassificationBadge cls={cls} label={classLabel(cls)} />
+                                                        })()}
+                                                    </TableCell>
+                                                    <TableCell className="text-right tabular-nums">{qty}</TableCell>
+                                                    <TableCell className="text-right tabular-nums">{fmt(price)}</TableCell>
+                                                    <TableCell className="text-right tabular-nums">{fmtOrDash(discount)}</TableCell>
+                                                    <TableCell className="text-right tabular-nums">{fmtOrDash(fees)}</TableCell>
+                                                    <TableCell className="text-right tabular-nums">{fmtOrDash(shipping)}</TableCell>
+                                                    <TableCell className="text-right tabular-nums">{fmtOrDash(settle)}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        {feeBreakdown && (
+                                                            <ExpandToggle open={isOpen} onClick={() => toggleOrder(i)} label={t('shopeeImportExpandFees')} />
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                                {isOpen && feeBreakdown && (
+                                                    <TableRow className="bg-muted/20 hover:bg-muted/20">
+                                                        <TableCell colSpan={10} className="py-2">
+                                                            <FeeBreakdownDetail t={t} fees={feeBreakdown} gmv={r.gmv ?? r.grossGmv ?? price} />
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </Fragment>
                                         )
                                     })}
                                 </TableBody>
@@ -521,6 +563,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                         <TableCell className={`text-right tabular-nums font-medium ${feeTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(feeTotal)}</TableCell>
                                         <TableCell className={`text-right tabular-nums font-medium ${(d.net_shipping ?? 0) >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(d.net_shipping ?? 0)}</TableCell>
                                         <TableCell className={`text-right tabular-nums font-medium ${settlement >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(settlement)}</TableCell>
+                                        <TableCell />
                                     </TableRow>
                                 </TableFooter>
                             </Table>
@@ -566,34 +609,48 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                     <TableHead className="text-right">{t('shopeeImportColCogs')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColContribution')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColCmPercent')}</TableHead>
+                                    <TableHead className="w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {enrichedSales.map((s) => {
                                     const mappedCode = getMappedSkuCode(s.sku)
+                                    const isOpen = expandedSkus.has(s.sku)
                                     return (
-                                        <TableRow key={s.sku}>
-                                            <TableCell className="w-[200px] max-w-[200px] whitespace-normal">
-                                                <p className="font-medium leading-snug">{s.sku}</p>
-                                                {mappedCode && <p className="text-[10px] text-primary font-medium mt-0.5">→ {mappedCode}</p>}
-                                            </TableCell>
-                                            <TableCell className="text-right tabular-nums">{s.units_sold}</TableCell>
-                                            <TableCell className="text-right tabular-nums">{fmt(s.gross_gmv)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">{fmt(s.refund_gmv ?? 0)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">{fmt(s.alloc_seller_discount)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">{fmt(s.alloc_channel_fees)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">{fmt(s.alloc_net_shipping)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">{fmt(s.alloc_settlement)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">
-                                                {s.cogs_per_unit > 0 ? fmt(s.total_cogs) : <span className="text-muted-foreground/40">-</span>}
-                                            </TableCell>
-                                            <TableCell className="text-right tabular-nums">
-                                                {s.contribution != null ? fmt(s.contribution) : <span className="text-muted-foreground/40">-</span>}
-                                            </TableCell>
-                                            <TableCell className={`text-right tabular-nums ${s.cm_percent != null && s.cm_percent < 20 ? 'text-red-600' : ''}`}>
-                                                {s.cm_percent != null ? `${s.cm_percent.toFixed(1)}%` : <span className="text-muted-foreground/40">-</span>}
-                                            </TableCell>
-                                        </TableRow>
+                                        <Fragment key={s.sku}>
+                                            <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleSku(s.sku)}>
+                                                <TableCell className="w-[200px] max-w-[200px] whitespace-normal">
+                                                    <p className="font-medium leading-snug">{s.sku}</p>
+                                                    {mappedCode && <p className="text-[10px] text-primary font-medium mt-0.5">→ {mappedCode}</p>}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">{s.units_sold}</TableCell>
+                                                <TableCell className="text-right tabular-nums">{fmt(s.gross_gmv)}</TableCell>
+                                                <TableCell className="text-right tabular-nums">{fmt(s.refund_gmv ?? 0)}</TableCell>
+                                                <TableCell className="text-right tabular-nums">{fmt(s.alloc_seller_discount)}</TableCell>
+                                                <TableCell className="text-right tabular-nums">{fmt(s.alloc_channel_fees)}</TableCell>
+                                                <TableCell className="text-right tabular-nums">{fmt(s.alloc_net_shipping)}</TableCell>
+                                                <TableCell className="text-right tabular-nums">{fmt(s.alloc_settlement)}</TableCell>
+                                                <TableCell className="text-right tabular-nums">
+                                                    {s.cogs_per_unit > 0 ? fmt(s.total_cogs) : <span className="text-muted-foreground/40">-</span>}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">
+                                                    {s.contribution != null ? fmt(s.contribution) : <span className="text-muted-foreground/40">-</span>}
+                                                </TableCell>
+                                                <TableCell className={`text-right tabular-nums ${s.cm_percent != null && s.cm_percent < 20 ? 'text-red-600' : ''}`}>
+                                                    {s.cm_percent != null ? `${s.cm_percent.toFixed(1)}%` : <span className="text-muted-foreground/40">-</span>}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <ExpandToggle open={isOpen} onClick={() => toggleSku(s.sku)} label={t('shopeeImportExpandFees')} />
+                                                </TableCell>
+                                            </TableRow>
+                                            {isOpen && (
+                                                <TableRow className="bg-muted/20 hover:bg-muted/20">
+                                                    <TableCell colSpan={12} className="py-2">
+                                                        <FeeBreakdownDetail t={t} fees={s.alloc_fee_breakdown} gmv={s.gross_gmv} />
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </Fragment>
                                     )
                                 })}
                             </TableBody>
@@ -625,6 +682,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                                     {hasContrib ? fmt(totalContrib) : <span className="text-muted-foreground/40">-</span>}
                                                 </TableCell>
                                                 {/* CM% total intentionally omitted — not meaningful as an aggregate */}
+                                                <TableCell />
                                                 <TableCell />
                                             </>
                                         )

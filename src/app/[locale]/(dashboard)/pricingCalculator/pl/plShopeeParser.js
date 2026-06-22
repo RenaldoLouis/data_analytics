@@ -251,6 +251,17 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
         const rowFeeTotal = ['commissionFee','serviceFee','processingFee','transactionFee','programFee','campaignFee','affiliateFee']
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
+        // Per-order channel-fee breakdown (snake_case keys mirror the stored shipping
+        // fee columns) — surfaced in the expandable "Channel Fees" detail row.
+        const rowFeeBreakdown = {
+            commission_fee:       ci.commissionFee  >= 0 ? n(row[ci.commissionFee])  : 0,
+            service_fee:          ci.serviceFee     >= 0 ? n(row[ci.serviceFee])     : 0,
+            processing_fee:       ci.processingFee  >= 0 ? n(row[ci.processingFee])  : 0,
+            transaction_fee:      ci.transactionFee >= 0 ? n(row[ci.transactionFee]) : 0,
+            program_fee:          ci.programFee     >= 0 ? n(row[ci.programFee])     : 0,
+            campaign_fee:         ci.campaignFee    >= 0 ? n(row[ci.campaignFee])    : 0,
+            affiliate_commission: ci.affiliateFee   >= 0 ? n(row[ci.affiliateFee])   : 0,
+        }
         // Net shipping per order = buyer-paid shipping (+) + courier cost (−) ≈ 0 (Bug #2).
         const rowBuyerShipping   = ci.buyerShipping  >= 0 ? n(row[ci.buyerShipping])  : 0
         const rowActualShipping  = ci.actualShipping  >= 0 ? n(row[ci.actualShipping])  : 0
@@ -260,6 +271,7 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
             grossGmv:      price,
             sellerDiscount: rowDiscount,
             feeTotal:      rowFeeTotal,
+            feeBreakdown:  rowFeeBreakdown,
             netShipping:   rowBuyerShipping - rowActualShipping,
             settlement:    ci.settlement >= 0 ? ns(row[ci.settlement]) : 0,
             excluded:      false,
@@ -327,6 +339,8 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 income_matched:  inc !== null,          // flag: was income report row found?
                 seller_discount: inc !== null ? (inc.sellerDiscount ?? 0) : null,
                 fee_total:       inc !== null ? (inc.feeTotal       ?? 0) : null,
+                // Per-order channel-fee breakdown for the expandable detail row.
+                fee_breakdown:   inc !== null ? (inc.feeBreakdown   ?? null) : null,
                 net_shipping:    inc !== null ? (inc.netShipping    ?? 0) : null,
                 settlement:      inc !== null ? (inc.settlement     ?? 0) : null,
             }
