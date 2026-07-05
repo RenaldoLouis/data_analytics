@@ -187,31 +187,34 @@ export default function LoginForm() {
 
     return (
         <div className="w-full max-w-md">
-            <div className="flex w-full mb-6">
-                <div className="flex items-center gap-2 text-sm">
-                    <button
-                        type="button"
-                        onClick={() => changeLanguage('en')}
-                        className={`cursor-pointer transition-colors ${locale === 'en'
-                            ? 'font-bold text-gray-900'
-                            : 'font-medium text-gray-400 hover:text-gray-600'
-                            }`}
-                    >
-                        EN
-                    </button>
-                    <span className="text-gray-300">|</span>
-                    <button
-                        type="button"
-                        onClick={() => changeLanguage('id')}
-                        className={`cursor-pointer transition-colors ${locale === 'id'
-                            ? 'font-bold text-gray-900'
-                            : 'font-medium text-gray-400 hover:text-gray-600'
-                            }`}
-                    >
-                        ID
-                    </button>
+            {/* Language selector — only on the main login view (hidden during the forgot-password flow) */}
+            {formView === 'LOGIN' && (
+                <div className="flex w-full mb-6">
+                    <div className="flex items-center gap-2 text-sm">
+                        <button
+                            type="button"
+                            onClick={() => changeLanguage('en')}
+                            className={`cursor-pointer transition-colors ${locale === 'en'
+                                ? 'font-bold text-gray-900'
+                                : 'font-medium text-gray-400 hover:text-gray-600'
+                                }`}
+                        >
+                            EN
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                            type="button"
+                            onClick={() => changeLanguage('id')}
+                            className={`cursor-pointer transition-colors ${locale === 'id'
+                                ? 'font-bold text-gray-900'
+                                : 'font-medium text-gray-400 hover:text-gray-600'
+                                }`}
+                        >
+                            ID
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
             {isLoading && (
                 <LoadingScreen />
             )}
