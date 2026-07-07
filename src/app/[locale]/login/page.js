@@ -32,13 +32,15 @@ export default function LoginPage() {
 
                 {/* ── Left: Sirius marketing panel (hidden on mobile) ── */}
                 <aside
-                    className="relative hidden lg:flex lg:w-1/2 flex-col justify-center overflow-y-auto px-10 py-10 xl:px-14"
+                    className="relative hidden lg:flex lg:w-1/2 flex-col overflow-y-auto px-10 py-10 xl:px-14"
                     style={{ backgroundImage: "linear-gradient(180deg, #F8FAFF 0%, #E6EEFF 100%)" }}
                 >
                     {/* Soft radial brand glow, upper-left */}
                     <div className="pointer-events-none absolute -left-32 -top-32 h-[26rem] w-[26rem] rounded-full bg-[#2563EB] opacity-[0.06] blur-3xl" />
 
-                    <div className="relative w-full max-w-lg">
+                    {/* my-auto (not justify-center) so it centers when it fits but the top
+                        stays scrollable/reachable when the content is taller than the panel. */}
+                    <div className="relative my-auto w-full max-w-lg">
                         {/* Brand lockup */}
                         <div className="mb-8 flex items-center gap-3.5">
                             <Image src="/logo.svg" alt="Sirius" width={110} height={24} priority />
