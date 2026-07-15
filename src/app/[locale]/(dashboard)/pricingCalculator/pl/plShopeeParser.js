@@ -120,6 +120,9 @@ function parseOrderReport(rawRows) {
     const productMap    = new Map()  // product_name → {units, price_sum, gmv}
     const orderRows     = []          // one row per order line (all orders, including cancelled)
     let platformVoucher = 0
+    // Whether this order report actually carries a returned-quantity column. Drives
+    // COGS on refunds (Improvement B): without it, refunds are restockable (no COGS).
+    const hasReturnedQty = ci.returnedQty >= 0
 
     for (const row of dataRows) {
         const status  = ci.orderStatus  >= 0 ? row[ci.orderStatus]  : null
@@ -143,6 +146,7 @@ function parseOrderReport(rawRows) {
             product_name: name,
             qty,
             qty_returned: qtyReturned,   // Bug 2: units physically returned by buyer
+            returned_qty_known: hasReturnedQty,  // false → refunds restockable (no COGS)
             price,
             gmv:          qty * price,
             status:       status ? String(status) : '',
@@ -331,6 +335,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 product_name:    r.product_name,
                 qty:             r.qty,
                 qty_returned:    r.qty_returned ?? 0,   // Bug 2
+                returned_qty_known: r.returned_qty_known ?? false,  // Improvement B
                 price:           r.price,
                 gmv:             r.gmv,
                 status:          r.status,

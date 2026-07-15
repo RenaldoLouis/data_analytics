@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IconArrowRight, IconCheck, IconChevronDown, IconFile, IconSearch, IconUpload, IconX } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import services from "@/services"
-import { classifyOrderRow, fmt } from "./plLib"
+import { classifyOrderRow, cogsUnitsForRow, fmt } from "./plLib"
 import { parseShopeeReports } from "./plShopeeParser"
 import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, Section, SectionHeader } from "./PlComponents"
 
@@ -299,8 +299,12 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
             for (const r of reportRows) {
                 if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
                 const name = r.product_name
-                if (!perProduct[name]) perProduct[name] = { settlement: 0, cogsUnits: 0 }
-                perProduct[name].cogsUnits += Math.max(0, (r.qty || 0) - (r.qty_returned || 0))   // Bug 2
+                if (!perProduct[name]) perProduct[name] = { settlement: 0, cogsUnits: 0, lossUnits: 0 }
+                // Bug #1 + Improvement B: core COGS on completed units; non-restockable
+                // refunds accrue as Return Loss (restockable refunds bear no COGS).
+                const { core, loss } = cogsUnitsForRow(r)
+                perProduct[name].cogsUnits += core
+                perProduct[name].lossUnits += loss
                 const oa = orderAgg[(r.order_no ?? '').trim()]
                 if (oa && oa.totalGmv > 0) perProduct[name].settlement += oa.settlement * ((r.gmv || 0) / oa.totalGmv)   // Bug 1
             }
@@ -312,11 +316,13 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                 ? skuList.find(s => s.id === mapping.id)
                 : null
             const cogsPerUnit = parseFloat(mappedSku?.cogs_per_unit) || 0
-            // Bug 2: COGS on units lost (qty − returned); Bug 1: actual per-order settlement.
+            // Bug #1: core COGS on completed units. Improvement B: non-restockable refunds → Return Loss.
             const cogsUnits = hasReport ? (perProduct[p.sku]?.cogsUnits ?? 0) : (p.units_sold || 0)
+            const lossUnits = hasReport ? (perProduct[p.sku]?.lossUnits ?? 0) : 0
             const totalCogs = cogsPerUnit * cogsUnits
+            const returLoss = cogsPerUnit * lossUnits
             const alloc_settlement = hasReport ? Math.round(perProduct[p.sku]?.settlement ?? 0) : allocSettle[idx]
-            const contribution = cogsPerUnit > 0 ? (alloc_settlement - totalCogs) : null
+            const contribution = cogsPerUnit > 0 ? (alloc_settlement - totalCogs - returLoss) : null
             const alloc_fee_breakdown = Object.fromEntries(
                 FEE_FIELDS.map(field => [field, allocFeeByField[field][idx]])
             )
@@ -330,9 +336,11 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                 alloc_settlement,
                 cogs_per_unit: cogsPerUnit,
                 total_cogs: totalCogs,
+                retur_loss: returLoss,
                 contribution,
-                cm_percent: (contribution != null && p.gross_gmv > 0)
-                    ? (contribution / p.gross_gmv) * 100
+                // Improvement A: CM% over Settlement; n/a when settlement ≤ 0.
+                cm_percent: (contribution != null && alloc_settlement > 0)
+                    ? (contribution / alloc_settlement) * 100
                     : null,
             }
         })
@@ -366,14 +374,17 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
             {/* Contribution = settlement − COGS (from Per SKU tab enrichedSales) */}
             {(() => {
                 const totalCogs = enrichedSales.reduce((s, p) => s + (p.total_cogs ?? 0), 0)
+                const totalReturLoss = enrichedSales.reduce((s, p) => s + (p.retur_loss ?? 0), 0)
                 const hasAnyCogs = enrichedSales.some(p => (p.cogs_per_unit ?? 0) > 0)
                 // Products with no COGS set (cogsPerUnit=0) contribute their full settlement
                 // This matches P/L detail where COGS=0 → contribution = settlement
                 const totalContribution = enrichedSales.reduce((s, p) => s + (p.contribution ?? p.settlement ?? 0), 0)
                 const contribCls = totalContribution >= 0 ? 'text-green-700' : 'text-red-600'
-                const contribSubtitle = hasAnyCogs
-                    ? `${t('shopeeImportColCogs')} ${fmt(totalCogs)}`
-                    : t('shopeeImportContributionNote')
+                const contribSubtitle = totalReturLoss > 0
+                    ? `${t('shopeeImportColCogs')} ${fmt(totalCogs)} · ${t('shopeeImportReturLoss')} ${fmt(totalReturLoss)}`
+                    : hasAnyCogs
+                        ? `${t('shopeeImportColCogs')} ${fmt(totalCogs)}`
+                        : t('shopeeImportContributionNote')
 
                 const refundGmv = d.refund_gmv ?? 0
                 const netGmv = d.net_gmv ?? (grossGmv - refundGmv)

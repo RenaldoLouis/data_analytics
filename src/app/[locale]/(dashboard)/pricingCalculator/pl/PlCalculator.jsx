@@ -11,7 +11,7 @@ import services from "@/services"
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Fragment, useEffect, useState, useMemo } from "react"
-import { classifyOrderRow, fmt } from "./plLib"
+import { classifyOrderRow, cogsUnitsForRow, fmt } from "./plLib"
 import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -254,30 +254,33 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const campFee = sum((f) => n(f.campaign_fee_amount))
         const affFee = sum((f) => n(f.affiliate_commission_amount))
         const totalFees = commFee + svcFee + procFee + txFee + campFee + affFee
-        // Bug 2: COGS = cogs_per_unit × units_lost, where units_lost = qty − returned_qty
-        // across all SETTLED order lines (refund goods not returned still cost COGS).
-        // Falls back to stored units_sold when no order report is available.
-        const totalCogs = records.reduce((s, rec) => {
+        // COGS (Bug #1 + Improvement B): core COGS is charged only on completed
+        // (settled, non-refunded) units. Refunded units are restockable by default
+        // (no COGS); non-restockable refunds surface as a separate "Return Loss".
+        // Falls back to stored units_sold (completed-only) when no order report exists.
+        let totalCogs = 0, returLoss = 0
+        for (const rec of records) {
             const cogsUnit = parseFloat(rec.cogs_per_unit) || 0
             const rows = rec.order_report_rows ?? []
             const names = Array.isArray(rec.product_names) ? rec.product_names : []
             if (rows.length > 0 && names.length > 0) {
-                let lost = 0
                 for (const r of rows) {
                     if (!names.includes(r.product_name)) continue
                     if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
-                    lost += Math.max(0, (r.qty || 0) - (r.qty_returned || 0))
+                    const { core, loss } = cogsUnitsForRow(r)
+                    totalCogs += cogsUnit * core
+                    returLoss += cogsUnit * loss
                 }
-                return s + cogsUnit * lost
+            } else {
+                const f = forms[rec.id] ?? buildFormFromRecord(rec)
+                totalCogs += cogsUnit * n(f.units_sold)
             }
-            const f = forms[rec.id] ?? buildFormFromRecord(rec)
-            return s + cogsUnit * n(f.units_sold)
-        }, 0)
+        }
         return {
             grossGmv, settlement, voucher, sellerDiscount, voucherCof, coin, coinCof, totalDisc,
             refund, platformVoucher, subsidy, buyerShipping, shipCost, netShipping,
             commFee, svcFee, procFee, txFee, campFee, affFee, totalFees,
-            totalCogs,
+            totalCogs, returLoss,
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [records, forms])
@@ -365,10 +368,14 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 for (const r of reportRows.filter(r => productNames.includes(r.product_name))) {
                     // SETTLED only (Improvement A) — skip cancelled, pending & cross-period.
                     if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
-                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0, settlement: 0, cogsUnits: 0 }
+                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0, settlement: 0, cogsUnits: 0, lossUnits: 0 }
                     const pm = productMap[r.product_name]
                     pm.gmv += r.gmv || 0
-                    pm.cogsUnits += Math.max(0, (r.qty || 0) - (r.qty_returned || 0))   // Bug 2
+                    // Bug #1 + Improvement B: COGS on completed units; non-restockable
+                    // refunds accrue as Return Loss instead of core COGS.
+                    const { core, loss } = cogsUnitsForRow(r)
+                    pm.cogsUnits += core
+                    pm.lossUnits += loss
                     const oa = orderAgg[(r.order_no ?? '').trim()]
                     if (oa && oa.totalGmv > 0) pm.settlement += oa.settlement * ((r.gmv || 0) / oa.totalGmv)   // Bug 1
                     if (r.refunded) pm.refund += r.gmv || 0     // refunded value
@@ -393,10 +400,12 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     const channelFees = Object.values(feeBreakdown).reduce((s, v) => s + v, 0)
                     const discPenjual = Math.round(recDisc * share)
                     const netOngkir = Math.round(recNetShipping * share)
-                    const cogs = cogsUnit * p.cogsUnits                // Bug 2: units lost
-                    const contribution = settlement - cogs
-                    return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution,
-                        cmPercent: p.gmv > 0 ? (contribution / p.gmv) * 100 : null }
+                    const cogs = cogsUnit * p.cogsUnits                // core COGS (completed units)
+                    const returLoss = cogsUnit * p.lossUnits           // Improvement B: non-restockable
+                    const contribution = settlement - cogs - returLoss
+                    // Improvement A: CM% over Settlement; n/a when settlement ≤ 0.
+                    return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
+                        cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null }
                 })
             }
 
@@ -416,9 +425,11 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             const netOngkir = n(f.buyer_shipping_paid) - n(f.actual_shipping_cost)
             const settlement = n(f.settlement_amount)
             const cogs = cogsUnit * units
-            const contribution = settlement - cogs
-            return [{ rec, productName: canonicalName(rec), units, grossGmv, refundGmv: 0, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution,
-                cmPercent: grossGmv > 0 ? (contribution / grossGmv) * 100 : null }]
+            const returLoss = 0   // no order report → refunds already excluded from units_sold
+            const contribution = settlement - cogs - returLoss
+            // Improvement A: CM% over Settlement; n/a when settlement ≤ 0.
+            return [{ rec, productName: canonicalName(rec), units, grossGmv, refundGmv: 0, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
+                cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null }]
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [records, forms])
@@ -526,9 +537,11 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                         subtitle: agg.grossGmv > 0 ? `${((agg.settlement / agg.grossGmv) * 100).toFixed(1)}% GMV` : undefined
                     },
                     {
-                        label: t('shopeeImportContribution'), value: agg.settlement - agg.totalCogs,
-                        cls: (agg.settlement - agg.totalCogs) >= 0 ? 'text-green-700' : 'text-red-600',
-                        subtitle: agg.totalCogs > 0 ? `${t('shopeeImportColCogs')} ${fmt(agg.totalCogs)}` : t('shopeeImportContributionNote')
+                        label: t('shopeeImportContribution'), value: agg.settlement - agg.totalCogs - agg.returLoss,
+                        cls: (agg.settlement - agg.totalCogs - agg.returLoss) >= 0 ? 'text-green-700' : 'text-red-600',
+                        subtitle: agg.returLoss > 0
+                            ? `${t('shopeeImportColCogs')} ${fmt(agg.totalCogs)} · ${t('shopeeImportReturLoss')} ${fmt(agg.returLoss)}`
+                            : agg.totalCogs > 0 ? `${t('shopeeImportColCogs')} ${fmt(agg.totalCogs)}` : t('shopeeImportContributionNote')
                     },
                 ]} />
 
@@ -765,7 +778,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                             {fmt(contribution)}
                                                         </TableCell>
                                                         <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${cmPercent != null && cmPercent < 20 ? 'text-red-600' : ''}`}>
-                                                            {cmPercent != null ? `${cmPercent.toFixed(1)}%` : '-'}
+                                                            {cmPercent != null ? `${cmPercent.toFixed(1)}%` : <span className="text-muted-foreground/40">—</span>}
                                                         </TableCell>
                                                         <TableCell className="py-1.5 px-3 text-right">
                                                             <ExpandToggle open={isOpen} onClick={() => toggleSku(rowKey)} label={t('shopeeImportExpandFees')} />
@@ -793,8 +806,8 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.netShipping >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.netShipping)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.settlement >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.settlement)}</TableCell>
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${agg.totalCogs >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(agg.totalCogs)}</TableCell>
-                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${(agg.settlement - agg.totalCogs) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                                {fmt(agg.settlement - agg.totalCogs)}
+                                            <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${(agg.settlement - agg.totalCogs - agg.returLoss) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                                {fmt(agg.settlement - agg.totalCogs - agg.returLoss)}
                                             </TableCell>
                                             {/* CM% total intentionally omitted — not meaningful as an aggregate */}
                                             <TableCell className="py-1.5 px-3" />
