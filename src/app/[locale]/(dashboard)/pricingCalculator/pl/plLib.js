@@ -50,6 +50,28 @@ export function classifyOrderRow(row) {
     return 'CROSS_PERIOD'
 }
 
+// ─── COGS recognition (July 2026 Bug #1 + Improvement B) ──────────────────────
+// Split an order line's units into COGS-bearing buckets:
+//   core — completed (Selesai) units → normal COGS.
+//   loss — refunded units the buyer did NOT return (non-restockable) → "Kerugian
+//          Retur", cost is lost. Restockable refunds return to the warehouse and
+//          bear NO COGS (Bug #1: previously charged on gross/refunded units).
+// Default is restockable (loss 0). A refunded line only becomes a loss when the
+// order report actually carries a returned_quantity column (`returned_qty_known`)
+// AND some units were kept (qty > returned). Old imports & files without the
+// column → restockable, so July reconciles (COGS on settled units only).
+export function cogsUnitsForRow(row) {
+    const qty = parseInt(row?.qty) || 0
+    const returned = parseInt(row?.qty_returned) || 0
+    if (!row?.refunded) {
+        return { core: Math.max(0, qty - returned), loss: 0 }
+    }
+    if (row?.returned_qty_known) {
+        return { core: 0, loss: Math.max(0, qty - returned) }
+    }
+    return { core: 0, loss: 0 }
+}
+
 export function getChColor(code, label) {
     const key = (label || code || "").toLowerCase()
     if (key.includes("shopee")) return { bg: "#fff7f0", color: "#c83200" }
