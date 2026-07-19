@@ -11,6 +11,7 @@ import services from "@/services"
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Fragment, useEffect, useState, useMemo } from "react"
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts"
 import { classifyOrderRow, cogsUnitsForRow, fmt, parentSku } from "./plLib"
 import { evaluateSkuAlerts, sortAlertRows, topSeverity } from "./plAlerts"
 import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, ProfitWaterfall, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
@@ -235,6 +236,109 @@ function SummaryTab({ agg, alertRows, onDrill }) {
                     subtotal={{ label: `${t('shopeeImportSettlementDiff')}${isMatch ? ' - ✓ ' + t('shopeeImportSettlementMatch') : ''}`, value: delta, cls: isMatch ? 'text-green-700' : 'text-red-600' }}
                 />
             </Section>
+        </div>
+    )
+}
+
+// ─── P2: Monthly Trend tab ────────────────────────────────────────────────────
+
+function TrendTab({ currentPeriod, locale }) {
+    const t = useTranslations('plpage')
+    const MONTHS = locale === 'id' ? MONTH_LABELS_ID : MONTH_LABELS_EN
+    const [series, setSeries] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        let alive = true
+        setLoading(true)
+        services.pl.getTrend()
+            .then(res => { if (alive) setSeries((res?.data?.data ?? res?.data ?? []).filter(Boolean)) })
+            .finally(() => { if (alive) setLoading(false) })
+        return () => { alive = false }
+    }, [])
+
+    if (loading) return <Skeleton className="w-full h-64 rounded-lg" />
+
+    const periodLabel = (p) => `${MONTHS[parseInt(p.period_month) - 1] ?? p.period_month} ${String(p.period_year).slice(-2)}`
+    const isCurrent = (p) => currentPeriod
+        && String(p.period_month).padStart(2, '0') === String(currentPeriod.month).padStart(2, '0')
+        && String(p.period_year) === String(currentPeriod.year)
+
+    // MoM deltas vs the previous period in the series.
+    const rows = series.map((p, i) => {
+        const prev = series[i - 1]
+        return {
+            ...p,
+            momCm: prev ? p.cm - prev.cm : null,
+            momCmPct: prev && p.cmPct != null && prev.cmPct != null ? (p.cmPct - prev.cmPct) * 100 : null, // percentage points
+        }
+    })
+    const chartData = rows.map(p => ({ name: periodLabel(p), settlement: Math.round(p.settlement), cm: Math.round(p.cm) }))
+    const jt = (v) => `${(v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 0 })}jt`
+
+    const TH = ({ children, right }) => <TableHead className={`py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground ${right ? 'text-right' : ''}`}>{children}</TableHead>
+    const momCls = (v) => v == null ? 'text-muted-foreground/40' : v > 0 ? 'text-green-700' : v < 0 ? 'text-red-600' : 'text-muted-foreground'
+    const momTxt = (v, suffix) => v == null ? '—' : `${v > 0 ? '+' : ''}${suffix === 'pp' ? v.toFixed(1) + ' pp' : fmt(v)}`
+
+    return (
+        <div className="space-y-3">
+            {series.length >= 2 && (
+                <Section title={t('shopeeTrendTitle')}>
+                    <div className="p-3">
+                        <div className="flex items-center gap-4 mb-2 text-[11px]">
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-blue-700" />{t('shopeeTrendSettlement')}</span>
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-green-700" />{t('shopeeTrendCm')}</span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={220}>
+                            <LineChart data={chartData} margin={{ top: 6, right: 10, left: 4, bottom: 2 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                                <YAxis tickFormatter={jt} tick={{ fontSize: 10 }} width={38} axisLine={false} tickLine={false} />
+                                <RTooltip formatter={(v, n) => [fmt(v), n === 'settlement' ? t('shopeeTrendSettlement') : t('shopeeTrendCm')]} labelClassName="text-xs" contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                                <Line type="monotone" dataKey="settlement" stroke="#1d4ed8" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                                <Line type="monotone" dataKey="cm" stroke="#15803d" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Section>
+            )}
+
+            <div className="overflow-x-auto rounded-md border">
+                <Table className="min-w-[760px] [&_tr:last-child_td]:border-b-0">
+                    <TableHeader>
+                        <TableRow className="bg-muted/60 hover:bg-muted/60">
+                            <TH>{t('shopeeTrendColPeriod')}</TH>
+                            <TH right>{t('shopeeColGmv')}</TH>
+                            <TH right>{t('shopeeTrendColNetGmv')}</TH>
+                            <TH right>{t('shopeeColSettlement')}</TH>
+                            <TH right>{t('shopeeImportContribution')}</TH>
+                            <TH right>{t('shopeeImportColCmPercent')}</TH>
+                            <TH right>{t('shopeeTrendColOrders')}</TH>
+                            <TH right>{t('shopeeTrendMoM')} ΔCM%</TH>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.map((p) => (
+                            <TableRow key={p.period} className={isCurrent(p) ? 'bg-primary/5 hover:bg-primary/5' : ''}>
+                                <TableCell className="py-1.5 px-3 text-sm font-medium">
+                                    {periodLabel(p)}
+                                    {isCurrent(p) && <span className="ml-1.5 text-[10px] text-primary">({t('shopeeTrendCurrent')})</span>}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums text-blue-700">{fmt(p.grossGmv)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(p.netGmv)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums text-blue-700">{fmt(p.settlement)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums text-green-700">{fmt(p.cm)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{p.cmPct != null ? `${(p.cmPct * 100).toFixed(1)}%` : '—'}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{p.ordersSettled}</TableCell>
+                                <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${momCls(p.momCmPct)}`}>{momTxt(p.momCmPct, 'pp')}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+            {series.length < 2 && (
+                <p className="text-[11px] text-muted-foreground px-1">{t('shopeeTrendNone')}</p>
+            )}
         </div>
     )
 }
@@ -716,6 +820,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                         <TabsTrigger value="summary">{t('shopeeImportTabPreview')}</TabsTrigger>
                         <TabsTrigger value="orders">{t('shopeeImportOrders')}</TabsTrigger>
                         <TabsTrigger value="sku">{t('shopeeImportTabPerSku')}</TabsTrigger>
+                        <TabsTrigger value="trend">{t('shopeeTrendTab')}</TabsTrigger>
                     </TabsList>
 
                     {/* ── Summary ── */}
@@ -1006,6 +1111,11 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                 </Table>
                             </div>
                         </div>
+                    </TabsContent>
+
+                    {/* ── Trend ── */}
+                    <TabsContent value="trend" className="mt-0">
+                        <TrendTab currentPeriod={{ year: active.period_year, month: active.period_month }} locale={locale} />
                     </TabsContent>
                 </Tabs>
 
