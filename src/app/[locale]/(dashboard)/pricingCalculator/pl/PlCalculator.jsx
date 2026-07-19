@@ -1,14 +1,20 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
+import {
+    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import {
     Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import services from "@/services"
-import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
+import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconReceiptTax } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Fragment, useEffect, useState, useMemo } from "react"
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts"
@@ -345,6 +351,122 @@ function TrendTab({ currentPeriod, locale }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// ─── P3: PPh tax-config (per account) ─────────────────────────────────────────
+
+const DEFAULT_TAX = { tipe_wp: 'OP', is_pkp: false, harga_termasuk_ppn: false, sudah_lapor_surat: false }
+
+// A labelled switch row used inside the tax dialog.
+function TaxToggle({ label, hint, checked, onChange }) {
+    return (
+        <div className="flex items-start justify-between gap-3 py-1.5">
+            <div className="space-y-0.5">
+                <p className="text-sm font-medium leading-none">{label}</p>
+                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+            </div>
+            <Switch checked={checked} onCheckedChange={onChange} />
+        </div>
+    )
+}
+
+function TaxSettingsDialog({ open, onOpenChange, config, onSaved }) {
+    const t = useTranslations('plpage')
+    const [form, setForm] = useState(config ?? DEFAULT_TAX)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        setForm({
+            tipe_wp: config?.tipe_wp ?? 'OP',
+            is_pkp: !!config?.is_pkp,
+            harga_termasuk_ppn: !!config?.harga_termasuk_ppn,
+            sudah_lapor_surat: !!config?.sudah_lapor_surat,
+        })
+    }, [config, open])
+
+    const set = (patch) => setForm(prev => ({ ...prev, ...patch }))
+
+    const save = async () => {
+        setSaving(true)
+        const res = await services.pl.updateTaxConfig(form)
+        setSaving(false)
+        if (!res?.error) {
+            onSaved?.(res?.data?.data ?? form)
+            onOpenChange(false)
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t('shopeeTaxTitle')}</DialogTitle>
+                    <DialogDescription>{t('shopeeTaxSubtitle')}</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3">
+                    <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t('shopeeTaxWpType')}</Label>
+                        <RadioGroup
+                            value={form.tipe_wp}
+                            onValueChange={(v) => set({ tipe_wp: v })}
+                            className="grid grid-cols-1 gap-2"
+                        >
+                            {[
+                                { v: 'OP', label: t('shopeeTaxWpOp'), hint: t('shopeeTaxWpOpHint') },
+                                { v: 'BADAN', label: t('shopeeTaxWpBadan'), hint: t('shopeeTaxWpBadanHint') },
+                            ].map(o => (
+                                <label
+                                    key={o.v}
+                                    htmlFor={`wp-${o.v}`}
+                                    className={`flex items-start gap-3 rounded-md border p-2.5 cursor-pointer transition-colors ${form.tipe_wp === o.v ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/40'}`}
+                                >
+                                    <RadioGroupItem id={`wp-${o.v}`} value={o.v} className="mt-0.5" />
+                                    <div className="space-y-0.5">
+                                        <p className="text-sm font-medium leading-none">{o.label}</p>
+                                        <p className="text-xs text-muted-foreground">{o.hint}</p>
+                                    </div>
+                                </label>
+                            ))}
+                        </RadioGroup>
+                    </div>
+
+                    <Separator />
+
+                    <TaxToggle
+                        label={t('shopeeTaxPkp')}
+                        checked={form.is_pkp}
+                        onChange={(v) => set({ is_pkp: v, harga_termasuk_ppn: v ? form.harga_termasuk_ppn : false })}
+                    />
+                    {form.is_pkp ? (
+                        <TaxToggle
+                            label={t('shopeeTaxPriceInclPpn')}
+                            hint={t('shopeeTaxPriceInclPpnHint')}
+                            checked={form.harga_termasuk_ppn}
+                            onChange={(v) => set({ harga_termasuk_ppn: v })}
+                        />
+                    ) : null}
+                    {form.tipe_wp === 'OP' ? (
+                        <TaxToggle
+                            label={t('shopeeTaxDeclared')}
+                            hint={t('shopeeTaxDeclaredHint')}
+                            checked={form.sudah_lapor_surat}
+                            onChange={(v) => set({ sudah_lapor_surat: v })}
+                        />
+                    ) : null}
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                        {t('shopeeTaxCancel')}
+                    </Button>
+                    <Button onClick={save} disabled={saving}>
+                        {saving ? t('shopeeTaxSaving') : t('shopeeTaxSave')}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 export default function PlCalculator({ editId, allIds, onBack }) {
     const locale = useLocale()
     const t = useTranslations('plpage')
@@ -352,6 +474,8 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     const [records, setRecords] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [forms, setForms] = useState({})
+    const [taxConfig, setTaxConfig] = useState(null)      // PPh regime (per account)
+    const [showTaxSettings, setShowTaxSettings] = useState(false)
     const [orderPage, setOrderPage] = useState(0)
     const [tab, setTab] = useState('summary')          // controlled tabs (for alert drill-down)
     const [skuFilter, setSkuFilter] = useState(null)   // { type:'parent'|'rule', value } | null
@@ -380,11 +504,13 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     }[cls] ?? cls)
 
     // ── Load ──────────────────────────────────────────────────────────────────
-    useEffect(() => {
+    // Single batched request for all of the period's records (was one per record).
+    // The backend computes PPh Final live from the tax config, so re-running this
+    // after saving the config refreshes the waterfall's PPh figure.
+    const loadRecords = () => {
         const ids = allIds?.length ? allIds : [editId]
         setIsLoading(true)
-        // Single batched request for all of the period's records (was one per record).
-        services.pl.getMonthlyByIds(ids)
+        return services.pl.getMonthlyByIds(ids)
             .then(res => {
                 const loaded = (res?.data?.data ?? res?.data ?? []).filter(Boolean)
                 setRecords(loaded)
@@ -393,6 +519,13 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 setForms(init)
             })
             .finally(() => setIsLoading(false))
+    }
+
+    useEffect(() => {
+        loadRecords()
+        services.pl.getTaxConfig().then(res => {
+            setTaxConfig(res?.data?.data ?? res?.data ?? DEFAULT_TAX)
+        })
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editId])
 
@@ -761,7 +894,25 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 <button type="button" onClick={onBack} className="text-sm hover:opacity-70">←</button>
                 <h2 className="text-xl font-bold">{t('plDetailTitle')}</h2>
                 {active.source === 'shopee' && <ShopeeChip />}
+                <Button
+                    variant="outline" size="sm"
+                    className="ml-auto h-8 gap-1.5 text-xs"
+                    onClick={() => setShowTaxSettings(true)}
+                >
+                    <IconReceiptTax size={15} />
+                    <span className="hidden sm:inline">{t('shopeeTaxEdit')}</span>
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                        {taxConfig?.tipe_wp === 'BADAN' ? t('shopeeTaxWpBadanShort') : t('shopeeTaxWpOpShort')}
+                    </span>
+                </Button>
             </div>
+
+            <TaxSettingsDialog
+                open={showTaxSettings}
+                onOpenChange={setShowTaxSettings}
+                config={taxConfig}
+                onSaved={(cfg) => { setTaxConfig(cfg); loadRecords() }}
+            />
 
             <div className="px-4 lg:px-6"><Separator /></div>
 
