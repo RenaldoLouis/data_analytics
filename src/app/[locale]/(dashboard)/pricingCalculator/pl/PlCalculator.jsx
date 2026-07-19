@@ -12,7 +12,7 @@ import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight 
 import { useLocale, useTranslations } from "next-intl"
 import { Fragment, useEffect, useState, useMemo } from "react"
 import { classifyOrderRow, cogsUnitsForRow, fmt } from "./plLib"
-import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
+import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, ProfitWaterfall, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,6 +88,10 @@ function buildFormFromRecord(rec) {
         transaction_fee_amount: toInt(sh.transaction_fee_amount),
         campaign_fee_amount: toInt(sh.campaign_fee_amount),
         affiliate_commission_amount: toInt(sh.affiliate_commission_amount),
+        // July 2026 improvements — structural (Rp 0 until Aug 2026)
+        ads_spend_amount: toInt(sh.ads_spend_amount),
+        pph_final_amount: toInt(sh.pph_final_amount),
+        affiliate_seller_amount: toInt(d.affiliate_seller_amount),
         _sales: salesArr.map(s => ({
             order_no: s.order_no ?? '',
             units_sold: toInt(s.units_sold),
@@ -112,8 +116,16 @@ function SummaryTab({ agg }) {
     const cl = (v, positive) => positive ? (v > 0 ? 'text-blue-700' : 'text-muted-foreground/60')
         : (v > 0 ? 'text-red-600' : 'text-muted-foreground/60')
 
+    const waterfall = {
+        grossGmv: agg.grossGmv, promo: agg.totalDisc, sellerFees: agg.totalFees,
+        affiliate: agg.affiliateSeller, pph: agg.pphFinal, netShipping: agg.netShipping,
+        refund: agg.refund, settlement: agg.settlement, cogs: agg.totalCogs,
+        returLoss: agg.returLoss, ads: agg.adsSpend,
+    }
+
     return (
         <div className="space-y-3">
+            <ProfitWaterfall t={t} data={waterfall} />
             <Section title={t('shopeeImportSectionRevenue')}>
                 <AuditTable noBorder rows={[
                     { label: t('shopeeImportRevenueGross'), value: agg.grossGmv, cls: 'text-blue-700' },
@@ -276,11 +288,16 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 totalCogs += cogsUnit * n(f.units_sold)
             }
         }
+        // July 2026 improvements — structural fields (Rp 0 until Aug 2026)
+        const adsSpend = sum((f) => n(f.ads_spend_amount))
+        const pphFinal = sum((f) => n(f.pph_final_amount))
+        const affiliateSeller = sum((f) => n(f.affiliate_seller_amount))
         return {
             grossGmv, settlement, voucher, sellerDiscount, voucherCof, coin, coinCof, totalDisc,
             refund, platformVoucher, subsidy, buyerShipping, shipCost, netShipping,
             commFee, svcFee, procFee, txFee, campFee, affFee, totalFees,
             totalCogs, returLoss,
+            adsSpend, pphFinal, affiliateSeller,
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [records, forms])

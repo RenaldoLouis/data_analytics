@@ -468,6 +468,13 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 { tKey: 'shopeeImportFeeAffiliate',   field: 'affiliate_commission', value: Math.round(totals.affiliateFee) },
             ],
             channel_fees_total:   Math.round(feeTotal),
+            // ── July 2026 improvements — structural, Rp 0 until Aug 2026 ──────────────
+            // Ads comes from a separate Shopee Ads report (not the income/order files);
+            // PPh Final 0,5% (PMK 37/2025) is conditional on taxpayer type + YTD omzet;
+            // seller-funded affiliate needs a dedicated column. All 0 for July's data.
+            ads_spend:            0,
+            pph_final:            0,
+            affiliate_seller:     0,
             buyer_shipping_paid:  Math.round(totals.buyerShipping),
             shipping_subsidy:     Math.round(totals.shippingSubsidy),
             actual_shipping_cost: Math.round(totals.actualShipping),

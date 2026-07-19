@@ -18,7 +18,7 @@ import { useLocale, useTranslations } from "next-intl"
 import services from "@/services"
 import { classifyOrderRow, cogsUnitsForRow, fmt } from "./plLib"
 import { parseShopeeReports } from "./plShopeeParser"
-import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, Section, SectionHeader } from "./PlComponents"
+import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, ProfitWaterfall, Section, SectionHeader } from "./PlComponents"
 
 const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -347,6 +347,16 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [d, skuList, skuMapping])
 
+    // Profit Waterfall input (mirrors the saved detail so preview == stored).
+    const waterfall = {
+        grossGmv, promo: d.discount_total, sellerFees: feeTotal,
+        affiliate: d.affiliate_seller ?? 0, pph: d.pph_final ?? 0, netShipping: d.net_shipping ?? 0,
+        refund: d.refund_amount ?? 0, settlement,
+        cogs: enrichedSales.reduce((s, p) => s + (p.total_cogs ?? 0), 0),
+        returLoss: enrichedSales.reduce((s, p) => s + (p.retur_loss ?? 0), 0),
+        ads: d.ads_spend ?? 0,
+    }
+
     // Prefer order_report_rows (has product names + qty from order report, enriched with financial data)
     const orderReportRows = d.order_report_rows ?? []
     const useOrderReport = orderReportRows.length > 0
@@ -425,6 +435,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
 
                 {/* ── Preview ── */}
                 <TabsContent value="preview" className="mt-0 space-y-3">
+                    <ProfitWaterfall t={t} data={waterfall} />
                     {/* SKU / Sales table */}
                     <Section title={t('shopeeImportSectionRevenue')}>
                         <AuditTable noBorder rows={[
@@ -848,6 +859,10 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                 actualShipping:  allocateInt(parsedData.actual_shipping_cost ?? 0, weights),
                 refund:          allocateInt(parsedData.refund_amount        ?? 0, weights),
                 settlement:      allocateInt(parsedData.settlement_report ?? totalSettlement, weights),
+                // July 2026 improvements — structural (Rp 0 until Aug 2026)
+                adsSpend:        allocateInt(parsedData.ads_spend        ?? 0, weights),
+                pphFinal:        allocateInt(parsedData.pph_final        ?? 0, weights),
+                affiliateSeller: allocateInt(parsedData.affiliate_seller ?? 0, weights),
             }
 
             const matchedOrdersCount = (parsedData.order_report_rows?.length > 0
@@ -882,6 +897,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                         coin_cofund_amount:      alloc.coinCofund[idx],
                         discount_amount:         alloc.discountTotal[idx],
                         platform_voucher_amount: alloc.platformVoucher[idx],
+                        affiliate_seller_amount: alloc.affiliateSeller[idx],
                     }],
                     shippings: [{
                         // Stored separately so the P/L detail shows Buyer / Subsidy / Carrier like
@@ -895,6 +911,8 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                         transaction_fee_amount:      alloc.transactionFee[idx],
                         campaign_fee_amount:         alloc.campaignFee[idx],
                         affiliate_commission_amount: alloc.affiliateFee[idx],
+                        ads_spend_amount:            alloc.adsSpend[idx],
+                        pph_final_amount:            alloc.pphFinal[idx],
                     }],
                     returns: [{
                         actual_refund_amount: alloc.refund[idx],
