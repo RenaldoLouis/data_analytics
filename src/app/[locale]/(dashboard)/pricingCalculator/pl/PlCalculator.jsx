@@ -11,7 +11,8 @@ import services from "@/services"
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Fragment, useEffect, useState, useMemo } from "react"
-import { classifyOrderRow, cogsUnitsForRow, fmt } from "./plLib"
+import { classifyOrderRow, cogsUnitsForRow, fmt, parentSku } from "./plLib"
+import { evaluateSkuAlerts, sortAlertRows, topSeverity } from "./plAlerts"
 import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, ProfitWaterfall, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -104,9 +105,65 @@ function buildFormFromRecord(rec) {
     }
 }
 
+// ─── P1: Alert badge + panel ──────────────────────────────────────────────────
+
+const SEVERITY_STYLE = {
+    critical: 'bg-red-100 text-red-700 border-red-300',
+    high:     'bg-orange-100 text-orange-700 border-orange-300',
+    medium:   'bg-amber-100 text-amber-700 border-amber-300',
+    low:      'bg-slate-100 text-slate-700 border-slate-300',
+    info:     'bg-slate-100 text-slate-600 border-slate-300',
+}
+const ruleLabel = (t, rule) => t(`shopeeAlertRule${rule}`)
+
+function AlertBadge({ t, severity, rule }) {
+    return (
+        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${SEVERITY_STYLE[severity] ?? SEVERITY_STYLE.info}`}>
+            {ruleLabel(t, rule)}
+        </span>
+    )
+}
+
+// "Alerts & Insights" panel — flagged parent SKUs only, sorted by severity → |CM|.
+function AlertsPanel({ t, rows, onDrill }) {
+    if (!rows.length) {
+        return (
+            <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5">
+                <span className="text-green-600 flex-shrink-0">✓</span>
+                <p className="text-xs text-green-800">{t('shopeeAlertNone')}</p>
+            </div>
+        )
+    }
+    return (
+        <div className="rounded-md border overflow-hidden">
+            <SectionHeader title={t('shopeeAlertTitle')} />
+            <div className="divide-y">
+                {rows.map((p) => {
+                    const name = p.names.size ? Array.from(p.names)[0] : p.parent
+                    return (
+                        <button key={p.parent} type="button" onClick={() => onDrill?.(p.parent)}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 transition-colors">
+                            <p className="text-sm font-medium truncate min-w-0 flex-1">{name}
+                                <span className="text-[11px] text-muted-foreground font-normal ml-1.5">{p.parent}</span>
+                            </p>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                                {p.flags.map(f => <AlertBadge key={f.rule} t={t} severity={f.severity} rule={f.rule} />)}
+                            </div>
+                            <div className="flex-shrink-0 text-[11px] tabular-nums text-muted-foreground whitespace-nowrap">
+                                {p.cmPct != null ? `CM ${(p.cmPct * 100).toFixed(1)}%` : 'CM —'} · {t('shopeeAlertReturnRate')} {(p.returnRate * 100).toFixed(1)}%
+                            </div>
+                            <span className="flex-shrink-0 text-[11px] text-primary ml-4">{t('shopeeAlertDrill')} →</span>
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
+
 // ─── Summary Tab ─────────────────────────────────────────────────────────────
 
-function SummaryTab({ agg }) {
+function SummaryTab({ agg, alertRows, onDrill }) {
     const t = useTranslations('plpage')
     // Formula matches import modal: GMV − Seller Discount − Channel Fees + Net Shipping − Returns
     const calculated = agg.grossGmv - agg.totalDisc - agg.totalFees + agg.netShipping - agg.refund
@@ -125,6 +182,7 @@ function SummaryTab({ agg }) {
 
     return (
         <div className="space-y-3">
+            <AlertsPanel t={t} rows={alertRows ?? []} onDrill={onDrill} />
             <ProfitWaterfall t={t} data={waterfall} />
             <Section title={t('shopeeImportSectionRevenue')}>
                 <AuditTable noBorder rows={[
@@ -191,6 +249,8 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     const [isLoading, setIsLoading] = useState(true)
     const [forms, setForms] = useState({})
     const [orderPage, setOrderPage] = useState(0)
+    const [tab, setTab] = useState('summary')          // controlled tabs (for alert drill-down)
+    const [skuFilter, setSkuFilter] = useState(null)   // { type:'parent'|'rule', value } | null
     // Expand/collapse state for the per-order & per-SKU channel-fee detail rows.
     const [expandedOrders, setExpandedOrders] = useState(() => new Set())
     const [expandedSkus, setExpandedSkus] = useState(() => new Set())
@@ -201,6 +261,10 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     })
     const toggleOrder = toggleKey(setExpandedOrders)
     const toggleSku = toggleKey(setExpandedSkus)
+
+    // Drill-down: clicking an alert jumps to the SKU tab filtered to that parent.
+    const drillToParent = (parent) => { setSkuFilter({ type: 'parent', value: parent }); setTab('sku') }
+    const chipCls = (on) => `px-2 py-0.5 rounded-full text-[11px] border cursor-pointer transition-colors ${on ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-input hover:bg-muted/50'}`
 
     // Improvement A: localized label for an order's classification bucket.
     const classLabel = (cls) => ({
@@ -385,7 +449,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 for (const r of reportRows.filter(r => productNames.includes(r.product_name))) {
                     // SETTLED only (Improvement A) — skip cancelled, pending & cross-period.
                     if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
-                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0, settlement: 0, cogsUnits: 0, lossUnits: 0 }
+                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0, refundedUnits: 0, settlement: 0, cogsUnits: 0, lossUnits: 0 }
                     const pm = productMap[r.product_name]
                     pm.gmv += r.gmv || 0
                     // Bug #1 + Improvement B: COGS on completed units; non-restockable
@@ -395,7 +459,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     pm.lossUnits += loss
                     const oa = orderAgg[(r.order_no ?? '').trim()]
                     if (oa && oa.totalGmv > 0) pm.settlement += oa.settlement * ((r.gmv || 0) / oa.totalGmv)   // Bug 1
-                    if (r.refunded) pm.refund += r.gmv || 0     // refunded value
+                    if (r.refunded) { pm.refund += r.gmv || 0; pm.refundedUnits += r.qty || 0 }   // refunded value + units (P1 return rate)
                     else            pm.units  += r.qty || 0     // completed → QTY display
                 }
 
@@ -421,7 +485,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     const returLoss = cogsUnit * p.lossUnits           // Improvement B: non-restockable
                     const contribution = settlement - cogs - returLoss
                     // Improvement A: CM% over Settlement; n/a when settlement ≤ 0.
-                    return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
+                    return { rec, productName, skuCode: rec.sku_code, cogsUnit, units: p.units, refundedUnits: p.refundedUnits, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
                         cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null }
                 })
             }
@@ -445,11 +509,95 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             const returLoss = 0   // no order report → refunds already excluded from units_sold
             const contribution = settlement - cogs - returLoss
             // Improvement A: CM% over Settlement; n/a when settlement ≤ 0.
-            return [{ rec, productName: canonicalName(rec), units, grossGmv, refundGmv: 0, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
+            return [{ rec, productName: canonicalName(rec), skuCode: rec.sku_code, cogsUnit, units, refundedUnits: 0, grossGmv, refundGmv: 0, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
                 cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null }]
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [records, forms])
+
+    // ── P1: per-parent-SKU roll-up + alert evaluation ───────────────────────────
+    // Group the per-variant skuRows by parent code (FSH-006-* → FSH-006). CM/CM% at
+    // parent level are pro-rata sums (approximate for multi-item orders); return rate
+    // is exact from the order-line refunded/sold units.
+    const parentRows = useMemo(() => {
+        const map = new Map()
+        for (const r of skuRows) {
+            const key = parentSku(r.skuCode) || r.productName
+            if (!map.has(key)) map.set(key, {
+                parent: key, variants: [], names: new Set(),
+                units: 0, refundedUnits: 0, grossGmv: 0, refundGmv: 0,
+                settlement: 0, cogs: 0, returLoss: 0, contribution: 0,
+                promoSeller: 0, missingCogs: false,
+            })
+            const g = map.get(key)
+            g.variants.push(r)
+            if (r.productName) g.names.add(r.productName)
+            g.units += r.units || 0
+            g.refundedUnits += r.refundedUnits || 0
+            g.grossGmv += r.grossGmv || 0
+            g.refundGmv += r.refundGmv || 0
+            g.settlement += r.settlement || 0
+            g.cogs += r.cogs || 0
+            g.returLoss += r.returLoss || 0
+            g.contribution += r.contribution || 0
+            g.promoSeller += r.discPenjual || 0
+            // Data quality: a variant that sold units but has no parent COGS (0) → flag.
+            if ((r.units || 0) > 0 && !(r.cogsUnit > 0)) g.missingCogs = true
+        }
+        // Per-record Aug-only fields (affiliate/ads), summed once per record within a parent.
+        const seenRec = new Set()
+        for (const r of skuRows) {
+            const key = parentSku(r.skuCode) || r.productName
+            const g = map.get(key)
+            const recId = r.rec?.id
+            if (!g || !recId || seenRec.has(recId)) continue
+            seenRec.add(recId)
+            const f = forms[recId] ?? {}
+            g.affiliateSeller = (g.affiliateSeller || 0) + n(f.affiliate_seller_amount)
+            g.adsSpend = (g.adsSpend || 0) + n(f.ads_spend_amount)
+        }
+        return Array.from(map.values()).map(g => {
+            const soldUnits = (g.units || 0) + (g.refundedUnits || 0)
+            const cm = g.contribution
+            const cmPct = g.settlement > 0 ? cm / g.settlement : null
+            const netGmv = g.grossGmv - g.refundGmv
+            const metrics = {
+                settlement: g.settlement, cm, cmPct,
+                returnRate: soldUnits > 0 ? (g.refundedUnits / soldUnits) : 0,
+                promoSeller: g.promoSeller, affiliate: g.affiliateSeller || 0, ads: g.adsSpend || 0,
+                netGmv, missingCogs: g.missingCogs,
+            }
+            const flags = evaluateSkuAlerts(metrics)
+            return { ...g, ...metrics, soldUnits, flags, topSeverity: topSeverity(flags) }
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [skuRows, forms])
+
+    // Parent → its flags (for rolling the badge up onto each variant row in the SKU tab).
+    const alertsByParent = useMemo(() => {
+        const m = {}
+        for (const p of parentRows) if (p.flags.length) m[p.parent] = p
+        return m
+    }, [parentRows])
+
+    const alertRows = useMemo(() => sortAlertRows(parentRows.filter(p => p.flags.length)), [parentRows])
+
+    // SKU-tab filtering (parent drill-down from an alert, or a rule chip).
+    const filteredSkuRows = useMemo(() => {
+        if (!skuFilter) return skuRows
+        if (skuFilter.type === 'parent') return skuRows.filter(r => (parentSku(r.skuCode) || r.productName) === skuFilter.value)
+        if (skuFilter.type === 'rule') return skuRows.filter(r => {
+            const p = alertsByParent[parentSku(r.skuCode) || r.productName]
+            return p && p.flags.some(f => f.rule === skuFilter.value)
+        })
+        return skuRows
+    }, [skuRows, skuFilter, alertsByParent])
+
+    const alertRuleOptions = useMemo(() => {
+        const s = new Set()
+        for (const p of parentRows) for (const f of p.flags) s.add(f.rule)
+        return Array.from(s)
+    }, [parentRows])
 
     // ── Loading ───────────────────────────────────────────────────────────────
     if (isLoading) return (
@@ -563,7 +711,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 ]} />
 
                 {/* ══ TABS ════════════════════════════════════════════════════════════ */}
-                <Tabs defaultValue="summary">
+                <Tabs value={tab} onValueChange={setTab}>
                     <TabsList className="mb-3">
                         <TabsTrigger value="summary">{t('shopeeImportTabPreview')}</TabsTrigger>
                         <TabsTrigger value="orders">{t('shopeeImportOrders')}</TabsTrigger>
@@ -572,7 +720,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
 
                     {/* ── Summary ── */}
                     <TabsContent value="summary" className="mt-0">
-                        <SummaryTab agg={agg} />
+                        <SummaryTab agg={agg} alertRows={alertRows} onDrill={drillToParent} />
                     </TabsContent>
 
                     {/* ── Orders ── */}
@@ -753,9 +901,22 @@ export default function PlCalculator({ editId, allIds, onBack }) {
 
                     {/* ── SKU ── */}
                     <TabsContent value="sku" className="mt-0 space-y-3">
+                        {(alertRuleOptions.length > 0 || skuFilter) && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[11px] text-muted-foreground mr-1">{t('shopeeFilterLabel')}:</span>
+                                <button type="button" className={chipCls(!skuFilter)} onClick={() => setSkuFilter(null)}>{t('shopeeAlertFilterAll')}</button>
+                                {alertRuleOptions.map(rule => (
+                                    <button key={rule} type="button" className={chipCls(skuFilter?.type === 'rule' && skuFilter.value === rule)}
+                                        onClick={() => setSkuFilter({ type: 'rule', value: rule })}>{ruleLabel(t, rule)}</button>
+                                ))}
+                                {skuFilter?.type === 'parent' && (
+                                    <button type="button" className={chipCls(true)} onClick={() => setSkuFilter(null)}>{skuFilter.value} ✕</button>
+                                )}
+                            </div>
+                        )}
                         <div>
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[940px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
+                                <Table className="min-w-[1020px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
                                     <TableHeader>
                                         <TableRow className="bg-muted/60 hover:bg-muted/60">
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('shopeeImportTabPerSku')}</TableHead>
@@ -769,19 +930,26 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCogs')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColContribution')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCmPercent')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeColReturnRate')}</TableHead>
                                             <TableHead className="py-1.5 px-3 w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {skuRows.map(({ rec, productName, units, grossGmv, refundGmv, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution, cmPercent }, idx) => {
+                                        {filteredSkuRows.map(({ rec, productName, skuCode, units, refundedUnits, grossGmv, refundGmv, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution, cmPercent }, idx) => {
                                             const rowKey = `${rec.id}-${idx}`
                                             const isOpen = expandedSkus.has(rowKey)
+                                            const parentFlags = alertsByParent[parentSku(skuCode) || productName]?.flags ?? []
+                                            const soldU = (units || 0) + (refundedUnits || 0)
+                                            const returnRate = soldU > 0 ? (refundedUnits || 0) / soldU : 0
                                             return (
                                                 <Fragment key={rowKey}>
                                                     <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleSku(rowKey)}>
                                                         <TableCell className="py-1.5 px-3">
                                                             <p className="font-medium text-sm">{productName}</p>
-                                                            <p className="text-[11px] text-muted-foreground mt-0.5">↳ {rec.sku_code ?? canonicalName(rec)}</p>
+                                                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                                                <p className="text-[11px] text-muted-foreground">↳ {rec.sku_code ?? canonicalName(rec)}</p>
+                                                                {parentFlags.map(f => <AlertBadge key={f.rule} t={t} severity={f.severity} rule={f.rule} />)}
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{units}</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(grossGmv)}</TableCell>
@@ -797,13 +965,14 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                         <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${cmPercent != null && cmPercent < 20 ? 'text-red-600' : ''}`}>
                                                             {cmPercent != null ? `${cmPercent.toFixed(1)}%` : <span className="text-muted-foreground/40">—</span>}
                                                         </TableCell>
+                                                        <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${returnRate > 0.05 ? 'text-red-600' : ''}`}>{(returnRate * 100).toFixed(1)}%</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-right">
                                                             <ExpandToggle open={isOpen} onClick={() => toggleSku(rowKey)} label={t('shopeeImportExpandFees')} />
                                                         </TableCell>
                                                     </TableRow>
                                                     {isOpen && (
                                                         <TableRow className="bg-muted/20 hover:bg-muted/20">
-                                                            <TableCell colSpan={12} className="py-2 px-3">
+                                                            <TableCell colSpan={13} className="py-2 px-3">
                                                                 <FeeBreakdownDetail t={t} fees={feeBreakdown} gmv={grossGmv} />
                                                             </TableCell>
                                                         </TableRow>
@@ -828,6 +997,9 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             </TableCell>
                                             {/* CM% total intentionally omitted — not meaningful as an aggregate */}
                                             <TableCell className="py-1.5 px-3" />
+                                            <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums font-semibold text-muted-foreground">
+                                                {(() => { const u = skuRows.reduce((a, r) => a + (r.units || 0), 0); const rf = skuRows.reduce((a, r) => a + (r.refundedUnits || 0), 0); const sold = u + rf; return `${(sold > 0 ? (rf / sold) * 100 : 0).toFixed(1)}%` })()}
+                                            </TableCell>
                                             <TableCell className="py-1.5 px-3" />
                                         </TableRow>
                                     </TableFooter>

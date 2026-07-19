@@ -72,6 +72,18 @@ export function cogsUnitsForRow(row) {
     return { core: 0, loss: 0 }
 }
 
+// ─── Parent SKU (July 2026 P1) ────────────────────────────────────────────────
+// Single source of truth for parent grouping used everywhere (alerts, roll-ups):
+// parent = the first two code segments, e.g. "FSH-006-GRE" → "FSH-006".
+// SKUs without a variant suffix or with a non-standard format fall back to the
+// whole trimmed code so nothing is dropped.
+export function parentSku(code) {
+    const c = String(code ?? '').trim()
+    if (!c) return ''
+    const parts = c.split('-')
+    return parts.length >= 2 ? `${parts[0]}-${parts[1]}` : c
+}
+
 export function getChColor(code, label) {
     const key = (label || code || "").toLowerCase()
     if (key.includes("shopee")) return { bg: "#fff7f0", color: "#c83200" }
