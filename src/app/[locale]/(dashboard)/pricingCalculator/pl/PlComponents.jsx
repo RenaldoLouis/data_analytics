@@ -321,15 +321,18 @@ export function AuditTable({ rows, subtotal, noBorder = false }) {
 
 // ─── ProfitWaterfall - full P&L chain Gross GMV → Net Operating Profit ────────
 // Invariants (July 2026 spec): subtotal after Return/Refund = Settlement; subtotal
-// after Return Loss = Contribution Margin; last step = Net Op. Profit (CM − Ads).
+// after Return Loss = Contribution Margin; last step = Net Op. Profit (CM - Ads).
 // `data` is normalized so the detail and the import preview share this component.
 // ── Profit Waterfall ─────────────────────────────────────────────────────────
 // Colors: totals/checkpoints (blue), final Net Profit (green), deductions (red),
 // additions (blue), tax/ads (amber), zero (grey).
 const WF = { total: '#1d4ed8', final: '#15803d', down: '#dc2626', up: '#2563eb', tax: '#f59e0b', zero: '#cbd5e1' }
+// Temporarily deactivated (July 2026): the PPh Final 0,5% step is hidden from the
+// waterfall until the real Aug 2026 data lands. Flip to true to re-show it.
+const SHOW_PPH_STEP = false
 // Format a value in millions ("juta"): 20449000 -> "20,45"
 const wfJt = (v) => (v / 1e6).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const wfDelta = (v) => v === 0 ? '0' : (v < 0 ? '−' : '+') + wfJt(Math.abs(v))
+const wfDelta = (v) => v === 0 ? '0' : (v < 0 ? '-' : '+') + wfJt(Math.abs(v))
 
 // Ordered, cumulative step list shared by both charts.
 function buildWfSteps(t, data) {
@@ -344,7 +347,7 @@ function buildWfSteps(t, data) {
         { key: 'promo',  short: 'Promo',  label: t('shopeeWfPromo'),       delta: -promo,       kind: 'sub' },
         { key: 'fees',   short: 'Fees',   label: t('shopeeWfSellerFees'),  delta: -sellerFees,  kind: 'sub' },
         { key: 'affil',  short: 'Affil',  label: t('shopeeWfAffiliate'),   delta: -affiliate,   kind: 'sub' },
-        { key: 'pph',    short: 'PPh',    label: t('shopeeWfPph'),         delta: -pph,         kind: 'tax' },
+        ...(SHOW_PPH_STEP ? [{ key: 'pph', short: 'PPh', label: t('shopeeWfPph'), delta: -pph, kind: 'tax' }] : []),
         { key: 'ship',   short: 'Ship',   label: t('shopeeWfNetShipping'), delta: netShipping,  kind: 'add' },
         { key: 'return', short: 'Return', label: t('shopeeWfReturn'),      delta: -refund,      kind: 'sub' },
         { key: 'settle', short: 'Settle', label: t('shopeeWfSettlement'),  total: settlement,   kind: 'checkpoint' },
@@ -450,7 +453,7 @@ function WaterfallBridge({ steps }) {
     )
 }
 
-// Graph 2: horizontal "expanded structure" — delta + running-total bar per step.
+// Graph 2: horizontal "expanded structure" - delta + running-total bar per step.
 // `fill` spreads the rows to occupy the full height of the card.
 function WaterfallStructure({ steps, fill = false }) {
     const maxRun = Math.max(...steps.map(s => Math.abs(s.running)), 1)
@@ -487,7 +490,7 @@ export function ProfitWaterfall({ t, data }) {
     const fullSteps = buildWfSteps(t, data)
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
-            {/* Left card — condensed bridge */}
+            {/* Left card - condensed bridge */}
             <div className="overflow-hidden rounded-md border flex flex-col">
                 <SectionHeader title={t('shopeeWfTitle')} />
                 <div className="p-3 flex-1 flex flex-col">
@@ -497,7 +500,7 @@ export function ProfitWaterfall({ t, data }) {
                     </div>
                 </div>
             </div>
-            {/* Right card — expanded structure (bars fill full card height) */}
+            {/* Right card - expanded structure (bars fill full card height) */}
             <div className="overflow-hidden rounded-md border flex flex-col">
                 <SectionHeader title={t('shopeeWfStructure')} />
                 <div className="p-3 flex-1 flex flex-col min-h-0">
@@ -610,7 +613,7 @@ export function FeeBreakdownDetail({ t, fees, gmv, emptyLabel }) {
                 the text block rather than stretching across the whole row. */}
             <div className="w-[28rem] max-w-full space-y-3">
 
-                {/* Stacked proportion bar — each segment is its share of total fees */}
+                {/* Stacked proportion bar - each segment is its share of total fees */}
                 <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
                     {rows.map(r => (
                         <div
@@ -631,16 +634,16 @@ export function FeeBreakdownDetail({ t, fees, gmv, emptyLabel }) {
                             <span className="truncate">{r.label}</span>
                         </span>
                         <span className="tabular-nums text-right w-24 text-foreground">{fmt(r.value)}</span>
-                        <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(r.value, grossGmv) ? `${pct(r.value, grossGmv)} GMV` : '—'}</span>
+                        <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(r.value, grossGmv) ? `${pct(r.value, grossGmv)} GMV` : '-'}</span>
                         <span className="tabular-nums text-right w-14 text-xs text-muted-foreground">{r.value === 0 ? '0%' : pct(r.value, total)}</span>
                     </div>
                 ))}
 
-                {/* Total — reconciles to the row's Channel Fees cell */}
+                {/* Total - reconciles to the row's Channel Fees cell */}
                 <div className="flex items-center gap-3 text-sm border-t pt-2 mt-2">
                     <span className="flex-1 min-w-0 font-medium truncate">{t('shopeeImportFeesTotal')}</span>
                     <span className="tabular-nums text-right w-24 font-semibold text-red-600">{fmt(total)}</span>
-                    <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(total, grossGmv) ? `${pct(total, grossGmv)} GMV` : '—'}</span>
+                    <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(total, grossGmv) ? `${pct(total, grossGmv)} GMV` : '-'}</span>
                     <span className="tabular-nums text-right w-14 text-xs text-muted-foreground">100%</span>
                 </div>
                 </div>

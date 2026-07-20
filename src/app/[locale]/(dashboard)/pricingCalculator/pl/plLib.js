@@ -29,7 +29,7 @@ export const toAmt = (v) => v != null && v !== '' ? String(Math.round(parseFloat
 export const toRate = (v, scale = 100) => v != null ? String(parseFloat((parseFloat(v) * scale).toFixed(4))) : '0'
 
 // ─── Improvement A: order classification ──────────────────────────────────────
-// Order still in transit (shipped) — outcome not final yet.
+// Order still in transit (shipped) - outcome not final yet.
 function isShipped(status) {
     const s = String(status ?? '').toLowerCase()
     return s.includes('dikirim') || s.includes('pengiriman') || s.includes('dalam perjalanan') ||
@@ -37,10 +37,10 @@ function isShipped(status) {
 }
 
 // Classify an order line into one bucket:
-//   SETTLED      — appears in this period's Income report (full P&L)
-//   CANCELLED    — cancelled, no money moved (excluded from everything)
-//   PENDING      — still shipping, not yet in Income (info only)
-//   CROSS_PERIOD — completed/returned but missing from Income; settles a later period (info only)
+//   SETTLED      - appears in this period's Income report (full P&L)
+//   CANCELLED    - cancelled, no money moved (excluded from everything)
+//   PENDING      - still shipping, not yet in Income (info only)
+//   CROSS_PERIOD - completed/returned but missing from Income; settles a later period (info only)
 // Works on both the parser's enriched rows and the stored rows (same field names).
 export function classifyOrderRow(row) {
     if (row?.income_matched) return 'SETTLED'
@@ -52,8 +52,8 @@ export function classifyOrderRow(row) {
 
 // ─── COGS recognition (July 2026 Bug #1 + Improvement B) ──────────────────────
 // Split an order line's units into COGS-bearing buckets:
-//   core — completed (Selesai) units → normal COGS.
-//   loss — refunded units the buyer did NOT return (non-restockable) → "Kerugian
+//   core - completed (Selesai) units → normal COGS.
+//   loss - refunded units the buyer did NOT return (non-restockable) → "Kerugian
 //          Retur", cost is lost. Restockable refunds return to the warehouse and
 //          bear NO COGS (Bug #1: previously charged on gross/refunded units).
 // Default is restockable (loss 0). A refunded line only becomes a loss when the

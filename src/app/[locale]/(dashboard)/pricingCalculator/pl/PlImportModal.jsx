@@ -89,7 +89,7 @@ function allocateInt(total, weights) {
     return out
 }
 
-// ─── Searchable SKU picker (no extra deps — Command/cmdk isn't installed) ──────
+// ─── Searchable SKU picker (no extra deps - Command/cmdk isn't installed) ──────
 function SkuCombobox({ skuList, placeholder, searchPlaceholder, noResults, onSelect }) {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
@@ -281,7 +281,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
         )
 
         // Per-product actual settlement (Bug 1) + units lost (Bug 2), from the order
-        // report — same logic as the saved P/L detail. Falls back to the GMV allocation
+        // report - same logic as the saved P/L detail. Falls back to the GMV allocation
         // / completed units when no order report was uploaded.
         const reportRows = d.order_report_rows ?? []
         const hasReport = reportRows.length > 0
@@ -381,7 +381,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                 )}
             </p>
 
-            {/* Contribution = settlement − COGS (from Per SKU tab enrichedSales) */}
+            {/* Contribution = settlement - COGS (from Per SKU tab enrichedSales) */}
             {(() => {
                 const totalCogs = enrichedSales.reduce((s, p) => s + (p.total_cogs ?? 0), 0)
                 const totalReturLoss = enrichedSales.reduce((s, p) => s + (p.retur_loss ?? 0), 0)
@@ -516,7 +516,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                         <TableHead className="text-right">{t('shopeeImportSectionFees')}</TableHead>
                                         <TableHead className="text-right">{t('shopeeImportShippingNet')}</TableHead>
                                         <TableHead className="text-right">{t('shopeeImportColSettlement')}</TableHead>
-                                        <TableHead className="w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
+                                        <TableHead className="w-10 pr-3 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -617,10 +617,10 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                 {/* ── Per SKU ── */}
                 <TabsContent value="per-sku" className="mt-0">
                     <div className="overflow-x-auto rounded-lg border">
-                        <Table className="min-w-[920px] [&_th]:text-[11px] [&_td]:text-xs">
+                        <Table className="min-w-[980px] [&_th]:text-[11px] [&_td]:text-xs">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[200px]">SKU</TableHead>
+                                    <TableHead className="w-[260px]">SKU</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColUnitsSold')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColGrossGmv')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColRefund')}</TableHead>
@@ -631,7 +631,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                     <TableHead className="text-right">{t('shopeeImportColCogs')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColContribution')}</TableHead>
                                     <TableHead className="text-right">{t('shopeeImportColCmPercent')}</TableHead>
-                                    <TableHead className="w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
+                                    <TableHead className="w-10 pr-3 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -641,8 +641,8 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                     return (
                                         <Fragment key={s.sku}>
                                             <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleSku(s.sku)}>
-                                                <TableCell className="w-[200px] max-w-[200px] whitespace-normal">
-                                                    <p className="font-medium leading-snug">{s.sku}</p>
+                                                <TableCell className="w-[260px] max-w-[260px] whitespace-normal">
+                                                    <p className="font-medium text-sm leading-snug">{s.sku}</p>
                                                     {mappedCode && <p className="text-[10px] text-primary font-medium mt-0.5">→ {mappedCode}</p>}
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums">{s.units_sold}</TableCell>
@@ -661,7 +661,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                                 <TableCell className={`text-right tabular-nums ${s.cm_percent != null && s.cm_percent < 20 ? 'text-red-600' : ''}`}>
                                                     {s.cm_percent != null ? `${s.cm_percent.toFixed(1)}%` : <span className="text-muted-foreground/40">-</span>}
                                                 </TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="pr-3 text-right">
                                                     <ExpandToggle open={isOpen} onClick={() => toggleSku(s.sku)} label={t('shopeeImportExpandFees')} />
                                                 </TableCell>
                                             </TableRow>
@@ -703,7 +703,7 @@ function Step2({ t, year, monthIdx, locale, data, skuMapping = {}, skuList = [] 
                                                 <TableCell className={`text-right tabular-nums font-medium ${hasContrib ? (totalContrib >= 0 ? 'text-green-700' : 'text-red-600') : ''}`}>
                                                     {hasContrib ? fmt(totalContrib) : <span className="text-muted-foreground/40">-</span>}
                                                 </TableCell>
-                                                {/* CM% total intentionally omitted — not meaningful as an aggregate */}
+                                                {/* CM% total intentionally omitted - not meaningful as an aggregate */}
                                                 <TableCell />
                                                 <TableCell />
                                             </>
@@ -838,7 +838,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
             const groups = Object.values(bySkuId)
             // Weight per record = its gross GMV share (same basis the Confirm modal uses
             // for per-SKU allocation). Largest-remainder so every column's slices sum
-            // EXACTLY to the import total — no per-record rounding drift.
+            // EXACTLY to the import total - no per-record rounding drift.
             const weights = groups.map(g => g.grossGmv)
             const alloc = {
                 voucher:         allocateInt(getDisc('shopeeImportDiscountVoucher'),       weights),
@@ -859,7 +859,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                 actualShipping:  allocateInt(parsedData.actual_shipping_cost ?? 0, weights),
                 refund:          allocateInt(parsedData.refund_amount        ?? 0, weights),
                 settlement:      allocateInt(parsedData.settlement_report ?? totalSettlement, weights),
-                // July 2026 improvements — structural (Rp 0 until Aug 2026)
+                // July 2026 improvements - structural (Rp 0 until Aug 2026)
                 adsSpend:        allocateInt(parsedData.ads_spend        ?? 0, weights),
                 pphFinal:        allocateInt(parsedData.pph_final        ?? 0, weights),
                 affiliateSeller: allocateInt(parsedData.affiliate_seller ?? 0, weights),
@@ -901,7 +901,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
                     }],
                     shippings: [{
                         // Stored separately so the P/L detail shows Buyer / Subsidy / Carrier like
-                        // the import modal. Net shipping = buyer-paid (+) − courier cost (−) ≈ 0 (Bug #2).
+                        // the import modal. Net shipping = buyer-paid (+) - courier cost (-) ≈ 0 (Bug #2).
                         buyer_shipping_paid:         alloc.buyerShipping[idx],
                         shipping_subsidy:            alloc.shippingSubsidy[idx],
                         actual_shipping_cost:        alloc.actualShipping[idx],
@@ -962,7 +962,7 @@ export default function PlImportModal({ open, onOpenChange, onSkip, takenPeriods
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose() }}>
             <DialogContent
-                className="md:max-w-5xl h-[85vh] flex flex-col gap-0 p-0 overflow-hidden"
+                className="md:max-w-6xl h-[88vh] flex flex-col gap-0 p-0 overflow-hidden"
                 preventClose
             >
 

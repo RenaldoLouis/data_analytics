@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 
-// Section markers — names match the website accordion titles
+// Section markers - names match the website accordion titles
 export const PL_EXCEL_SECTIONS = {
     BASIC_INFO:    '>> BASIC INFO <<',
     BUNDLING:      '>> COGS / HPP <<',
@@ -29,7 +29,7 @@ function buildSkuRows(channels, skuName, product = {}) {
     const push = (...cells) => rows.push(cells)
     const blank = () => rows.push([])
 
-    push(`Monthly P&L — SKU: ${skuName}`)
+    push(`Monthly P&L - SKU: ${skuName}`)
     push('Instructions: Fill in the input columns only. Do not change section headers or channel names.')
     blank()
 
@@ -96,7 +96,7 @@ function buildFilledRows(channels, skuName, formData, product = {}) {
     const { infoData = {}, adsData = {}, discountData = {}, returnData = {},
         shippingData = {}, bundlingData = {}, customRows = [] } = formData
 
-    push(`Monthly P&L — SKU: ${skuName}`)
+    push(`Monthly P&L - SKU: ${skuName}`)
     push('Exported data. Import this file on any month to pre-fill all fields.')
     blank()
 

@@ -1,12 +1,22 @@
 // ─── P1 · SKU Alert engine (July 2026 spec) ───────────────────────────────────
-// Rules engine over per-parent-SKU metrics. CM = Settlement − COGS(settled units)
+// Rules engine over per-parent-SKU metrics. CM = Settlement - COGS(settled units)
 // (Bug #1), CM% = CM ÷ Settlement (Improvement A), return rate = returned units ÷
 // units sold. Thresholds are the documented defaults (hardcoded for now).
 
 export const ALERT_THRESHOLDS = {
     lowMarginPct:   0.10,  // CM% below this → LOW_MARGIN
     highReturnRate: 0.05,  // return rate above this → HIGH_RETURN
-    heavyPct:       0.20,  // promo / affiliate / ads above this share of Net GMV → *_HEAVY
+}
+
+// Map the persisted per-account config (snake_case fractions) onto the engine's
+// threshold shape, falling back to the documented defaults for any missing field.
+export function thresholdsFromConfig(cfg) {
+    if (!cfg) return ALERT_THRESHOLDS
+    const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d)
+    return {
+        lowMarginPct:   num(cfg.low_margin_pct,   ALERT_THRESHOLDS.lowMarginPct),
+        highReturnRate: num(cfg.high_return_rate, ALERT_THRESHOLDS.highReturnRate),
+    }
 }
 
 // Lower rank = more severe (drives sort order).
@@ -18,18 +28,15 @@ export const ALERT_RULES = {
     NO_COGS:         { severity: 'high' },
     LOW_MARGIN:      { severity: 'high' },
     HIGH_RETURN:     { severity: 'medium' },
-    PROMO_HEAVY:     { severity: 'medium' },
-    AFFILIATE_HEAVY: { severity: 'medium' },
-    ADS_HEAVY:       { severity: 'medium' },
 }
 
-// Evaluate one parent-SKU's metrics against every rule. Returns the flags it trips
+// Evaluate one SKU's metrics against every rule. Returns the flags it trips
 // (empty array = healthy → not shown in the alert panel).
-// metrics: { settlement, cm, cmPct, returnRate, promoSeller, affiliate, ads, netGmv, missingCogs }
+// metrics: { settlement, cm, cmPct, returnRate, missingCogs }
 export function evaluateSkuAlerts(m, th = ALERT_THRESHOLDS) {
     const flags = []
 
-    // Data quality first — a variant with no parent COGS is surfaced, never silently skipped.
+    // Data quality first - a variant with no parent COGS is surfaced, never silently skipped.
     if (m.missingCogs) flags.push('NO_COGS')
 
     // Margin rules only meaningful when there is settlement to divide by.
@@ -39,15 +46,6 @@ export function evaluateSkuAlerts(m, th = ALERT_THRESHOLDS) {
     }
 
     if ((m.returnRate ?? 0) > th.highReturnRate) flags.push('HIGH_RETURN')
-
-    // *_HEAVY are based on per-parent Net GMV. In July these inputs are 0 → dormant;
-    // they light up from Aug once promo/affiliate/ads carry values.
-    const netGmv = m.netGmv ?? 0
-    if (netGmv > 0) {
-        if ((m.promoSeller ?? 0) > th.heavyPct * netGmv) flags.push('PROMO_HEAVY')
-        if ((m.affiliate ?? 0)  > th.heavyPct * netGmv) flags.push('AFFILIATE_HEAVY')
-        if ((m.ads ?? 0)        > th.heavyPct * netGmv) flags.push('ADS_HEAVY')
-    }
 
     return flags.map(rule => ({ rule, severity: ALERT_RULES[rule].severity }))
 }

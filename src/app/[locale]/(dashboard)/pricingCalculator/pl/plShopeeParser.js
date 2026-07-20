@@ -10,22 +10,22 @@ const COL_INCOME = {
     orderStatus:    ['status pesanan', 'order status'],
     // Seller-funded discounts
     voucher:        ['voucher ditanggung penjual', 'voucher disponsor oleh penjual', 'voucher dispons', 'diskon dari voucher penjual', 'seller voucher', 'voucher penjual'],
-    // "Diskon dari Seller / Penjual" (col U) — distinct seller-funded discount (Improvement B).
+    // "Diskon dari Seller / Penjual" (col U) - distinct seller-funded discount (Improvement B).
     sellerDiscount: ['diskon dari seller', 'diskon seller'],
     voucherCofund:  ['voucher co-fund disponsor', 'voucher co-fund', 'diskon dari voucher shopee', 'shopee voucher'],
     coin:           ['cashback koin dispons', 'koin shopee yang digunakan', 'koin yang digunakan'],
     coinCofund:     ['cashback koin co-fund', 'koin co-fund'],
     totalDiscount:  ['total diskon produk', 'total diskon', 'total discount'],
-    // "Pengembalian Dana (Produk)" (col J) — buyer refund on returns.
+    // "Pengembalian Dana (Produk)" (col J) - buyer refund on returns.
     refundAmount:   ['jumlah pengembalian dana', 'pengembalian dana ke pembeli', 'pengembalian dana', 'refund amount'],
-    // Channel fees — Shopee income report naming:
+    // Channel fees - Shopee income report naming:
     //   "Biaya Administrasi"           = main commission/admin fee (% of order)
     //   "Biaya Layanan"                = platform service fee
     //   "Biaya Proses Pesanan"         = order processing fee (fixed per order)
     //   "Biaya Program Hemat Biaya Kirim" = shipping savings program fee
     //   "Biaya Kampanye"               = campaign fee
     //   "Biaya Komisi AMS"             = AMS affiliate commission (usually 0)
-    // NOTE: commissionFee must NOT match "Biaya Komisi AMS" — that column appears
+    // NOTE: commissionFee must NOT match "Biaya Komisi AMS" - that column appears
     //       before "Biaya Administrasi" in the xlsx so we use the most specific pattern.
     commissionFee:  ['biaya administrasi', 'commission fee', 'admin fee'],
     serviceFee:     ['biaya layanan', 'service fee'],
@@ -40,7 +40,7 @@ const COL_INCOME = {
     actualShipping:  ['biaya pengiriman ke kurir', 'pengiriman ke kurir', 'ongkir ke kurir', 'ongkir yang diteruskan', 'ongkir yang diterimakan ke kurir', 'diterimakan ke kurir', 'diteruskan oleh shopee', 'biaya ongkir yang ditanggung penjual', 'ongkos kirim aktual', 'actual shipping'],
     // Buyer-paid shipping (col P "Ongkos Kirim Dibayar/Berbayar Pembeli").
     buyerShipping:   ['ongkos kirim dibayar pembeli', 'ongkos kirim berbayar pembeli', 'ongkir berbayar pembeli', 'ongkir dibayar pembeli', 'ongkos kirim yang dibayar pembeli', 'buyer shipping'],
-    // Settlement — "Total Penghasilan" is the net payout to the seller
+    // Settlement - "Total Penghasilan" is the net payout to the seller
     settlement:      ['total penghasilan', 'total pemasukan', 'jumlah pemasukan', 'settlement amount', 'total diterima'],
 }
 
@@ -48,7 +48,7 @@ const COL_ORDER = {
     orderNo:        ['no. pesanan', 'order id', 'no pesanan'],
     productName:    ['nama produk', 'product name', 'nama barang'],
     quantity:       ['jumlah produk di pesan', 'jumlah produk dipesan', 'jumlah produk dibeli', 'jumlah produk', 'kuantitas produk', 'quantity', 'qty', 'jumlah'],
-    // Returned units (Bug 2) — goods physically returned by the buyer. Patterns are
+    // Returned units (Bug 2) - goods physically returned by the buyer. Patterns are
     // specific so they don't collide with "Jumlah" (qty) or the "Dikembalikan" timestamp.
     returnedQty:    ['jumlah produk dikembalikan', 'jumlah dikembalikan', 'kuantitas dikembalikan', 'kuantitas pengembalian', 'jumlah retur', 'returned quantity', 'qty returned'],
     sellingPrice:   ['harga setelah diskon', 'discounted price', 'harga jual'],
@@ -74,12 +74,12 @@ function findHeaderRow(rows, identifiers) {
     return 0
 }
 
-// Magnitude parser — always positive (for discounts/fees that are inherently positive).
+// Magnitude parser - always positive (for discounts/fees that are inherently positive).
 function n(v) {
     return Math.abs(parseFloat(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0)
 }
 
-// Signed parser — preserves the sign from the report (for settlement & shipping,
+// Signed parser - preserves the sign from the report (for settlement & shipping,
 // where Shopee uses negatives for refund payouts / courier costs). See Bug #3.
 function ns(v) {
     return parseFloat(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0
@@ -94,7 +94,7 @@ function isCancelled(status) {
 // Refunded order ("Pengembalian Dana"): completed then returned. Goods go back to
 // warehouse (no QTY/COGS) but settlement keeps the negative platform-fee loss.
 // NOTE: "pengembalian" does NOT contain the substring "kembali", so it must be
-// matched explicitly — this was the root cause of Bug #1.
+// matched explicitly - this was the root cause of Bug #1.
 function isRefund(status) {
     const s = String(status ?? '').toLowerCase()
     return s.includes('pengembalian') || s.includes('dikembalikan') ||
@@ -137,7 +137,7 @@ function parseOrderReport(rawRows) {
             : ci.sellingPrice  >= 0 ? n(row[ci.sellingPrice]) : 0
         const cancelled = status != null && isCancelled(status)
         const refunded  = status != null && isRefund(status)
-        // "excluded" drives QTY/COGS downstream — true for both cancelled and refunded.
+        // "excluded" drives QTY/COGS downstream - true for both cancelled and refunded.
         const excluded  = cancelled || refunded
 
         // Collect every order line (all statuses)
@@ -160,7 +160,7 @@ function parseOrderReport(rawRows) {
             productMap.set(name, { units_sold: 0, price_sum: 0, gross_gmv: 0, refund_gmv: 0 })
         }
         const p = productMap.get(name)
-        // Gross GMV = all non-cancelled (Selesai + refund) — "semua status".
+        // Gross GMV = all non-cancelled (Selesai + refund) - "semua status".
         p.gross_gmv += qty * price
         if (refunded) {
             // Refunded value tracked separately; no QTY/COGS (goods returned). Bug #1.
@@ -178,7 +178,7 @@ function parseOrderReport(rawRows) {
 
 // ─── Parse income report ─────────────────────────────────────────────────────
 // validOrderNos: when an Order report is uploaded, the set of its order numbers.
-// Income rows whose order_no is NOT in that set are ANOMALY (Improvement A) — they
+// Income rows whose order_no is NOT in that set are ANOMALY (Improvement A) - they
 // are excluded from all P&L totals and collected separately for review.
 function parseIncomeReport(rawRows, validOrderNos = null) {
     const headerIdx = findHeaderRow(rawRows, ['no. pesanan', 'harga asli produk', 'waktu pesanan dibuat'])
@@ -209,7 +209,7 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
         const status = ci.orderStatus >= 0 ? row[ci.orderStatus] : null
         // Only truly cancelled orders are dropped from the income report. Refunded
         // ("Pengembalian Dana") orders are KEPT so their negative settlement (platform
-        // fee loss) is included — see Bug #3.
+        // fee loss) is included - see Bug #3.
         if (status != null && isCancelled(status)) {
             excludedOrders++
             orderRows.push({
@@ -232,16 +232,16 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
             continue
         }
 
-        // Use original price (harga asli) for gross GMV — seller receives full original
+        // Use original price (harga asli) for gross GMV - seller receives full original
         // price and is reimbursed for platform vouchers; only seller-funded vouchers reduce income.
         const price = ci.originalPrice >= 0 ? n(row[ci.originalPrice])
             : ci.sellingPrice  >= 0 ? n(row[ci.sellingPrice]) : 0
 
         totals.grossGmv += price
-        // Settlement is SIGNED — refund orders have a negative payout (Bug #3).
+        // Settlement is SIGNED - refund orders have a negative payout (Bug #3).
         if (ci.settlement >= 0) totals.settlement += ns(row[ci.settlement])
 
-        // All accumulated as magnitudes. Net shipping = buyer (+) − courier (−) is computed
+        // All accumulated as magnitudes. Net shipping = buyer (+) - courier (-) is computed
         // from these magnitudes below, matching the per-order calculation (Bug #2).
         for (const key of ['voucher','sellerDiscount','voucherCofund','totalDiscount','coin','coinCofund',
                            'refundAmount','commissionFee','serviceFee','processingFee',
@@ -256,7 +256,7 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
         const rowFeeTotal = ['commissionFee','serviceFee','processingFee','transactionFee','programFee','campaignFee','affiliateFee']
             .reduce((s, k) => s + (ci[k] >= 0 ? n(row[ci[k]]) : 0), 0)
         // Per-order channel-fee breakdown (snake_case keys mirror the stored shipping
-        // fee columns) — surfaced in the expandable "Channel Fees" detail row.
+        // fee columns) - surfaced in the expandable "Channel Fees" detail row.
         const rowFeeBreakdown = {
             commission_fee:       ci.commissionFee  >= 0 ? n(row[ci.commissionFee])  : 0,
             service_fee:          ci.serviceFee     >= 0 ? n(row[ci.serviceFee])     : 0,
@@ -266,7 +266,7 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
             campaign_fee:         ci.campaignFee    >= 0 ? n(row[ci.campaignFee])    : 0,
             affiliate_commission: ci.affiliateFee   >= 0 ? n(row[ci.affiliateFee])   : 0,
         }
-        // Net shipping per order = buyer-paid shipping (+) + courier cost (−) ≈ 0 (Bug #2).
+        // Net shipping per order = buyer-paid shipping (+) + courier cost (-) ≈ 0 (Bug #2).
         const rowBuyerShipping   = ci.buyerShipping  >= 0 ? n(row[ci.buyerShipping])  : 0
         const rowActualShipping  = ci.actualShipping  >= 0 ? n(row[ci.actualShipping])  : 0
         orderRows.push({
@@ -313,7 +313,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
             : null
         let incomeResult = parseIncomeReport(incomeRows, validOrderNos)
         // If NOTHING matched, the two files are different exports (order IDs differ),
-        // not anomalies — reparse with full totals and drop the anomaly flags so the
+        // not anomalies - reparse with full totals and drop the anomaly flags so the
         // existing "order numbers don't match" fallback still shows gross.
         if (validOrderNos && incomeResult.matchedOrders === 0 && order.orderRows.length > 0) {
             incomeResult = parseIncomeReport(incomeRows, null)
@@ -377,7 +377,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
         // lines that matched an Income row, so PENDING/CROSS_PERIOD orders are excluded
         // from revenue/COGS. For fully-matched data this is identical to order.productMap.
         // When NO order line matched (order IDs differ between files) we fall back to the
-        // full order.productMap to preserve the existing "show gross, fees as –" behavior.
+        // full order.productMap to preserve the existing "show gross, fees as -" behavior.
         const settledMap = new Map()
         for (const r of enrichedOrderReportRows) {
             if (r.classification !== 'SETTLED') continue
@@ -410,7 +410,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 })
             }
         } else {
-            // No order report — use income aggregate
+            // No order report - use income aggregate
             sales = [{
                 sku:                  'Shopee Sales',
                 units_sold:           matchedOrders,
@@ -435,7 +435,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
         const netGmv    = grossGmv - refundGmv
         const refundRate = grossGmv > 0 ? refundGmv / grossGmv : 0
 
-        // Net shipping = buyer-paid shipping (+) + courier cost (−) ≈ 0 (Bug #2).
+        // Net shipping = buyer-paid shipping (+) + courier cost (-) ≈ 0 (Bug #2).
         const netShipping   = totals.buyerShipping - totals.actualShipping
         const settlementCalc = grossGmv - effectiveTotal - feeTotal + netShipping - totals.refundAmount
 
@@ -468,7 +468,7 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 { tKey: 'shopeeImportFeeAffiliate',   field: 'affiliate_commission', value: Math.round(totals.affiliateFee) },
             ],
             channel_fees_total:   Math.round(feeTotal),
-            // ── July 2026 improvements — structural, Rp 0 until Aug 2026 ──────────────
+            // ── July 2026 improvements - structural, Rp 0 until Aug 2026 ──────────────
             // Ads comes from a separate Shopee Ads report (not the income/order files);
             // PPh Final 0,5% (PMK 37/2025) is conditional on taxpayer type + YTD omzet;
             // seller-funded affiliate needs a dedicated column. All 0 for July's data.

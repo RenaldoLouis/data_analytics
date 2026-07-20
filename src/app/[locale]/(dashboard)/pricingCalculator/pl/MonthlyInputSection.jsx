@@ -149,7 +149,7 @@ export default function MonthlyInputSection({
                         <div className="divide-y">
                             {enablerConfig.customFixed.filter(r => parseFloat(r.val) > 0).map(r => (
                                 <div key={r.id} className="flex items-center justify-between py-2.5">
-                                    <p className="text-xs font-medium">{r.name || '—'}</p>
+                                    <p className="text-xs font-medium">{r.name || '-'}</p>
                                     <span className="text-xs font-semibold text-teal-700 tabular-nums">{fmt(parseFloat(r.val))}</span>
                                 </div>
                             ))}
@@ -300,7 +300,7 @@ export default function MonthlyInputSection({
                                                     <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
                                                     <td className="py-2.5 px-2 text-right">
                                                         <span className="text-xs font-semibold text-teal-700 tabular-nums">
-                                                            {prefillPrice ? fmt(parseFloat(prefillPrice) || 0) : '—'}
+                                                            {prefillPrice ? fmt(parseFloat(prefillPrice) || 0) : '-'}
                                                         </span>
                                                     </td>
                                                     <td className="py-2.5 px-2 text-right">
@@ -314,7 +314,7 @@ export default function MonthlyInputSection({
                                                         />
                                                     </td>
                                                     <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
-                                                        {grossByChannel[i] > 0 ? fmt(grossByChannel[i]) : '—'}
+                                                        {grossByChannel[i] > 0 ? fmt(grossByChannel[i]) : '-'}
                                                     </td>
                                                 </tr>
                                             )
@@ -334,14 +334,14 @@ export default function MonthlyInputSection({
                             <div className="divide-y mt-2">
                                 <div className="flex justify-between items-center py-2.5">
                                     <p className="text-xs font-medium">{t('cogsPerUnitRow')}</p>
-                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.cogs ? fmt(parseFloat(activeSku.cogs) || 0) : '—'}</span>
+                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.cogs ? fmt(parseFloat(activeSku.cogs) || 0) : '-'}</span>
                                 </div>
                                 <div className="flex justify-between items-center py-2.5">
                                     <div>
                                         <p className="text-xs font-medium">{t('packagingPerUnitRow')}</p>
                                         <p className="text-[11px] text-muted-foreground">{t('packagingDesc')}</p>
                                     </div>
-                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.pkg ? fmt(parseFloat(activeSku.pkg) || 0) : '—'}</span>
+                                    <span className="text-xs font-semibold text-teal-700 tabular-nums">{activeSku.pkg ? fmt(parseFloat(activeSku.pkg) || 0) : '-'}</span>
                                 </div>
                                 <div className="pt-3">
                                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{t('cogsBundlingTitle')}</p>
@@ -462,7 +462,7 @@ export default function MonthlyInputSection({
                                                     </span>
                                                 </td>
                                                 <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
-                                                    {discByChannel[chIdx] > 0 ? fmt(discByChannel[chIdx]) : '—'}
+                                                    {discByChannel[chIdx] > 0 ? fmt(discByChannel[chIdx]) : '-'}
                                                 </td>
                                             </tr>
                                         ))}
@@ -541,7 +541,7 @@ export default function MonthlyInputSection({
                                                     />
                                                 </td>
                                                 <td className="py-2.5 px-2 text-right text-xs font-medium tabular-nums">
-                                                    {adsByChannel[i] > 0 ? fmt(adsByChannel[i]) : '—'}
+                                                    {adsByChannel[i] > 0 ? fmt(adsByChannel[i]) : '-'}
                                                 </td>
                                             </tr>
                                         ))}

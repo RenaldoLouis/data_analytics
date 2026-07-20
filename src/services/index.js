@@ -62,6 +62,8 @@ export default {
         getTrend:           ()               => get('/next-api/pl/trend'),
         getTaxConfig:       ()               => get('/next-api/pl/tax-config'),
         updateTaxConfig:    (payload)        => put('/next-api/pl/tax-config', payload),
+        getAlertConfig:     ()               => get('/next-api/pl/alert-config'),
+        updateAlertConfig:  (payload)        => put('/next-api/pl/alert-config', payload),
         createMonthly:      (payload)        => post('/next-api/pl/monthly', payload),
         updateMonthly:      (updateId, payload) => put(`/next-api/pl/monthly/${updateId}`, payload),
         deleteMonthly:      (updateId)       => del(`/next-api/pl/monthly/${updateId}`),
