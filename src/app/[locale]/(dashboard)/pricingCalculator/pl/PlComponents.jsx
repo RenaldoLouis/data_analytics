@@ -298,7 +298,7 @@ export function AuditTable({ rows, subtotal, noBorder = false }) {
                 <TableBody>
                     {rows.map(({ label, value, cls, note }) => (
                         <TableRow key={label}>
-                            <TableCell className="text-muted-foreground w-[60%]">{label}</TableCell>
+                            <TableCell className="text-muted-foreground w-[55%] whitespace-normal break-words">{label}</TableCell>
                             <TableCell className={`text-right tabular-nums ${cls ?? ''}`}>
                                 {fmt(value)}
                                 {note && <span className="text-[10px] text-muted-foreground ml-1">({note})</span>}
@@ -307,7 +307,7 @@ export function AuditTable({ rows, subtotal, noBorder = false }) {
                     ))}
                     {subtotal && (
                         <TableRow className="bg-muted/40">
-                            <TableCell className="font-medium">{subtotal.label}</TableCell>
+                            <TableCell className="font-medium whitespace-normal break-words">{subtotal.label}</TableCell>
                             <TableCell className={`text-right tabular-nums font-medium ${subtotal.cls ?? ''}`}>
                                 {fmt(subtotal.value)}
                             </TableCell>
@@ -315,6 +315,201 @@ export function AuditTable({ rows, subtotal, noBorder = false }) {
                     )}
                 </TableBody>
             </Table>
+        </div>
+    )
+}
+
+// ─── ProfitWaterfall - full P&L chain Gross GMV → Net Operating Profit ────────
+// Invariants (July 2026 spec): subtotal after Return/Refund = Settlement; subtotal
+// after Return Loss = Contribution Margin; last step = Net Op. Profit (CM - Ads).
+// `data` is normalized so the detail and the import preview share this component.
+// ── Profit Waterfall ─────────────────────────────────────────────────────────
+// Colors: totals/checkpoints (blue), final Net Profit (green), deductions (red),
+// additions (blue), tax/ads (amber), zero (grey).
+const WF = { total: '#1d4ed8', final: '#15803d', down: '#dc2626', up: '#2563eb', tax: '#f59e0b', zero: '#cbd5e1' }
+// Temporarily deactivated (July 2026): the PPh Final 0,5% step is hidden from the
+// waterfall until the real Aug 2026 data lands. Flip to true to re-show it.
+const SHOW_PPH_STEP = false
+// Format a value in millions ("juta"): 20449000 -> "20,45"
+const wfJt = (v) => (v / 1e6).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const wfDelta = (v) => v === 0 ? '0' : (v < 0 ? '-' : '+') + wfJt(Math.abs(v))
+
+// Ordered, cumulative step list shared by both charts.
+function buildWfSteps(t, data) {
+    const {
+        grossGmv = 0, promo = 0, sellerFees = 0, affiliate = 0, pph = 0,
+        netShipping = 0, refund = 0, settlement = 0, cogs = 0, returLoss = 0, ads = 0,
+    } = data ?? {}
+    const cm = settlement - cogs - returLoss
+    const net = cm - ads
+    const defs = [
+        { key: 'gross',  short: 'Gross',  label: t('shopeeWfGross'),       total: grossGmv,     kind: 'start' },
+        { key: 'promo',  short: 'Promo',  label: t('shopeeWfPromo'),       delta: -promo,       kind: 'sub' },
+        { key: 'fees',   short: 'Fees',   label: t('shopeeWfSellerFees'),  delta: -sellerFees,  kind: 'sub' },
+        { key: 'affil',  short: 'Affil',  label: t('shopeeWfAffiliate'),   delta: -affiliate,   kind: 'sub' },
+        ...(SHOW_PPH_STEP ? [{ key: 'pph', short: 'PPh', label: t('shopeeWfPph'), delta: -pph, kind: 'tax' }] : []),
+        { key: 'ship',   short: 'Ship',   label: t('shopeeWfNetShipping'), delta: netShipping,  kind: 'add' },
+        { key: 'return', short: 'Return', label: t('shopeeWfReturn'),      delta: -refund,      kind: 'sub' },
+        { key: 'settle', short: 'Settle', label: t('shopeeWfSettlement'),  total: settlement,   kind: 'checkpoint' },
+        { key: 'cogs',   short: 'COGS',   label: t('shopeeWfHpp'),         delta: -cogs,        kind: 'sub' },
+        { key: 'rloss',  short: 'R.Loss', label: t('shopeeWfReturLoss'),   delta: -returLoss,   kind: 'sub' },
+        { key: 'cm',     short: 'CM',     label: t('shopeeWfCm'),          total: cm,           kind: 'checkpoint' },
+        { key: 'ads',    short: 'Ads',    label: t('shopeeWfAds'),         delta: -ads,         kind: 'tax' },
+        { key: 'net',    short: 'Net',    label: t('shopeeWfNetOp'),       total: net,          kind: 'final' },
+    ]
+    let cum = 0
+    return defs.map((d) => {
+        const isTotal = d.total !== undefined
+        let start, end
+        if (isTotal) { start = 0; end = d.total; cum = d.total }
+        else { start = cum; cum += d.delta; end = cum }
+        const value = isTotal ? d.total : d.delta
+        const color = (d.kind === 'start' || d.kind === 'checkpoint') ? WF.total
+            : d.kind === 'final' ? WF.final
+            : d.kind === 'tax' ? (Math.abs(value) > 0 ? WF.tax : WF.zero)
+            : value === 0 ? WF.zero
+            : (value < 0 ? WF.down : WF.up)
+        return { ...d, isTotal, start, end, running: cum, value, color }
+    })
+}
+
+// Condensed 7-step list for the bridge chart (the at-a-glance business view).
+// Net Profit here is the running total of the shown steps (for July, Affiliate/PPh/
+// Return Loss/Ads are 0 so it equals the full Net Op. Profit; the expanded card carries
+// every step).
+function buildWfBridgeSteps(t, data) {
+    const { grossGmv = 0, promo = 0, sellerFees = 0, netShipping = 0, refund = 0, cogs = 0 } = data ?? {}
+    const defs = [
+        { key: 'gross',  short: 'Gross',  label: t('shopeeWfGross'),       kind: 'start', total: grossGmv },
+        { key: 'disc',   short: 'Disc',   label: t('shopeeWfSellerDisc'),  kind: 'sub',   delta: -promo },
+        { key: 'fees',   short: 'Fees',   label: t('shopeeWfChannelFees'), kind: 'sub',   delta: -sellerFees },
+        { key: 'ship',   short: 'Ship',   label: t('shopeeWfShipping'),    kind: 'add',   delta: netShipping },
+        { key: 'return', short: 'Return', label: t('shopeeWfReturnShort'), kind: 'sub',   delta: -refund },
+        { key: 'hpp',    short: 'COGS',   label: t('shopeeWfHppShort'),    kind: 'sub',   delta: -cogs },
+        { key: 'net',    short: 'Net',    label: t('shopeeWfNetProfit'),   kind: 'final' },
+    ]
+    let cum = 0
+    return defs.map((d) => {
+        let start, end
+        if (d.kind === 'start') { start = 0; end = d.total; cum = d.total }
+        else if (d.kind === 'final') { start = 0; end = cum }
+        else { start = cum; cum += d.delta; end = cum }
+        const isTotal = d.kind === 'start' || d.kind === 'final'
+        const value = isTotal ? end : d.delta
+        const color = d.kind === 'start' ? WF.total
+            : d.kind === 'final' ? WF.final
+            : value === 0 ? WF.zero
+            : (value < 0 ? WF.down : WF.up)
+        return { ...d, isTotal, start, end, running: cum, value, color }
+    })
+}
+
+// Graph 1: vertical waterfall / bridge chart with connector lines (custom SVG).
+function WaterfallBridge({ steps }) {
+    const W = 480, H = 226, padTop = 22, padBottom = 36, padX = 6
+    const plotH = H - padTop - padBottom
+    const maxV = Math.max(...steps.map(s => Math.max(s.start, s.end)), 1)
+    const n = steps.length
+    const slot = (W - padX * 2) / n
+    const barW = Math.min(slot * 0.62, 30)
+    const y = (v) => padTop + plotH * (1 - v / maxV)
+    const cx = (i) => padX + slot * (i + 0.5)
+    return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet" role="img">
+            <line x1={padX} y1={y(0)} x2={W - padX} y2={y(0)} stroke="#e5e7eb" />
+            {/* connector lines between adjacent bars at the running-total level */}
+            {steps.slice(0, -1).map((s, i) => (
+                <line key={`c${i}`} x1={cx(i) + barW / 2} y1={y(s.end)} x2={cx(i + 1) - barW / 2} y2={y(s.end)}
+                      stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
+            ))}
+            {steps.map((s, i) => {
+                const yHi = y(Math.max(s.start, s.end))
+                const h = Math.max(y(Math.min(s.start, s.end)) - yHi, 2)
+                return (
+                    <g key={s.key}>
+                        <title>{`${s.label}: ${wfJt(s.value)} jt`}</title>
+                        <rect x={cx(i) - barW / 2} y={yHi} width={barW} height={h} rx="1.5" fill={s.color} />
+                        <text x={cx(i)} y={yHi - 4} textAnchor="middle" fontSize="9"
+                              fontWeight={s.isTotal ? 700 : 400} fill={s.isTotal ? s.color : '#475569'}>
+                            {s.isTotal ? wfJt(s.value) : wfDelta(s.value)}
+                        </text>
+                        {(() => {
+                            // Full label, wrapped onto up to two lines so it fits under the bar.
+                            const words = String(s.label).split(' ')
+                            const l1 = words[0]
+                            const l2 = words.slice(1).join(' ')
+                            return (
+                                <text x={cx(i)} y={H - 20} textAnchor="middle" fontSize="8"
+                                      fill={s.isTotal ? '#334155' : '#64748b'} fontWeight={s.isTotal ? 600 : 400}>
+                                    <tspan x={cx(i)} dy="0">{l1}</tspan>
+                                    {l2 && <tspan x={cx(i)} dy="9">{l2}</tspan>}
+                                </text>
+                            )
+                        })()}
+                    </g>
+                )
+            })}
+        </svg>
+    )
+}
+
+// Graph 2: horizontal "expanded structure" - delta + running-total bar per step.
+// `fill` spreads the rows to occupy the full height of the card.
+function WaterfallStructure({ steps, fill = false }) {
+    const maxRun = Math.max(...steps.map(s => Math.abs(s.running)), 1)
+    return (
+        <div className={fill
+            ? 'space-y-1 lg:space-y-0 lg:flex lg:flex-col lg:justify-between lg:gap-1 lg:h-full lg:min-h-0'
+            : 'space-y-1'}>
+            {steps.map((s) => {
+                const w = Math.max((Math.abs(s.running) / maxRun) * 100, 3)
+                const deltaCls = s.isTotal ? 'text-transparent'
+                    : s.value < 0 ? 'text-red-600' : s.value > 0 ? 'text-blue-700' : 'text-muted-foreground/50'
+                return (
+                    <div key={s.key} className="grid items-center gap-2" style={{ gridTemplateColumns: '108px 54px 1fr' }}
+                         title={`${s.label}: ${fmt(s.running)}`}>
+                        <span className={`text-[10px] truncate ${s.isTotal ? 'font-semibold' : 'text-muted-foreground'}`}
+                              style={s.isTotal ? { color: s.color } : undefined}>{s.label}</span>
+                        <span className={`text-[10px] text-right tabular-nums ${deltaCls}`}>{s.isTotal ? '' : wfDelta(s.value)}</span>
+                        <div className="relative h-4 rounded-sm bg-muted/30 overflow-hidden">
+                            <div className="absolute inset-y-0 left-0 rounded-sm flex items-center justify-end pr-1"
+                                 style={{ width: `${w}%`, background: s.color }}>
+                                <span className="text-[9px] font-medium text-white tabular-nums">{wfJt(s.running)}</span>
+                            </div>
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
+// Two separate cards (bridge | expanded structure) side by side; audit summary follows below.
+export function ProfitWaterfall({ t, data }) {
+    const bridgeSteps = buildWfBridgeSteps(t, data)
+    const fullSteps = buildWfSteps(t, data)
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
+            {/* Left card - condensed bridge */}
+            <div className="overflow-hidden rounded-md border flex flex-col">
+                <SectionHeader title={t('shopeeWfTitle')} />
+                <div className="p-3 flex-1 flex flex-col">
+                    <p className="text-[10px] text-muted-foreground text-right mb-1">{t('shopeeWfInMillions')}</p>
+                    <div className="flex-1 flex items-center">
+                        <WaterfallBridge steps={bridgeSteps} />
+                    </div>
+                </div>
+            </div>
+            {/* Right card - expanded structure (bars fill full card height) */}
+            <div className="overflow-hidden rounded-md border flex flex-col">
+                <SectionHeader title={t('shopeeWfStructure')} />
+                <div className="p-3 flex-1 flex flex-col min-h-0">
+                    <p className="text-[10px] text-muted-foreground text-right mb-2">{t('shopeeWfInMillions')}</p>
+                    <div className="flex-1 min-h-0">
+                        <WaterfallStructure steps={fullSteps} fill />
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
@@ -418,7 +613,7 @@ export function FeeBreakdownDetail({ t, fees, gmv, emptyLabel }) {
                 the text block rather than stretching across the whole row. */}
             <div className="w-[28rem] max-w-full space-y-3">
 
-                {/* Stacked proportion bar — each segment is its share of total fees */}
+                {/* Stacked proportion bar - each segment is its share of total fees */}
                 <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
                     {rows.map(r => (
                         <div
@@ -439,19 +634,16 @@ export function FeeBreakdownDetail({ t, fees, gmv, emptyLabel }) {
                             <span className="truncate">{r.label}</span>
                         </span>
                         <span className="tabular-nums text-right w-24 text-foreground">{fmt(r.value)}</span>
-                        <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(r.value, grossGmv) ? `${pct(r.value, grossGmv)} GMV` : '—'}</span>
+                        <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(r.value, grossGmv) ? `${pct(r.value, grossGmv)} GMV` : '-'}</span>
                         <span className="tabular-nums text-right w-14 text-xs text-muted-foreground">{r.value === 0 ? '0%' : pct(r.value, total)}</span>
                     </div>
                 ))}
 
-                {/* Total — reconciles to the row's Channel Fees cell */}
+                {/* Total - reconciles to the row's Channel Fees cell */}
                 <div className="flex items-center gap-3 text-sm border-t pt-2 mt-2">
-                    <span className="flex items-center gap-2 flex-1 min-w-0 font-medium">
-                        {t('shopeeImportFeesTotal')}
-                        <span className="text-xs font-normal text-green-700 whitespace-nowrap">✓ {t('shopeeImportFeeMatch')}</span>
-                    </span>
+                    <span className="flex-1 min-w-0 font-medium truncate">{t('shopeeImportFeesTotal')}</span>
                     <span className="tabular-nums text-right w-24 font-semibold text-red-600">{fmt(total)}</span>
-                    <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(total, grossGmv) ? `${pct(total, grossGmv)} GMV` : '—'}</span>
+                    <span className="tabular-nums text-right w-20 text-xs text-muted-foreground">{pct(total, grossGmv) ? `${pct(total, grossGmv)} GMV` : '-'}</span>
                     <span className="tabular-nums text-right w-14 text-xs text-muted-foreground">100%</span>
                 </div>
                 </div>

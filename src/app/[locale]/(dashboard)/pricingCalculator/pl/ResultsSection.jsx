@@ -54,7 +54,7 @@ export default function ResultsSection({
                                         <span className="text-[10px] font-normal text-muted-foreground ml-1">({m.grossMarginPct.toFixed(1)}%)</span>
                                     </td>
                                     <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">
-                                        {m.fixedCost > 0 ? `− ${fmt(m.fixedCost)}` : <span className="text-muted-foreground">—</span>}
+                                        {m.fixedCost > 0 ? `- ${fmt(m.fixedCost)}` : <span className="text-muted-foreground">-</span>}
                                     </td>
                                     <td className="py-2.5 px-2 pr-4 text-right text-xs tabular-nums">
                                         <span className={`font-semibold ${m.operatingProfit < 0 ? 'text-red-600' : 'text-green-700'}`}>{fmt(m.operatingProfit)}</span>
@@ -71,7 +71,7 @@ export default function ResultsSection({
                                         <span className={allSkuGrossProfit < 0 ? 'text-red-600' : 'text-green-700'}>{fmt(allSkuGrossProfit)}</span>
                                     </td>
                                     <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">
-                                        {allSkuFixedTotal > 0 ? `− ${fmt(allSkuFixedTotal)}` : <span className="text-muted-foreground">—</span>}
+                                        {allSkuFixedTotal > 0 ? `- ${fmt(allSkuFixedTotal)}` : <span className="text-muted-foreground">-</span>}
                                     </td>
                                     <td className={`py-2.5 px-2 pr-4 text-right text-xs font-bold tabular-nums ${allSkuOpProfit < 0 ? 'text-red-600' : 'text-green-700'}`}>
                                         {fmt(allSkuOpProfit)}

@@ -3,6 +3,7 @@ import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useDashboardContext } from "@/context/dashboard-context";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
+import { LanguageSwitch } from "./language-switch";
 import { NavUser } from "./nav-user";
 import { SearchBar } from "./searchBar";
 
@@ -27,7 +28,8 @@ export function SiteHeader() {
           )}
         </div>
 
-        <div className="flex w-full items-center justify-end">
+        <div className="flex w-full items-center justify-end gap-2">
+          <LanguageSwitch />
           <NavUser user={userInfo} />
         </div>
       </div>

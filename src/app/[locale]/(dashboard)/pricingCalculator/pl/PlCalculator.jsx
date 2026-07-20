@@ -1,18 +1,27 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
+import {
+    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import {
     Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import services from "@/services"
-import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
+import { IconAdjustmentsHorizontal, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconReceiptTax } from "@tabler/icons-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Fragment, useEffect, useState, useMemo } from "react"
-import { classifyOrderRow, cogsUnitsForRow, fmt } from "./plLib"
-import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts"
+import { classifyOrderRow, cogsUnitsForRow, fmt, parentSku } from "./plLib"
+import { evaluateSkuAlerts, sortAlertRows, thresholdsFromConfig, topSeverity } from "./plAlerts"
+import { AuditTable, ClassificationBadge, ExpandToggle, FeeBreakdownDetail, KpiCards, ProfitWaterfall, Section, SectionHeader, ShopeeChip, SkuCell } from "./PlComponents"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,6 +97,10 @@ function buildFormFromRecord(rec) {
         transaction_fee_amount: toInt(sh.transaction_fee_amount),
         campaign_fee_amount: toInt(sh.campaign_fee_amount),
         affiliate_commission_amount: toInt(sh.affiliate_commission_amount),
+        // July 2026 improvements - structural (Rp 0 until Aug 2026)
+        ads_spend_amount: toInt(sh.ads_spend_amount),
+        pph_final_amount: toInt(sh.pph_final_amount),
+        affiliate_seller_amount: toInt(d.affiliate_seller_amount),
         _sales: salesArr.map(s => ({
             order_no: s.order_no ?? '',
             units_sold: toInt(s.units_sold),
@@ -100,11 +113,67 @@ function buildFormFromRecord(rec) {
     }
 }
 
+// ─── P1: Alert badge + panel ──────────────────────────────────────────────────
+
+const SEVERITY_STYLE = {
+    critical: 'bg-red-100 text-red-700 border-red-300',
+    high:     'bg-orange-100 text-orange-700 border-orange-300',
+    medium:   'bg-amber-100 text-amber-700 border-amber-300',
+    low:      'bg-slate-100 text-slate-700 border-slate-300',
+    info:     'bg-slate-100 text-slate-600 border-slate-300',
+}
+const ruleLabel = (t, rule) => t(`shopeeAlertRule${rule}`)
+
+function AlertBadge({ t, severity, rule }) {
+    return (
+        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${SEVERITY_STYLE[severity] ?? SEVERITY_STYLE.info}`}>
+            {ruleLabel(t, rule)}
+        </span>
+    )
+}
+
+// "Alerts & Insights" panel - flagged parent SKUs only, sorted by severity → |CM|.
+function AlertsPanel({ t, rows, onDrill }) {
+    if (!rows.length) {
+        return (
+            <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5">
+                <span className="text-green-600 flex-shrink-0">✓</span>
+                <p className="text-xs text-green-800">{t('shopeeAlertNone')}</p>
+            </div>
+        )
+    }
+    return (
+        <div className="rounded-md border overflow-hidden">
+            <SectionHeader title={t('shopeeAlertTitle')} />
+            <div className="divide-y">
+                {rows.map((p) => {
+                    const name = p.names.size ? Array.from(p.names)[0] : p.parent
+                    return (
+                        <button key={p.parent} type="button" onClick={() => onDrill?.(p.parent)}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 transition-colors">
+                            <p className="text-sm font-medium truncate min-w-0 flex-1">{name}
+                                <span className="text-[11px] text-muted-foreground font-normal ml-1.5">{p.parent}</span>
+                            </p>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                                {p.flags.map(f => <AlertBadge key={f.rule} t={t} severity={f.severity} rule={f.rule} />)}
+                            </div>
+                            <div className="flex-shrink-0 text-[11px] tabular-nums text-muted-foreground whitespace-nowrap">
+                                {p.cmPct != null ? `CM ${(p.cmPct * 100).toFixed(1)}%` : 'CM -'} · {t('shopeeAlertReturnRate')} {(p.returnRate * 100).toFixed(1)}%
+                            </div>
+                            <span className="flex-shrink-0 text-[11px] text-primary ml-4">{t('shopeeAlertDrill')} →</span>
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
+
 // ─── Summary Tab ─────────────────────────────────────────────────────────────
 
-function SummaryTab({ agg }) {
+function SummaryTab({ agg, alertRows, onDrill }) {
     const t = useTranslations('plpage')
-    // Formula matches import modal: GMV − Seller Discount − Channel Fees + Net Shipping − Returns
+    // Formula matches import modal: GMV - Seller Discount - Channel Fees + Net Shipping - Returns
     const calculated = agg.grossGmv - agg.totalDisc - agg.totalFees + agg.netShipping - agg.refund
     const delta = agg.settlement - calculated
     const isMatch = delta === 0
@@ -112,8 +181,17 @@ function SummaryTab({ agg }) {
     const cl = (v, positive) => positive ? (v > 0 ? 'text-blue-700' : 'text-muted-foreground/60')
         : (v > 0 ? 'text-red-600' : 'text-muted-foreground/60')
 
+    const waterfall = {
+        grossGmv: agg.grossGmv, promo: agg.totalDisc, sellerFees: agg.totalFees,
+        affiliate: agg.affiliateSeller, pph: agg.pphFinal, netShipping: agg.netShipping,
+        refund: agg.refund, settlement: agg.settlement, cogs: agg.totalCogs,
+        returLoss: agg.returLoss, ads: agg.adsSpend,
+    }
+
     return (
         <div className="space-y-3">
+            <AlertsPanel t={t} rows={alertRows ?? []} onDrill={onDrill} />
+            <ProfitWaterfall t={t} data={waterfall} />
             <Section title={t('shopeeImportSectionRevenue')}>
                 <AuditTable noBorder rows={[
                     { label: t('shopeeImportRevenueGross'), value: agg.grossGmv, cls: 'text-blue-700' },
@@ -169,7 +247,327 @@ function SummaryTab({ agg }) {
     )
 }
 
+// ─── P2: Monthly Trend tab ────────────────────────────────────────────────────
+
+function TrendTab({ currentPeriod, locale }) {
+    const t = useTranslations('plpage')
+    const MONTHS = locale === 'id' ? MONTH_LABELS_ID : MONTH_LABELS_EN
+    const [series, setSeries] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        let alive = true
+        setLoading(true)
+        services.pl.getTrend()
+            .then(res => { if (alive) setSeries((res?.data?.data ?? res?.data ?? []).filter(Boolean)) })
+            .finally(() => { if (alive) setLoading(false) })
+        return () => { alive = false }
+    }, [])
+
+    if (loading) return <Skeleton className="w-full h-64 rounded-lg" />
+
+    const periodLabel = (p) => `${MONTHS[parseInt(p.period_month) - 1] ?? p.period_month} ${String(p.period_year).slice(-2)}`
+    const isCurrent = (p) => currentPeriod
+        && String(p.period_month).padStart(2, '0') === String(currentPeriod.month).padStart(2, '0')
+        && String(p.period_year) === String(currentPeriod.year)
+
+    // MoM deltas vs the previous period in the series.
+    const rows = series.map((p, i) => {
+        const prev = series[i - 1]
+        return {
+            ...p,
+            momCm: prev ? p.cm - prev.cm : null,
+            momCmPct: prev && p.cmPct != null && prev.cmPct != null ? (p.cmPct - prev.cmPct) * 100 : null, // percentage points
+        }
+    })
+    const chartData = rows.map(p => ({ name: periodLabel(p), settlement: Math.round(p.settlement), cm: Math.round(p.cm) }))
+    const jt = (v) => `${(v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 0 })}jt`
+
+    const TH = ({ children, right }) => <TableHead className={`py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground ${right ? 'text-right' : ''}`}>{children}</TableHead>
+    const momCls = (v) => v == null ? 'text-muted-foreground/40' : v > 0 ? 'text-green-700' : v < 0 ? 'text-red-600' : 'text-muted-foreground'
+    const momTxt = (v, suffix) => v == null ? '-' : `${v > 0 ? '+' : ''}${suffix === 'pct' ? v.toFixed(1) + '%' : fmt(v)}`
+
+    return (
+        <div className="space-y-3">
+            {series.length >= 2 && (
+                <Section title={t('shopeeTrendTitle')}>
+                    <div className="p-3">
+                        <div className="flex items-center gap-4 mb-2 text-[11px]">
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-blue-700" />{t('shopeeTrendSettlement')}</span>
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-green-700" />{t('shopeeTrendCm')}</span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={220}>
+                            <LineChart data={chartData} margin={{ top: 6, right: 12, left: 4, bottom: 6 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickMargin={10} padding={{ left: 10, right: 10 }} />
+                                <YAxis tickFormatter={jt} tick={{ fontSize: 10 }} width={40} axisLine={false} tickLine={false} tickMargin={6} />
+                                <RTooltip formatter={(v, n) => [fmt(v), n === 'settlement' ? t('shopeeTrendSettlement') : t('shopeeTrendCm')]} labelClassName="text-xs" contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                                <Line type="monotone" dataKey="settlement" stroke="#1d4ed8" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                                <Line type="monotone" dataKey="cm" stroke="#15803d" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Section>
+            )}
+
+            <div className="overflow-x-auto rounded-md border">
+                <Table className="min-w-[760px] [&_tr:last-child_td]:border-b-0">
+                    <TableHeader>
+                        <TableRow className="bg-muted/60 hover:bg-muted/60">
+                            <TH>{t('shopeeTrendColPeriod')}</TH>
+                            <TH right>{t('shopeeColGmv')}</TH>
+                            <TH right>{t('shopeeTrendColNetGmv')}</TH>
+                            <TH right>{t('shopeeColSettlement')}</TH>
+                            <TH right>{t('shopeeImportContribution')}</TH>
+                            <TH right>{t('shopeeImportColCmPercent')}</TH>
+                            <TH right>{t('shopeeTrendColOrders')}</TH>
+                            <TH right>Δ {t('shopeeTrendMoM')} CM</TH>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.map((p) => (
+                            <TableRow key={p.period} className={isCurrent(p) ? 'bg-primary/5 hover:bg-primary/5' : ''}>
+                                <TableCell className="py-1.5 px-3 text-sm font-medium">
+                                    {periodLabel(p)}
+                                    {isCurrent(p) && <span className="ml-1.5 text-[10px] text-primary">({t('shopeeTrendCurrent')})</span>}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums text-blue-700">{fmt(p.grossGmv)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(p.netGmv)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums text-blue-700">{fmt(p.settlement)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums text-green-700">{fmt(p.cm)}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{p.cmPct != null ? `${(p.cmPct * 100).toFixed(1)}%` : '-'}</TableCell>
+                                <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{p.ordersSettled}</TableCell>
+                                <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${momCls(p.momCmPct)}`}>{momTxt(p.momCmPct, 'pct')}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+            {series.length < 2 && (
+                <p className="text-[11px] text-muted-foreground px-1">{t('shopeeTrendNone')}</p>
+            )}
+        </div>
+    )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
+
+// ─── P3: PPh tax-config (per account) ─────────────────────────────────────────
+
+const DEFAULT_TAX = { tipe_wp: 'OP', is_pkp: false, harga_termasuk_ppn: false, sudah_lapor_surat: false }
+
+// Temporarily deactivated (July 2026): PPh Final 0,5% + Tax Settings are hidden until
+// the real Aug 2026 data lands. Flip to true to re-show the Tax button and PPh step
+// (backend also gated by PPH_ENABLED in services/pl.js).
+const TAX_ENABLED = false
+
+// A labelled switch row used inside the tax dialog.
+function TaxToggle({ label, hint, checked, onChange }) {
+    return (
+        <div className="flex items-start justify-between gap-3 py-1.5">
+            <div className="space-y-0.5">
+                <p className="text-sm font-medium leading-none">{label}</p>
+                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+            </div>
+            <Switch checked={checked} onCheckedChange={onChange} />
+        </div>
+    )
+}
+
+function TaxSettingsDialog({ open, onOpenChange, config, onSaved }) {
+    const t = useTranslations('plpage')
+    const [form, setForm] = useState(config ?? DEFAULT_TAX)
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        setForm({
+            tipe_wp: config?.tipe_wp ?? 'OP',
+            is_pkp: !!config?.is_pkp,
+            harga_termasuk_ppn: !!config?.harga_termasuk_ppn,
+            sudah_lapor_surat: !!config?.sudah_lapor_surat,
+        })
+    }, [config, open])
+
+    const set = (patch) => setForm(prev => ({ ...prev, ...patch }))
+
+    const save = async () => {
+        setSaving(true)
+        const res = await services.pl.updateTaxConfig(form)
+        setSaving(false)
+        if (!res?.error) {
+            onSaved?.(res?.data?.data ?? form)
+            onOpenChange(false)
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t('shopeeTaxTitle')}</DialogTitle>
+                    <DialogDescription>{t('shopeeTaxSubtitle')}</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3">
+                    <div className="space-y-1.5">
+                        <Label className="text-sm font-medium">{t('shopeeTaxWpType')}</Label>
+                        <RadioGroup
+                            value={form.tipe_wp}
+                            onValueChange={(v) => set({ tipe_wp: v })}
+                            className="grid grid-cols-1 gap-2"
+                        >
+                            {[
+                                { v: 'OP', label: t('shopeeTaxWpOp'), hint: t('shopeeTaxWpOpHint') },
+                                { v: 'BADAN', label: t('shopeeTaxWpBadan'), hint: t('shopeeTaxWpBadanHint') },
+                            ].map(o => (
+                                <label
+                                    key={o.v}
+                                    htmlFor={`wp-${o.v}`}
+                                    className={`flex items-start gap-3 rounded-md border p-2.5 cursor-pointer transition-colors ${form.tipe_wp === o.v ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/40'}`}
+                                >
+                                    <RadioGroupItem id={`wp-${o.v}`} value={o.v} className="mt-0.5" />
+                                    <div className="space-y-0.5">
+                                        <p className="text-sm font-medium leading-none">{o.label}</p>
+                                        <p className="text-xs text-muted-foreground">{o.hint}</p>
+                                    </div>
+                                </label>
+                            ))}
+                        </RadioGroup>
+                    </div>
+
+                    <Separator />
+
+                    <TaxToggle
+                        label={t('shopeeTaxPkp')}
+                        checked={form.is_pkp}
+                        onChange={(v) => set({ is_pkp: v, harga_termasuk_ppn: v ? form.harga_termasuk_ppn : false })}
+                    />
+                    {form.is_pkp ? (
+                        <TaxToggle
+                            label={t('shopeeTaxPriceInclPpn')}
+                            hint={t('shopeeTaxPriceInclPpnHint')}
+                            checked={form.harga_termasuk_ppn}
+                            onChange={(v) => set({ harga_termasuk_ppn: v })}
+                        />
+                    ) : null}
+                    {form.tipe_wp === 'OP' ? (
+                        <TaxToggle
+                            label={t('shopeeTaxDeclared')}
+                            hint={t('shopeeTaxDeclaredHint')}
+                            checked={form.sudah_lapor_surat}
+                            onChange={(v) => set({ sudah_lapor_surat: v })}
+                        />
+                    ) : null}
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                        {t('shopeeTaxCancel')}
+                    </Button>
+                    <Button onClick={save} disabled={saving}>
+                        {saving ? t('shopeeTaxSaving') : t('shopeeTaxSave')}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+// ─── P1: SKU-alert threshold config (per account) ─────────────────────────────
+
+const DEFAULT_ALERT = { low_margin_pct: 0.10, high_return_rate: 0.05 }
+
+// A labelled whole-percent input row for the thresholds dialog.
+function ThresholdField({ label, hint, value, onChange }) {
+    return (
+        <div className="flex items-start justify-between gap-3 py-1.5">
+            <div className="space-y-0.5 flex-1 min-w-0">
+                <p className="text-sm font-medium leading-none">{label}</p>
+                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+            </div>
+            <div className="relative w-24 flex-shrink-0">
+                <Input
+                    type="number" inputMode="decimal" min={0} max={100} step={0.5}
+                    value={value} onChange={(e) => onChange(e.target.value)}
+                    className="pr-6 text-right tabular-nums"
+                />
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+            </div>
+        </div>
+    )
+}
+
+function AlertThresholdsDialog({ open, onOpenChange, config, onSaved }) {
+    const t = useTranslations('plpage')
+    // Edit in whole-percent units; persist as fractions.
+    const toPct = (frac, d) => String(+(Number(frac ?? d) * 100).toFixed(2))
+    const [form, setForm] = useState({ lowMargin: '10', highReturn: '5' })
+    const [saving, setSaving] = useState(false)
+
+    useEffect(() => {
+        setForm({
+            lowMargin:  toPct(config?.low_margin_pct,   DEFAULT_ALERT.low_margin_pct),
+            highReturn: toPct(config?.high_return_rate, DEFAULT_ALERT.high_return_rate),
+        })
+    }, [config, open])
+
+    const set = (patch) => setForm(prev => ({ ...prev, ...patch }))
+    const frac = (v, d) => {
+        const n = parseFloat(v)
+        return Number.isFinite(n) ? Math.min(Math.max(n / 100, 0), 1) : d
+    }
+
+    const save = async () => {
+        const payload = {
+            low_margin_pct:   frac(form.lowMargin,  DEFAULT_ALERT.low_margin_pct),
+            high_return_rate: frac(form.highReturn, DEFAULT_ALERT.high_return_rate),
+        }
+        // Schema requires > 0; fall back to the default for any empty/zero field.
+        for (const k of Object.keys(payload)) if (!(payload[k] > 0)) payload[k] = DEFAULT_ALERT[k]
+        setSaving(true)
+        const res = await services.pl.updateAlertConfig(payload)
+        setSaving(false)
+        if (!res?.error) { onSaved?.(res?.data?.data ?? payload); onOpenChange(false) }
+    }
+
+    const resetDefaults = () => setForm({ lowMargin: '10', highReturn: '5' })
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader className="mb-3">
+                    <DialogTitle>{t('shopeeAlertCfgTitle')}</DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-1">
+                    <ThresholdField
+                        label={t('shopeeAlertCfgLowMargin')} hint={t('shopeeAlertCfgLowMarginHint')}
+                        value={form.lowMargin} onChange={(v) => set({ lowMargin: v })}
+                    />
+                    <Separator />
+                    <ThresholdField
+                        label={t('shopeeAlertCfgHighReturn')} hint={t('shopeeAlertCfgHighReturnHint')}
+                        value={form.highReturn} onChange={(v) => set({ highReturn: v })}
+                    />
+                </div>
+
+                <DialogFooter className="sm:justify-between">
+                    <Button variant="outline" onClick={resetDefaults} disabled={saving} className="text-xs">
+                        {t('shopeeAlertCfgReset')}
+                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                            {t('shopeeTaxCancel')}
+                        </Button>
+                        <Button onClick={save} disabled={saving}>
+                            {saving ? t('shopeeTaxSaving') : t('shopeeTaxSave')}
+                        </Button>
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 export default function PlCalculator({ editId, allIds, onBack }) {
     const locale = useLocale()
@@ -178,7 +576,13 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     const [records, setRecords] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [forms, setForms] = useState({})
+    const [taxConfig, setTaxConfig] = useState(null)      // PPh regime (per account)
+    const [showTaxSettings, setShowTaxSettings] = useState(false)
+    const [alertConfig, setAlertConfig] = useState(null)  // SKU-alert thresholds (per account)
+    const [showAlertSettings, setShowAlertSettings] = useState(false)
     const [orderPage, setOrderPage] = useState(0)
+    const [tab, setTab] = useState('summary')          // controlled tabs (for alert drill-down)
+    const [skuFilter, setSkuFilter] = useState(null)   // { type:'parent'|'rule', value } | null
     // Expand/collapse state for the per-order & per-SKU channel-fee detail rows.
     const [expandedOrders, setExpandedOrders] = useState(() => new Set())
     const [expandedSkus, setExpandedSkus] = useState(() => new Set())
@@ -190,6 +594,10 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     const toggleOrder = toggleKey(setExpandedOrders)
     const toggleSku = toggleKey(setExpandedSkus)
 
+    // Drill-down: clicking an alert jumps to the SKU tab filtered to that parent.
+    const drillToParent = (parent) => { setSkuFilter({ type: 'parent', value: parent }); setTab('sku') }
+    const chipCls = (on) => `px-2 py-0.5 rounded-full text-[11px] border cursor-pointer transition-colors ${on ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground border-input hover:bg-muted/50'}`
+
     // Improvement A: localized label for an order's classification bucket.
     const classLabel = (cls) => ({
         SETTLED:      t('shopeeClassSettled'),
@@ -200,11 +608,13 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     }[cls] ?? cls)
 
     // ── Load ──────────────────────────────────────────────────────────────────
-    useEffect(() => {
+    // Single batched request for all of the period's records (was one per record).
+    // The backend computes PPh Final live from the tax config, so re-running this
+    // after saving the config refreshes the waterfall's PPh figure.
+    const loadRecords = () => {
         const ids = allIds?.length ? allIds : [editId]
         setIsLoading(true)
-        // Single batched request for all of the period's records (was one per record).
-        services.pl.getMonthlyByIds(ids)
+        return services.pl.getMonthlyByIds(ids)
             .then(res => {
                 const loaded = (res?.data?.data ?? res?.data ?? []).filter(Boolean)
                 setRecords(loaded)
@@ -213,8 +623,21 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 setForms(init)
             })
             .finally(() => setIsLoading(false))
+    }
+
+    useEffect(() => {
+        loadRecords()
+        if (TAX_ENABLED) services.pl.getTaxConfig().then(res => {
+            setTaxConfig(res?.data?.data ?? res?.data ?? DEFAULT_TAX)
+        })
+        services.pl.getAlertConfig().then(res => {
+            setAlertConfig(res?.data?.data ?? res?.data ?? DEFAULT_ALERT)
+        })
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editId])
+
+    // P1: configured alert thresholds (defaults until the account config loads).
+    const alertThresholds = useMemo(() => thresholdsFromConfig(alertConfig), [alertConfig])
 
     const active = records[0]
 
@@ -229,7 +652,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const firstOrderRows = records[0]?.order_report_rows ?? []
         const grossGmv = firstOrderRows.length > 0
             ? firstOrderRows
-                // SETTLED only (Improvement A) — excludes PENDING/CROSS_PERIOD from P&L.
+                // SETTLED only (Improvement A) - excludes PENDING/CROSS_PERIOD from P&L.
                 .filter(r => (r.classification ?? classifyOrderRow(r)) === 'SETTLED')
                 .reduce((s, r) => s + (r.gmv || 0), 0)
             : sum((f) => n(f.units_sold) * n(f.actual_selling_price))
@@ -245,7 +668,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
         const subsidy = sum((f) => n(f.shipping_subsidy))
         const buyerShipping = sum((f) => n(f.buyer_shipping_paid))
         const shipCost = sum((f) => n(f.actual_shipping_cost))
-        // Net shipping = buyer-paid (+) − courier cost (−) ≈ 0 (Bug #2)
+        // Net shipping = buyer-paid (+) - courier cost (-) ≈ 0 (Bug #2)
         const netShipping = buyerShipping - shipCost
         const commFee = sum((f) => n(f.commission_fee_amount))
         const svcFee = sum((f) => n(f.service_fee_amount))
@@ -276,11 +699,16 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 totalCogs += cogsUnit * n(f.units_sold)
             }
         }
+        // July 2026 improvements - structural fields (Rp 0 until Aug 2026)
+        const adsSpend = sum((f) => n(f.ads_spend_amount))
+        const pphFinal = sum((f) => n(f.pph_final_amount))
+        const affiliateSeller = sum((f) => n(f.affiliate_seller_amount))
         return {
             grossGmv, settlement, voucher, sellerDiscount, voucherCof, coin, coinCof, totalDisc,
             refund, platformVoucher, subsidy, buyerShipping, shipCost, netShipping,
             commFee, svcFee, procFee, txFee, campFee, affFee, totalFees,
             totalCogs, returLoss,
+            adsSpend, pphFinal, affiliateSeller,
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [records, forms])
@@ -331,8 +759,22 @@ export default function PlCalculator({ editId, allIds, onBack }) {
     useEffect(() => { setOrderPage(0) }, [records.length])
 
     // ── Per-SKU rows (for SKU tab) - one row per Shopee product ─────────────────
-    const skuRows = useMemo(() =>
-        records.flatMap(rec => {
+    const skuRows = useMemo(() => {
+        // Per-variant (WYSIWYG) alert flags: each row is evaluated against its OWN
+        // metrics/CM% (not the parent aggregate) so the SKU-tab badge lines up with the
+        // number shown in that row. The Summary panel stays parent-level (see parentRows).
+        const rowFlags = (row) => {
+            const soldU = (row.units || 0) + (row.refundedUnits || 0)
+            const flags = evaluateSkuAlerts({
+                settlement: row.settlement,
+                cm: row.contribution,
+                cmPct: row.cmPercent != null ? row.cmPercent / 100 : null,
+                returnRate: soldU > 0 ? (row.refundedUnits || 0) / soldU : 0,
+                missingCogs: (row.units || 0) > 0 && !(row.cogsUnit > 0),
+            }, alertThresholds)
+            return { ...row, flags, topSeverity: topSeverity(flags) }
+        }
+        return records.flatMap(rec => {
             const f = forms[rec.id] ?? buildFormFromRecord(rec)
             const cogsUnit = parseFloat(rec.cogs_per_unit) || 0
             const reportRows = rec.order_report_rows ?? []
@@ -347,7 +789,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 const recNetShipping = n(f.buyer_shipping_paid) - n(f.actual_shipping_cost)
 
                 // Bug 1: actual per-order settlement. The Income join puts the same order
-                // settlement (signed — negative for refunds) on every line of that order;
+                // settlement (signed - negative for refunds) on every line of that order;
                 // build order → { revenue, settlement } from ALL settled lines so we can
                 // split it across SKUs by revenue share instead of a flat GMV rate.
                 const orderAgg = {}
@@ -362,13 +804,13 @@ export default function PlCalculator({ editId, allIds, onBack }) {
 
                 // Aggregate per product for this SKU's products.
                 //  - settlement: actual per-order value allocated by revenue (Bug 1, signed)
-                //  - cogsUnits: qty − returned_qty across ALL settled lines (Bug 2 — refund
+                //  - cogsUnits: qty - returned_qty across ALL settled lines (Bug 2 - refund
                 //    goods not returned by the buyer still cost COGS)
                 const productMap = {}
                 for (const r of reportRows.filter(r => productNames.includes(r.product_name))) {
-                    // SETTLED only (Improvement A) — skip cancelled, pending & cross-period.
+                    // SETTLED only (Improvement A) - skip cancelled, pending & cross-period.
                     if ((r.classification ?? classifyOrderRow(r)) !== 'SETTLED') continue
-                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0, settlement: 0, cogsUnits: 0, lossUnits: 0 }
+                    if (!productMap[r.product_name]) productMap[r.product_name] = { units: 0, gmv: 0, refund: 0, refundedUnits: 0, settlement: 0, cogsUnits: 0, lossUnits: 0 }
                     const pm = productMap[r.product_name]
                     pm.gmv += r.gmv || 0
                     // Bug #1 + Improvement B: COGS on completed units; non-restockable
@@ -378,7 +820,7 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     pm.lossUnits += loss
                     const oa = orderAgg[(r.order_no ?? '').trim()]
                     if (oa && oa.totalGmv > 0) pm.settlement += oa.settlement * ((r.gmv || 0) / oa.totalGmv)   // Bug 1
-                    if (r.refunded) pm.refund += r.gmv || 0     // refunded value
+                    if (r.refunded) { pm.refund += r.gmv || 0; pm.refundedUnits += r.qty || 0 }   // refunded value + units (P1 return rate)
                     else            pm.units  += r.qty || 0     // completed → QTY display
                 }
 
@@ -404,8 +846,8 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                     const returLoss = cogsUnit * p.lossUnits           // Improvement B: non-restockable
                     const contribution = settlement - cogs - returLoss
                     // Improvement A: CM% over Settlement; n/a when settlement ≤ 0.
-                    return { rec, productName, units: p.units, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
-                        cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null }
+                    return rowFlags({ rec, productName, skuCode: rec.sku_code, cogsUnit, units: p.units, refundedUnits: p.refundedUnits, grossGmv: p.gmv, refundGmv: p.refund, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
+                        cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null })
                 })
             }
 
@@ -428,11 +870,86 @@ export default function PlCalculator({ editId, allIds, onBack }) {
             const returLoss = 0   // no order report → refunds already excluded from units_sold
             const contribution = settlement - cogs - returLoss
             // Improvement A: CM% over Settlement; n/a when settlement ≤ 0.
-            return [{ rec, productName: canonicalName(rec), units, grossGmv, refundGmv: 0, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
-                cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null }]
-        }),
+            return [rowFlags({ rec, productName: canonicalName(rec), skuCode: rec.sku_code, cogsUnit, units, refundedUnits: 0, grossGmv, refundGmv: 0, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, returLoss, contribution,
+                cmPercent: settlement > 0 ? (contribution / settlement) * 100 : null })]
+        })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [records, forms])
+    }, [records, forms, alertThresholds])
+
+    // ── P1: per-parent-SKU roll-up + alert evaluation ───────────────────────────
+    // Group the per-variant skuRows by parent code (FSH-006-* → FSH-006). CM/CM% at
+    // parent level are pro-rata sums (approximate for multi-item orders); return rate
+    // is exact from the order-line refunded/sold units.
+    const parentRows = useMemo(() => {
+        const map = new Map()
+        for (const r of skuRows) {
+            const key = parentSku(r.skuCode) || r.productName
+            if (!map.has(key)) map.set(key, {
+                parent: key, variants: [], names: new Set(),
+                units: 0, refundedUnits: 0, grossGmv: 0, refundGmv: 0,
+                settlement: 0, cogs: 0, returLoss: 0, contribution: 0,
+                promoSeller: 0, missingCogs: false,
+            })
+            const g = map.get(key)
+            g.variants.push(r)
+            if (r.productName) g.names.add(r.productName)
+            g.units += r.units || 0
+            g.refundedUnits += r.refundedUnits || 0
+            g.grossGmv += r.grossGmv || 0
+            g.refundGmv += r.refundGmv || 0
+            g.settlement += r.settlement || 0
+            g.cogs += r.cogs || 0
+            g.returLoss += r.returLoss || 0
+            g.contribution += r.contribution || 0
+            g.promoSeller += r.discPenjual || 0
+            // Data quality: a variant that sold units but has no parent COGS (0) → flag.
+            if ((r.units || 0) > 0 && !(r.cogsUnit > 0)) g.missingCogs = true
+        }
+        // Per-record Aug-only fields (affiliate/ads), summed once per record within a parent.
+        const seenRec = new Set()
+        for (const r of skuRows) {
+            const key = parentSku(r.skuCode) || r.productName
+            const g = map.get(key)
+            const recId = r.rec?.id
+            if (!g || !recId || seenRec.has(recId)) continue
+            seenRec.add(recId)
+            const f = forms[recId] ?? {}
+            g.affiliateSeller = (g.affiliateSeller || 0) + n(f.affiliate_seller_amount)
+            g.adsSpend = (g.adsSpend || 0) + n(f.ads_spend_amount)
+        }
+        return Array.from(map.values()).map(g => {
+            const soldUnits = (g.units || 0) + (g.refundedUnits || 0)
+            const cm = g.contribution
+            const cmPct = g.settlement > 0 ? cm / g.settlement : null
+            const netGmv = g.grossGmv - g.refundGmv
+            const metrics = {
+                settlement: g.settlement, cm, cmPct,
+                returnRate: soldUnits > 0 ? (g.refundedUnits / soldUnits) : 0,
+                promoSeller: g.promoSeller, affiliate: g.affiliateSeller || 0, ads: g.adsSpend || 0,
+                netGmv, missingCogs: g.missingCogs,
+            }
+            const flags = evaluateSkuAlerts(metrics, alertThresholds)
+            return { ...g, ...metrics, soldUnits, flags, topSeverity: topSeverity(flags) }
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [skuRows, forms, alertThresholds])
+
+    const alertRows = useMemo(() => sortAlertRows(parentRows.filter(p => p.flags.length)), [parentRows])
+
+    // SKU-tab filtering (parent drill-down from an alert, or a rule chip).
+    const filteredSkuRows = useMemo(() => {
+        if (!skuFilter) return skuRows
+        if (skuFilter.type === 'parent') return skuRows.filter(r => (parentSku(r.skuCode) || r.productName) === skuFilter.value)
+        // Rule chip filters by each row's OWN flags (per-variant, matches the badge).
+        if (skuFilter.type === 'rule') return skuRows.filter(r => (r.flags ?? []).some(f => f.rule === skuFilter.value))
+        return skuRows
+    }, [skuRows, skuFilter])
+
+    const alertRuleOptions = useMemo(() => {
+        const s = new Set()
+        for (const r of skuRows) for (const f of (r.flags ?? [])) s.add(f.rule)
+        return Array.from(s)
+    }, [skuRows])
 
     // ── Loading ───────────────────────────────────────────────────────────────
     if (isLoading) return (
@@ -492,7 +1009,46 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 <button type="button" onClick={onBack} className="text-sm hover:opacity-70">←</button>
                 <h2 className="text-xl font-bold">{t('plDetailTitle')}</h2>
                 {active.source === 'shopee' && <ShopeeChip />}
+                <div className="ml-auto flex items-center gap-2">
+                    <Button
+                        variant="outline" size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={() => setShowAlertSettings(true)}
+                    >
+                        <IconAdjustmentsHorizontal size={15} />
+                        <span className="hidden sm:inline">{t('shopeeAlertCfgEdit')}</span>
+                    </Button>
+                    {TAX_ENABLED && (
+                        <Button
+                            variant="outline" size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                            onClick={() => setShowTaxSettings(true)}
+                        >
+                            <IconReceiptTax size={15} />
+                            <span className="hidden sm:inline">{t('shopeeTaxEdit')}</span>
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                                {taxConfig?.tipe_wp === 'BADAN' ? t('shopeeTaxWpBadanShort') : t('shopeeTaxWpOpShort')}
+                            </span>
+                        </Button>
+                    )}
+                </div>
             </div>
+
+            {TAX_ENABLED && (
+                <TaxSettingsDialog
+                    open={showTaxSettings}
+                    onOpenChange={setShowTaxSettings}
+                    config={taxConfig}
+                    onSaved={(cfg) => { setTaxConfig(cfg); loadRecords() }}
+                />
+            )}
+
+            <AlertThresholdsDialog
+                open={showAlertSettings}
+                onOpenChange={setShowAlertSettings}
+                config={alertConfig}
+                onSaved={(cfg) => setAlertConfig(cfg)}
+            />
 
             <div className="px-4 lg:px-6"><Separator /></div>
 
@@ -546,16 +1102,17 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                 ]} />
 
                 {/* ══ TABS ════════════════════════════════════════════════════════════ */}
-                <Tabs defaultValue="summary">
+                <Tabs value={tab} onValueChange={setTab}>
                     <TabsList className="mb-3">
                         <TabsTrigger value="summary">{t('shopeeImportTabPreview')}</TabsTrigger>
                         <TabsTrigger value="orders">{t('shopeeImportOrders')}</TabsTrigger>
                         <TabsTrigger value="sku">{t('shopeeImportTabPerSku')}</TabsTrigger>
+                        <TabsTrigger value="trend">{t('shopeeTrendTab')}</TabsTrigger>
                     </TabsList>
 
                     {/* ── Summary ── */}
                     <TabsContent value="summary" className="mt-0">
-                        <SummaryTab agg={agg} />
+                        <SummaryTab agg={agg} alertRows={alertRows} onDrill={drillToParent} />
                     </TabsContent>
 
                     {/* ── Orders ── */}
@@ -736,9 +1293,22 @@ export default function PlCalculator({ editId, allIds, onBack }) {
 
                     {/* ── SKU ── */}
                     <TabsContent value="sku" className="mt-0 space-y-3">
+                        {(alertRuleOptions.length > 0 || skuFilter) && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[11px] text-muted-foreground mr-1">{t('shopeeFilterLabel')}:</span>
+                                <button type="button" className={chipCls(!skuFilter)} onClick={() => setSkuFilter(null)}>{t('shopeeAlertFilterAll')}</button>
+                                {alertRuleOptions.map(rule => (
+                                    <button key={rule} type="button" className={chipCls(skuFilter?.type === 'rule' && skuFilter.value === rule)}
+                                        onClick={() => setSkuFilter({ type: 'rule', value: rule })}>{ruleLabel(t, rule)}</button>
+                                ))}
+                                {skuFilter?.type === 'parent' && (
+                                    <button type="button" className={chipCls(true)} onClick={() => setSkuFilter(null)}>{skuFilter.value} ✕</button>
+                                )}
+                            </div>
+                        )}
                         <div>
                             <div className="overflow-x-auto">
-                                <Table className="min-w-[940px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
+                                <Table className="min-w-[1020px] border rounded-b-md [&_tr:last-child_td]:border-b-0">
                                     <TableHeader>
                                         <TableRow className="bg-muted/60 hover:bg-muted/60">
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t('shopeeImportTabPerSku')}</TableHead>
@@ -752,19 +1322,26 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCogs')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColContribution')}</TableHead>
                                             <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeImportColCmPercent')}</TableHead>
+                                            <TableHead className="py-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t('shopeeColReturnRate')}</TableHead>
                                             <TableHead className="py-1.5 px-3 w-8 text-right"><span className="sr-only">{t('shopeeImportColDetail')}</span></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {skuRows.map(({ rec, productName, units, grossGmv, refundGmv, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution, cmPercent }, idx) => {
+                                        {filteredSkuRows.map(({ rec, productName, skuCode, units, refundedUnits, grossGmv, refundGmv, discPenjual, channelFees, feeBreakdown, netOngkir, settlement, cogs, contribution, cmPercent, flags }, idx) => {
                                             const rowKey = `${rec.id}-${idx}`
                                             const isOpen = expandedSkus.has(rowKey)
+                                            const rowFlagList = flags ?? []
+                                            const soldU = (units || 0) + (refundedUnits || 0)
+                                            const returnRate = soldU > 0 ? (refundedUnits || 0) / soldU : 0
                                             return (
                                                 <Fragment key={rowKey}>
                                                     <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleSku(rowKey)}>
                                                         <TableCell className="py-1.5 px-3">
                                                             <p className="font-medium text-sm">{productName}</p>
-                                                            <p className="text-[11px] text-muted-foreground mt-0.5">↳ {rec.sku_code ?? canonicalName(rec)}</p>
+                                                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                                                <p className="text-[11px] text-muted-foreground">↳ {rec.sku_code ?? canonicalName(rec)}</p>
+                                                                {rowFlagList.map(f => <AlertBadge key={f.rule} t={t} severity={f.severity} rule={f.rule} />)}
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{units}</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-sm text-right tabular-nums">{fmt(grossGmv)}</TableCell>
@@ -778,15 +1355,16 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                                             {fmt(contribution)}
                                                         </TableCell>
                                                         <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${cmPercent != null && cmPercent < 20 ? 'text-red-600' : ''}`}>
-                                                            {cmPercent != null ? `${cmPercent.toFixed(1)}%` : <span className="text-muted-foreground/40">—</span>}
+                                                            {cmPercent != null ? `${cmPercent.toFixed(1)}%` : <span className="text-muted-foreground/40">-</span>}
                                                         </TableCell>
+                                                        <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums ${returnRate > 0.05 ? 'text-red-600' : ''}`}>{(returnRate * 100).toFixed(1)}%</TableCell>
                                                         <TableCell className="py-1.5 px-3 text-right">
                                                             <ExpandToggle open={isOpen} onClick={() => toggleSku(rowKey)} label={t('shopeeImportExpandFees')} />
                                                         </TableCell>
                                                     </TableRow>
                                                     {isOpen && (
                                                         <TableRow className="bg-muted/20 hover:bg-muted/20">
-                                                            <TableCell colSpan={12} className="py-2 px-3">
+                                                            <TableCell colSpan={13} className="py-2 px-3">
                                                                 <FeeBreakdownDetail t={t} fees={feeBreakdown} gmv={grossGmv} />
                                                             </TableCell>
                                                         </TableRow>
@@ -809,7 +1387,8 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                             <TableCell className={`py-1.5 px-3 text-sm text-right tabular-nums font-semibold ${(agg.settlement - agg.totalCogs - agg.returLoss) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
                                                 {fmt(agg.settlement - agg.totalCogs - agg.returLoss)}
                                             </TableCell>
-                                            {/* CM% total intentionally omitted — not meaningful as an aggregate */}
+                                            {/* CM% and Return Rate totals intentionally omitted - not meaningful as aggregates */}
+                                            <TableCell className="py-1.5 px-3" />
                                             <TableCell className="py-1.5 px-3" />
                                             <TableCell className="py-1.5 px-3" />
                                         </TableRow>
@@ -817,6 +1396,11 @@ export default function PlCalculator({ editId, allIds, onBack }) {
                                 </Table>
                             </div>
                         </div>
+                    </TabsContent>
+
+                    {/* ── Trend ── */}
+                    <TabsContent value="trend" className="mt-0">
+                        <TrendTab currentPeriod={{ year: active.period_year, month: active.period_month }} locale={locale} />
                     </TabsContent>
                 </Tabs>
 

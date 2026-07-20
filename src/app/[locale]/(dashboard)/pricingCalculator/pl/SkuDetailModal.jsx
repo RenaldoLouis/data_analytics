@@ -159,10 +159,10 @@ export default function SkuDetailModal({ t, channels, detailModalSku, setDetailM
                                         <tr key={ch} className="border-t">
                                             <td className="py-2.5"><ChBadge code={ch} label={ch} /></td>
                                             <td className="py-2.5 px-2 text-right text-xs tabular-nums">{fmt(d.grossByCh[i])}</td>
-                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(d.discByCh[i])}</td>
-                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(d.retByCh[i])}</td>
-                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(d.shipByCh[i])}</td>
-                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">− {fmt(d.adsByCh[i])}</td>
+                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">- {fmt(d.discByCh[i])}</td>
+                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">- {fmt(d.retByCh[i])}</td>
+                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">- {fmt(d.shipByCh[i])}</td>
+                                            <td className="py-2.5 px-2 text-right text-xs tabular-nums text-red-600">- {fmt(d.adsByCh[i])}</td>
                                             <td className={`py-2.5 px-2 text-right text-xs tabular-nums font-semibold ${d.netByCh[i] < 0 ? 'text-red-600' : 'text-green-700'}`}>
                                                 {fmt(d.netByCh[i])}
                                             </td>
@@ -171,10 +171,10 @@ export default function SkuDetailModal({ t, channels, detailModalSku, setDetailM
                                     <tr className="border-t bg-muted/40">
                                         <td className="py-2.5 text-xs font-semibold">{t('totalRow')}</td>
                                         <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums">{fmt(d.grossTotal)}</td>
-                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(d.discByCh.reduce((a, b) => a + b, 0))}</td>
-                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(d.retByCh.reduce((a, b) => a + b, 0))}</td>
-                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(d.shipByCh.reduce((a, b) => a + b, 0))}</td>
-                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">− {fmt(d.adsByCh.reduce((a, b) => a + b, 0))}</td>
+                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">- {fmt(d.discByCh.reduce((a, b) => a + b, 0))}</td>
+                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">- {fmt(d.retByCh.reduce((a, b) => a + b, 0))}</td>
+                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">- {fmt(d.shipByCh.reduce((a, b) => a + b, 0))}</td>
+                                        <td className="py-2.5 px-2 text-right text-xs font-semibold tabular-nums text-red-600">- {fmt(d.adsByCh.reduce((a, b) => a + b, 0))}</td>
                                         <td className={`py-2.5 px-2 text-right text-xs font-bold tabular-nums ${d.netTotal < 0 ? 'text-red-600' : 'text-green-700'}`}>
                                             {fmt(d.netTotal)}
                                         </td>

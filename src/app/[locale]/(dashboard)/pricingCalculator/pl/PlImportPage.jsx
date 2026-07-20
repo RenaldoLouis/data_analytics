@@ -70,10 +70,10 @@ const AUDIT_SECTIONS = [
 ]
 
 const NOT_SHOWN = [
-    { label: "Voucher Ditanggung Shopee", badge: "Tier 2 – Opsional", badgeType: "tier2" },
-    { label: "Nama Penerima", badge: "PII – UU PDP", badgeType: "pii" },
-    { label: "No. Telepon, Alamat", badge: "PII – UU PDP", badgeType: "pii" },
-    { label: "Catatan Pembeli, Username", badge: "PII – UU PDP", badgeType: "pii" },
+    { label: "Voucher Ditanggung Shopee", badge: "Tier 2 - Opsional", badgeType: "tier2" },
+    { label: "Nama Penerima", badge: "PII - UU PDP", badgeType: "pii" },
+    { label: "No. Telepon, Alamat", badge: "PII - UU PDP", badgeType: "pii" },
+    { label: "Catatan Pembeli, Username", badge: "PII - UU PDP", badgeType: "pii" },
 ]
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -232,7 +232,7 @@ function PreviewTab() {
                             <TableCell className="text-right text-sm text-blue-700 py-1.5 px-2.5">{fmt(18500)}</TableCell>
                         </TableRow>
                         <TableRow>
-                            <TableCell className="text-sm text-muted-foreground w-[38%] py-1.5 px-2.5">GMV − Diskon Penjual − Channel Fees + Net Ongkir</TableCell>
+                            <TableCell className="text-sm text-muted-foreground w-[38%] py-1.5 px-2.5">GMV - Diskon Penjual - Channel Fees + Net Ongkir</TableCell>
                             <TableCell className="font-mono text-[11px] text-muted-foreground/50 py-1.5 px-2.5">calculated_settlement</TableCell>
                             <TableCell className="text-right text-sm text-blue-700 py-1.5 px-2.5">{fmt(18500)}</TableCell>
                         </TableRow>
