@@ -128,7 +128,7 @@ export function AppSidebar({ ...props }) {
       </SidebarContent>
       <SidebarFooter>
         <div className="flex items-center gap-2 px-2 py-1">
-          <span className="text-[11px] text-muted-foreground">v1.0.0</span>
+          <span className="text-[11px] text-muted-foreground">v1.1.0</span>
         </div>
       </SidebarFooter>
     </Sidebar>
