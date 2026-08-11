@@ -173,8 +173,9 @@ function AlertsPanel({ t, rows, onDrill }) {
 
 function SummaryTab({ agg, alertRows, onDrill }) {
     const t = useTranslations('plpage')
-    // Formula matches import modal: GMV - Seller Discount - Channel Fees + Net Shipping - Returns
-    const calculated = agg.grossGmv - agg.totalDisc - agg.totalFees + agg.netShipping - agg.refund
+    // Formula matches import modal: GMV - Seller Discount - Channel Fees - Affiliate + Net Shipping - Returns
+    // Bug #2 (Aug 2026): seller-funded affiliate ("Biaya Program") reduces settlement.
+    const calculated = agg.grossGmv - agg.totalDisc - agg.totalFees - agg.affiliateSeller + agg.netShipping - agg.refund
     const delta = agg.settlement - calculated
     const isMatch = delta === 0
 

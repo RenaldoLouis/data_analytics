@@ -66,6 +66,16 @@ function matchCol(headers, patterns) {
     )
 }
 
+// Seller-funded affiliate = the Income "Biaya Program" column (Aug 2026 onward).
+// Must NOT grab "Biaya Program Hemat Biaya Kirim" (the shipping-savings program fee,
+// mapped separately as programFee), so prefer an exact header match.
+function matchAffiliateProgramCol(headers) {
+    const norm = headers.map(h => String(h ?? '').toLowerCase().trim())
+    const exact = norm.findIndex(h => h === 'biaya program' || h === 'biaya program afiliasi')
+    if (exact >= 0) return exact
+    return norm.findIndex(h => h.includes('biaya program') && !h.includes('hemat') && !h.includes('kirim'))
+}
+
 function findHeaderRow(rows, identifiers) {
     for (let i = 0; i < Math.min(30, rows.length); i++) {
         const rowStr = rows[i].map(c => String(c ?? '').toLowerCase().trim())
@@ -186,6 +196,8 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
     const ci = Object.fromEntries(
         Object.keys(COL_INCOME).map(k => [k, matchCol(headers, COL_INCOME[k])])
     )
+    // Bug #2 (Aug 2026): seller-funded affiliate lives in the "Biaya Program" column.
+    ci.affiliateSeller = matchAffiliateProgramCol(headers)
     const dataRows = rawRows.slice(headerIdx + 1).filter(row =>
         row && row.some(c => c != null && c !== '')
     )
@@ -197,6 +209,7 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
         coin: 0, coinCofund: 0, refundAmount: 0,
         commissionFee: 0, serviceFee: 0, processingFee: 0,
         transactionFee: 0, programFee: 0, campaignFee: 0, affiliateFee: 0,
+        affiliateSeller: 0,   // Bug #2: seller-funded affiliate ("Biaya Program")
         shippingSubsidy: 0, actualShipping: 0, buyerShipping: 0, settlement: 0,
     }
     const productMap = new Map()
@@ -245,7 +258,7 @@ function parseIncomeReport(rawRows, validOrderNos = null) {
         // from these magnitudes below, matching the per-order calculation (Bug #2).
         for (const key of ['voucher','sellerDiscount','voucherCofund','totalDiscount','coin','coinCofund',
                            'refundAmount','commissionFee','serviceFee','processingFee',
-                           'transactionFee','programFee','campaignFee','affiliateFee',
+                           'transactionFee','programFee','campaignFee','affiliateFee','affiliateSeller',
                            'shippingSubsidy','actualShipping','buyerShipping']) {
             if (ci[key] >= 0) totals[key] += n(row[ci[key]])
         }
@@ -301,10 +314,44 @@ export function parseShopeeReports(incomeFile, orderFile) {
         reader.readAsBinaryString(file)
     })
 
+    // Improvement D (Aug 2026): total Shopee Ads from the "Biaya Iklan" sheet in the
+    // Income workbook (seller cost outside Settlement). Skips the trailing TOTAL row.
+    // Resolves 0 when the sheet/column is absent (older files) — never rejects.
+    const readAdsTotal = (file) => new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onerror = () => resolve(0)
+        reader.onload = (e) => {
+            try {
+                const wb = XLSX.read(e.target.result, { type: 'binary' })
+                const sheetName = wb.SheetNames.find(s => String(s).toLowerCase().includes('iklan'))
+                if (!sheetName) return resolve(0)
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' })
+                const hdrIdx = Math.max(0, rows.findIndex(r => r.some(c => {
+                    const s = String(c ?? '').toLowerCase().trim(); return s === 'biaya' || s === 'tanggal'
+                })))
+                const norm = (rows[hdrIdx] || []).map(c => String(c ?? '').toLowerCase().trim())
+                let biayaCol = norm.findIndex(h => h === 'biaya')
+                if (biayaCol < 0) biayaCol = norm.findIndex(h => h.includes('biaya'))
+                const labelCol = norm.findIndex(h => h.includes('kampanye') || h.includes('sku'))
+                if (biayaCol < 0) return resolve(0)
+                let total = 0
+                for (let i = hdrIdx + 1; i < rows.length; i++) {
+                    const label = labelCol >= 0 ? String(rows[i][labelCol] ?? '').toUpperCase() : ''
+                    if (label.includes('TOTAL')) continue              // skip the summary row
+                    const v = parseFloat(String(rows[i][biayaCol] ?? '').replace(/[^0-9.-]/g, ''))
+                    if (!isNaN(v)) total += v
+                }
+                resolve(Math.round(Math.abs(total)))
+            } catch { resolve(0) }
+        }
+        reader.readAsBinaryString(file)
+    })
+
     return Promise.all([
         readFile(incomeFile),
         orderFile ? readFile(orderFile) : Promise.resolve(null),
-    ]).then(([incomeRows, orderFileRows]) => {
+        readAdsTotal(incomeFile),
+    ]).then(([incomeRows, orderFileRows, adsTotal]) => {
         // Parse the Order report first so the Income parser can flag anomalies
         // (Income rows with no matching order) and exclude them from P&L totals.
         const order = orderFileRows ? parseOrderReport(orderFileRows) : { productMap: new Map(), platformVoucher: 0, orderRows: [] }
@@ -437,7 +484,8 @@ export function parseShopeeReports(incomeFile, orderFile) {
 
         // Net shipping = buyer-paid shipping (+) + courier cost (-) ≈ 0 (Bug #2).
         const netShipping   = totals.buyerShipping - totals.actualShipping
-        const settlementCalc = grossGmv - effectiveTotal - feeTotal + netShipping - totals.refundAmount
+        // Bug #2 (Aug 2026): seller-funded affiliate ("Biaya Program") reduces settlement.
+        const settlementCalc = grossGmv - effectiveTotal - feeTotal - totals.affiliateSeller + netShipping - totals.refundAmount
 
         return {
             channel:          'Shopee',
@@ -468,13 +516,13 @@ export function parseShopeeReports(incomeFile, orderFile) {
                 { tKey: 'shopeeImportFeeAffiliate',   field: 'affiliate_commission', value: Math.round(totals.affiliateFee) },
             ],
             channel_fees_total:   Math.round(feeTotal),
-            // ── July 2026 improvements - structural, Rp 0 until Aug 2026 ──────────────
-            // Ads comes from a separate Shopee Ads report (not the income/order files);
-            // PPh Final 0,5% (PMK 37/2025) is conditional on taxpayer type + YTD omzet;
-            // seller-funded affiliate needs a dedicated column. All 0 for July's data.
-            ads_spend:            0,
+            // ── Aug 2026 (live) ──────────────────────────────────────────────────────
+            // Affiliate (Bug #2) from the Income "Biaya Program" column; Ads (Improv. D)
+            // from the "Biaya Iklan" sheet (summed in parseShopeeReports and injected via
+            // adsTotal). PPh Final 0,5% is deferred → stays 0.
+            ads_spend:            adsTotal ?? 0,
             pph_final:            0,
-            affiliate_seller:     0,
+            affiliate_seller:     Math.round(totals.affiliateSeller),
             buyer_shipping_paid:  Math.round(totals.buyerShipping),
             shipping_subsidy:     Math.round(totals.shippingSubsidy),
             actual_shipping_cost: Math.round(totals.actualShipping),

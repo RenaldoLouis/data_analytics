@@ -354,7 +354,7 @@ function buildWfSteps(t, data) {
         { key: 'cogs',   short: 'COGS',   label: t('shopeeWfHpp'),         delta: -cogs,        kind: 'sub' },
         { key: 'rloss',  short: 'R.Loss', label: t('shopeeWfReturLoss'),   delta: -returLoss,   kind: 'sub' },
         { key: 'cm',     short: 'CM',     label: t('shopeeWfCm'),          total: cm,           kind: 'checkpoint' },
-        { key: 'ads',    short: 'Ads',    label: t('shopeeWfAds'),         delta: -ads,         kind: 'tax' },
+        { key: 'ads',    short: 'Ads',    label: t('shopeeWfAds'),         delta: -ads,         kind: 'sub' },
         { key: 'net',    short: 'Net',    label: t('shopeeWfNetOp'),       total: net,          kind: 'final' },
     ]
     let cum = 0
@@ -374,18 +374,20 @@ function buildWfSteps(t, data) {
 }
 
 // Condensed 7-step list for the bridge chart (the at-a-glance business view).
-// Net Profit here is the running total of the shown steps (for July, Affiliate/PPh/
-// Return Loss/Ads are 0 so it equals the full Net Op. Profit; the expanded card carries
-// every step).
+// Condensed bridge: the same deductions as the expanded card (Affiliate + Ads included
+// so its Net Profit == the expanded Net Operating Profit), minus the intermediate
+// subtotal checkpoints (Settlement / CM). Return Loss folds into COGS (≈0 in practice).
 function buildWfBridgeSteps(t, data) {
-    const { grossGmv = 0, promo = 0, sellerFees = 0, netShipping = 0, refund = 0, cogs = 0 } = data ?? {}
+    const { grossGmv = 0, promo = 0, sellerFees = 0, affiliate = 0, netShipping = 0, refund = 0, cogs = 0, returLoss = 0, ads = 0 } = data ?? {}
     const defs = [
         { key: 'gross',  short: 'Gross',  label: t('shopeeWfGross'),       kind: 'start', total: grossGmv },
         { key: 'disc',   short: 'Disc',   label: t('shopeeWfSellerDisc'),  kind: 'sub',   delta: -promo },
         { key: 'fees',   short: 'Fees',   label: t('shopeeWfChannelFees'), kind: 'sub',   delta: -sellerFees },
+        { key: 'affil',  short: 'Affil',  label: t('shopeeWfAffiliate'),   kind: 'sub',   delta: -affiliate },
         { key: 'ship',   short: 'Ship',   label: t('shopeeWfShipping'),    kind: 'add',   delta: netShipping },
         { key: 'return', short: 'Return', label: t('shopeeWfReturnShort'), kind: 'sub',   delta: -refund },
-        { key: 'hpp',    short: 'COGS',   label: t('shopeeWfHppShort'),    kind: 'sub',   delta: -cogs },
+        { key: 'hpp',    short: 'COGS',   label: t('shopeeWfHppShort'),    kind: 'sub',   delta: -(cogs + returLoss) },
+        { key: 'ads',    short: 'Ads',    label: t('shopeeWfAds'),         kind: 'sub',   delta: -ads },
         { key: 'net',    short: 'Net',    label: t('shopeeWfNetProfit'),   kind: 'final' },
     ]
     let cum = 0
